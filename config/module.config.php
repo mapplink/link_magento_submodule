@@ -1,0 +1,63 @@
+<?php
+
+return array (
+    'service_manager'=>array(
+        'invokables'=>array(
+            'magento_soap'=>'Magento\Api\Soap',
+            'magento_soapv1'=>'Magento\Api\SoapV1',
+            'magento_rest'=>'Magento\Api\Rest',
+            'magento_db'=>'Magento\Api\Db',
+        ),
+        'shared'=>array(
+            'magento_soap'=>false,
+            'magento_soapv1'=>false,
+            'magento_rest'=>false,
+            'magento_db'=>false,
+        ),
+    ),
+	'node_types'=>array(
+        'magento'=>array(
+            'module'=>'Magento', // Module name used for this node
+            'name'=>'Magento', // Human-readable node name
+            'store_specific'=>false, // True if this node only operates with one store view, false if operates on all at once
+            'entity_type_support'=>array( // List of entity type codes that this module supports
+                'product',
+                'stockitem',
+                'customer',
+                'order',
+                'creditmemo',
+                #'address',
+                #'orderitem',
+            ),
+            'config'=>array( // Config options to be displayed to the administrator
+                'multi_store'=>array('label'=>'Enable Multi-Store support (DO NOT CHANGE)', 'type'=>'Checkbox', 'default'=>true),
+                'web_url'=>array('label'=>'Base Web URL', 'type'=>'Text', 'required'=>true),
+
+                'soap_username'=>array('label'=>'SOAP Username','type'=>'Text', 'required'=>true),
+                'soap_password'=>array('label'=>'SOAP Password','type'=>'Text', 'required'=>true),
+
+                'rest_key'=>array('label'=>'REST Consumer Key','type'=>'Text', 'required'=>false),
+                'rest_secret'=>array('label'=>'REST Consumer Secret','type'=>'Text', 'required'=>false),
+
+                'db_hostname'=>array('label'=>'Database Host','type'=>'Text', 'required'=>false),
+                'db_schema'=>array('label'=>'Database Schema','type'=>'Text', 'required'=>false),
+                'db_username'=>array('label'=>'Database Username','type'=>'Text', 'required'=>false),
+                'db_password'=>array('label'=>'Database Password','type'=>'Text', 'required'=>false),
+
+
+                'load_full_product'=>array('label'=>'Load full product data', 'type'=>'Checkbox', 'default'=>false),
+                'load_stock'=>array('label'=>'Load stock data (SLOW)', 'type'=>'Checkbox', 'default'=>false),
+                'load_full_customer'=>array('label'=>'Load full customer data', 'type'=>'Checkbox', 'default'=>false),
+                'load_full_order'=>array('label'=>'Load full order data', 'type'=>'Checkbox', 'default'=>false),
+                'product_attributes'=>array('label'=>'Extra product attributes to load', 'type'=>'Text', 'default'=>array()),
+                'customer_attributes'=>array('label'=>'Extra customer attributes to load', 'type'=>'Text', 'default'=>array()),
+                //'customer_special_att'=>array('label'=>'Extra customer attribute (stored in taxvat)', 'type'=>'Text', 'default'=>''),
+
+                'time_delta_product'=>array('label'=>'Timezone delta for product fetch', 'type'=>'Text', 'default'=>'0'),
+                'time_delta_customer'=>array('label'=>'Timezone delta for customer fetch', 'type'=>'Text', 'default'=>'0'),
+                'time_delta_order'=>array('label'=>'Timezone delta for order fetch', 'type'=>'Text', 'default'=>'0'),
+                'time_delta_creditmemo'=>array('label'=>'Timezone delta for creditmemo fetch', 'type'=>'Text', 'default'=>'0'),
+            ),
+        )
+    ),
+);
