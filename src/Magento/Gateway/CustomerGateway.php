@@ -192,6 +192,10 @@ class CustomerGateway extends AbstractGateway {
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                         $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_new', 'New customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
                         $needsUpdate = false;
+                    }else if($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != null){
+                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_wronglink', 'Incorrectly linked customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                        $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
+                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }else{
                         $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_link', 'Unlinked customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
