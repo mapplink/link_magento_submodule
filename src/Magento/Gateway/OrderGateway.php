@@ -618,7 +618,7 @@ class OrderGateway extends AbstractGateway
             $items[] = array('order_item_id'=>$local, 'qty'=>$qty);
         }
 
-        $this->_soap->call('salesOrderCreditmemoCreate', array(
+        $res = $this->_soap->call('salesOrderCreditmemoCreate', array(
             ($order->getData('original_order') != null ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
             array(
                 'qtys'=>$items,
@@ -630,6 +630,24 @@ class OrderGateway extends AbstractGateway
             $notify,
             $sendComment,
             $creditRefund
+        ));
+        if(is_object($res)){
+            $res = $res->result;
+        }else if(is_array($res)){
+            if(isset($res['result'])){
+                $res = $res['result'];
+            }else{
+                $res = array_shift($res);
+            }
+        }
+        if(!$res){
+            throw new MagelinkException('Failed to get creditmemo ID from Magento for order ' . $order->getUniqueId());
+        }
+        $this->_soap->call('salesOrderCreditmemoAddComment', array(
+            $res,
+            'FOR ORDER: ' . $order->getUniqueId(),
+            false,
+            false
         ));
         $this->_node->retrieve(array('creditmemo'));
     }

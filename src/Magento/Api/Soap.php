@@ -75,8 +75,12 @@ class Soap implements ServiceLocatorAwareInterface {
             throw new \Magelink\Exception\MagelinkException('Soap Fault - ' . $sf->getMessage(), 0, $sf);// throw $sf;
         }
         // NOTE: Uncomment the following for debugging
-        //echo PHP_EOL . $this->_soapClient->getLastRequest() . PHP_EOL . $this->_soapClient->getLastResponse() . PHP_EOL;
+        // $this->forceStdoutDebug();
         return $this->_processResponse($res);
+    }
+
+    public function forceStdoutDebug(){
+        echo PHP_EOL . $this->_soapClient->getLastRequest() . PHP_EOL . $this->_soapClient->getLastResponse() . PHP_EOL;
     }
 
     /**

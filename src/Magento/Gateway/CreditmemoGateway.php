@@ -172,6 +172,18 @@ class CreditmemoGateway extends AbstractGateway {
                         $parent_id = $ent->getId();
                     }
                 }
+                if(isset($creditmemo['comments'])){
+                    foreach($creditmemo['comments'] as $com){
+                        if(preg_match('/FOR ORDER: ([0-9]+[a-zA-Z]*)/', $com['comment'], $matches)){
+                            $ent = $entityService->loadEntity($this->_node->getNodeId(), 'order', $store_id, $matches[1]);
+                            if(!$ent){
+                                throw new MagelinkException('Comment referenced order ' . $matches[1] . ' on cm ' . $unique_id . ' but could not locate order!');
+                            }else{
+                                $parent_id = $ent->getId();
+                            }
+                        }
+                    }
+                }
 
                 /** @var boolean $needsUpdate Whether we need to perform an entity update here */
                 $needsUpdate = true;
