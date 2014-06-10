@@ -338,9 +338,9 @@ class OrderGateway extends AbstractGateway
                 );
                 if (isset($item['base_price_incl_tax'])) {
                     $data['item_tax'] = $item['base_price_incl_tax'] - $data['item_price'];
-                }elseif ($data['total_price']) {
-                    $data['item_tax'] = $data['total_tax'] / $data['total_price'] * $data['item_price'];
-                }elseif ($data['quantity']){
+                }elseif ($data['total_price'] && $data['total_price'] > 0) {
+                    $data['item_tax'] = ($data['total_tax'] / $data['total_price']) * $data['item_price'];
+                }elseif ($data['quantity'] && $data['quantity'] > 0){
                     $data['item_tax'] = $data['total_tax'] / $data['quantity'];
                 }else{
                     $data['item_tax'] = 0;
