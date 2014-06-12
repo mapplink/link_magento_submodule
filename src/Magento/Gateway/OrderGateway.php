@@ -609,6 +609,7 @@ class OrderGateway extends AbstractGateway
      * @param int $creditRefund
      * @param int $adjustmentPositive
      * @param int $adjustmentNegative
+     * @throws MagelinkException
      */
     protected function actionCreditmemo(\Entity\Entity $order, $comment='', $notify = 'false', $sendComment = 'false',
         $itemsRefunded = NULL, $shippingRefund = 0, $creditRefund = 0, $adjustmentPositive = 0, $adjustmentNegative = 0)
@@ -649,7 +650,6 @@ class OrderGateway extends AbstractGateway
             false,
             false
         ));
-        $this->_node->retrieve(array('creditmemo'));
     }
 
     /**

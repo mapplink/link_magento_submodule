@@ -92,6 +92,8 @@ class CreditmemoGateway extends AbstractGateway {
 
             foreach($results as $creditmemo){
 
+                $data = array();
+
                 $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($creditmemo['increment_id']));
                 if(isset($creditmemo['result'])){
                     $creditmemo = $creditmemo['result'];
@@ -174,7 +176,7 @@ class CreditmemoGateway extends AbstractGateway {
                 }
                 if(isset($creditmemo['comments'])){
                     foreach($creditmemo['comments'] as $com){
-                        if(preg_match('/FOR ORDER: ([0-9]+[a-zA-Z]*)/', $com['comment'], $matches)){
+                        if(isset($com['comment']) && preg_match('/FOR ORDER: ([0-9]+[a-zA-Z]*)/', $com['comment'], $matches)){
                             $ent = $entityService->loadEntity($this->_node->getNodeId(), 'order', $store_id, $matches[1]);
                             if(!$ent){
                                 throw new MagelinkException('Comment referenced order ' . $matches[1] . ' on cm ' . $unique_id . ' but could not locate order!');
@@ -206,6 +208,7 @@ class CreditmemoGateway extends AbstractGateway {
                         $needsUpdate = false;
                     }else{
                         $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'ent_link', 'Unlinked creditmemo ' . $unique_id, array('sku'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                        try{$entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);}catch(\Exception $e){} // Ignore errors.
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }
                 }else{
@@ -213,6 +216,7 @@ class CreditmemoGateway extends AbstractGateway {
                 }
                 if($needsUpdate){
                     $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, false);
+                    $this->createItems($creditmemo, $existingEntity->getId(), $entityService);
                 }
                 $this->updateComments($creditmemo, $existingEntity, $entityService);
             }
@@ -239,7 +243,7 @@ class CreditmemoGateway extends AbstractGateway {
             if(in_array($histEntry['comment_id'], $referenceIds)){
                 continue; // Comment already loaded
             }
-            $es->createEntityComment($cmEnt, 'Magento', 'Comment: ' . $histEntry['created_at'], $histEntry['comment'], $histEntry['comment_id'], $histEntry['is_visible_on_front']);
+            $es->createEntityComment($cmEnt, 'Magento', 'Comment: ' . $histEntry['created_at'], (isset($histEntry['comment']) ? $histEntry['comment'] : ''), $histEntry['comment_id'], $histEntry['is_visible_on_front']);
         }
     }
 
@@ -256,31 +260,34 @@ class CreditmemoGateway extends AbstractGateway {
         foreach($creditmemo['items'] as $item){
             $unique_id = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
 
+            $local_id = $item['item_id'];
+            $product = $es->loadEntityLocal($this->_node->getNodeId(), 'product', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['product_id']);
+            $parent_item = $es->loadEntityLocal($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['parent_id']);
+            $order_item = $es->loadEntityLocal($this->_node->getNodeId(), 'orderitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['order_item_id']);
+            $data = array(
+                'product'=>($product ? $product->getId() : null),
+                'parent_item'=>($parent_item ? $parent_item->getId() : null),
+                'order_item'=>($order_item ? $order_item->getId() : null),
+                'tax_amount'=>(isset($item['tax_amount']) ? $item['tax_amount'] : null),
+                'discount_amount'=>(isset($item['discount_amount']) ? $item['discount_amount'] : null),
+                'sku'=>(isset($item['sku']) ? $item['sku'] : null),
+                'name'=>(isset($item['name']) ? $item['name'] : null),
+                'qty'=>(isset($item['qty']) ? $item['qty'] : null),
+                'row_total'=>(isset($item['row_total']) ? $item['row_total'] : null),
+                'price_incl_tax'=>(isset($item['price_incl_tax']) ? $item['price_incl_tax'] : null),
+                'price'=>(isset($item['price']) ? $item['price'] : null),
+                'row_total_incl_tax'=>(isset($item['row_total_incl_tax']) ? $item['row_total_incl_tax'] : null),
+                'additional_data'=>(isset($item['additional_data']) ? $item['additional_data'] : null),
+                'description'=>(isset($item['description']) ? $item['description'] : null),
+                'hidden_tax_amount'=>(isset($item['hidden_tax_amount']) ? $item['hidden_tax_amount'] : null),
+            );
+
             $e = $es->loadEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id);
             if(!$e){
-                $local_id = $item['item_id'];
-                $product = $es->loadEntityLocal($this->_node->getNodeId(), 'product', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['product_id']);
-                $parent_item = $es->loadEntityLocal($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['parent_id']);
-                $order_item = $es->loadEntityLocal($this->_node->getNodeId(), 'orderitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['order_item_id']);
-                $data = array(
-                    'product'=>($product ? $product->getId() : null),
-                    'parent_item'=>($parent_item ? $parent_item->getId() : null),
-                    'order_item'=>($order_item ? $order_item->getId() : null),
-                    'tax_amount'=>(isset($item['tax_amount']) ? $item['tax_amount'] : null),
-                    'discount_amount'=>(isset($item['discount_amount']) ? $item['discount_amount'] : null),
-                    'sku'=>(isset($item['sku']) ? $item['sku'] : null),
-                    'name'=>(isset($item['name']) ? $item['name'] : null),
-                    'qty'=>(isset($item['qty']) ? $item['qty'] : null),
-                    'row_total'=>(isset($item['row_total']) ? $item['row_total'] : null),
-                    'price_incl_tax'=>(isset($item['price_incl_tax']) ? $item['price_incl_tax'] : null),
-                    'price'=>(isset($item['price']) ? $item['price'] : null),
-                    'row_total_incl_tax'=>(isset($item['row_total_incl_tax']) ? $item['row_total_incl_tax'] : null),
-                    'additional_data'=>(isset($item['additional_data']) ? $item['additional_data'] : null),
-                    'description'=>(isset($item['description']) ? $item['description'] : null),
-                    'hidden_tax_amount'=>(isset($item['hidden_tax_amount']) ? $item['hidden_tax_amount'] : null),
-                );
                 $e = $es->createEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id, $data, $parent_id);
                 $es->linkEntity($this->_node->getNodeId(), $e, $local_id);
+            }else{
+                $es->updateEntity($this->_node->getNodeId(), $e, $data);
             }
         }
     }
@@ -290,11 +297,69 @@ class CreditmemoGateway extends AbstractGateway {
      * @param \Entity\Entity $entity
      * @param string[] $attributes
      * @param int $type
+     * @throws MagelinkException
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type=\Entity\Update::TYPE_UPDATE)
     {
-        // We don't perform any direct updates to creditmemos in this manner.
-        // TODO creation
+        if($type == \Entity\Update::TYPE_UPDATE){
+            return; // We don't update, ever.
+        }else if($type == \Entity\Update::TYPE_DELETE){
+            $this->_soap->call('salesOrderCreditmemoCancel', array($entity->getUniqueId()));
+            return;
+        }else if($type == \Entity\Update::TYPE_CREATE){
+            /** @var \Entity\Service\EntityService $entityService */
+            $entityService = $this->getServiceLocator()->get('entityService');
+
+            $order = $entity->getParent();
+            if(!$order || $order->getTypeStr() != 'order'){
+                throw new MagelinkException('Creditmemo parent not correctly set for Creditmemo ' . $entity->getId() . '!');
+            }
+
+            /** @var \Entity\Entity[] $items */
+            $items = $entity->getItems();
+            $itemData = array();
+            foreach($items as $itm){
+                $itemData[] = array('order_item_id'=>$entityService->getLocalId($this->_node->getNodeId(), $itm), 'qty'=>$itm->getData('qty', 0));
+            }
+
+
+            $res = $this->_soap->call('salesOrderCreditmemoCreate', array(
+                ($order->getData('original_order') != null ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
+                array(
+                    'qtys'=>$itemData,
+                    'shipping_amount'=>$entity->getData('shipping_amount', 0),
+                    'adjustment_positive'=>$entity->getData('adjustment_positive', 0),
+                    'adjustment_negative'=>$entity->getData('adjustment_negative', 0),
+                ),
+                '',
+                false,
+                false,
+                $entity->getData('customer_balance', 0)
+            ));
+            if(is_object($res)){
+                $res = $res->result;
+            }else if(is_array($res)){
+                if(isset($res['result'])){
+                    $res = $res['result'];
+                }else{
+                    $res = array_shift($res);
+                }
+            }
+            if(!$res){
+                throw new MagelinkException('Failed to get creditmemo ID from Magento for order ' . $order->getUniqueId());
+            }
+            $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $res);
+
+            $this->_soap->call('salesOrderCreditmemoAddComment', array(
+                $res,
+                'FOR ORDER: ' . $order->getUniqueId(),
+                false,
+                false
+            ));
+
+        }else{
+            throw new MagelinkException('Invalid update type ' . $type);
+        }
         return;
     }
 
@@ -314,10 +379,10 @@ class CreditmemoGateway extends AbstractGateway {
 
         switch($action->getType()){
             case 'comment':
-                $status = ($action->hasData('status') ? $action->getData('status') : $entity->getData('status'));
                 $comment = $action->getData('comment');
                 $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : null);
-                $this->_soap->call('salesOrderCreditmemoAddComment', $entity->getUniqueId(), $status, $comment, $notify);
+                $includeComment = ($action->hasData('includeComment') ? ($action->getData('includeComment') ? 'true' : 'false' ) : null);
+                $this->_soap->call('salesOrderCreditmemoAddComment', array($entity->getUniqueId(), $comment, $notify, $includeComment));
                 return true;
                 break;
             case 'cancel':
