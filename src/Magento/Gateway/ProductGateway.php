@@ -407,7 +407,8 @@ class ProductGateway extends AbstractGateway {
     /**
      * Write out all the updates to the given entity.
      * @param \Entity\Entity $entity
-     * @param \Entity\Attribute[] $attributes
+     * @param string[] $attributes
+     * @param int $type
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type=\Entity\Update::TYPE_UPDATE)
     {
@@ -589,8 +590,6 @@ class ProductGateway extends AbstractGateway {
             }
             $entityService->linkEntity($this->_node->getNodeId(), $entity, $res);
         }
-
-        // TODO: Implement writeUpdates() method.
     }
 
 

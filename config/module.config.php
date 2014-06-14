@@ -60,4 +60,26 @@ return array (
             ),
         )
     ),
+
+    'controllers' => array(
+        'invokables' => array(
+            'Magento\Controller\Console' => 'Magento\Controller\Console',
+        ),
+    ),
+
+    'console' => array(
+        'router' => array(
+            'routes' => array(
+                'magento-console' => array(
+                    'options' => array(
+                        'route'    => 'magento <task> <id> [<params>]',
+                        'defaults' => array(
+                            'controller' => 'Magento\Controller\Console',
+                            'action'     => 'run'
+                        )
+                    )
+                )
+            )
+        )
+    )
 );
