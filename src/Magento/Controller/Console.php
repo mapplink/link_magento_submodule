@@ -114,17 +114,24 @@ class Console extends AbstractConsole
 
         $paymentData = array(
             'po_number' => null,
-            'method' => 'magebasedpspxpost',
-            'cc_cid' => '111',
-            'cc_owner' => 'Lero9 Testorder',
-            'cc_number' => '4111111111111111',
-            'cc_type' => 'VI',
-            'cc_exp_year' => '2018',
-            'cc_exp_month' => '05'
+            'method' => 'banktransfer',
+            'cc_cid' => null,
+            'cc_owner' => null,
+            'cc_number' => null,
+            'cc_type' => null,
+            'cc_exp_year' => null,
+            'cc_exp_month' => null
         );
-        $invoice = false;
+        $invoice = true;
 
         $availableProducts = $entityService->executeQueryAssoc('SELECT p.unique_id AS k, si.available AS v FROM {product:p:visible,enabled,type} JOIN {stockitem:si:available,pickable} ON si.parent_id = p.entity_id WHERE si.available > 1 AND p.visible = 1 AND p.enabled = 1 AND p.type = "simple"');
+
+        if(gethostname() == 'photon'){
+            $availableProducts = array();
+            $availableProducts['1113'] = 5;
+            $availableProducts['1112'] = 4;
+            $avaialbleProducts['1111'] = 3;
+        }
 
         $patterns = array(
             array(1),
