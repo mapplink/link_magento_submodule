@@ -207,8 +207,8 @@ class Console extends AbstractConsole
 
             try{
                 $soap->call('shoppingCartProductAdd', array($cid, $toAdd, 1));
-            }catch(\SoapFault $e){
-                echo 'SoapFault when adding products, skipping: ' . $e->getMessage() . PHP_EOL;
+            }catch(\Exception $e){
+                echo 'Exception when adding products, skipping: ' . $e->getMessage() . PHP_EOL;
                 $preserveCart = true;
                 continue;
             }
