@@ -115,8 +115,8 @@ class Console extends AbstractConsole
         $paymentData = array(
             'po_number' => null,
             'method' => 'magebasedpspxpost',
-            'cc_cid' => null,
-            'cc_owner' => 'M JOHNSTON',
+            'cc_cid' => '111',
+            'cc_owner' => 'Lero9 Testorder',
             'cc_number' => '4111111111111111',
             'cc_type' => 'VI',
             'cc_exp_year' => '2018',
