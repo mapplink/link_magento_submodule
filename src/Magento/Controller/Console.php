@@ -119,7 +119,7 @@ class Console extends AbstractConsole
             'cc_owner' => 'M JOHNSTON',
             'cc_number' => '4111111111111111',
             'cc_type' => 'VI',
-            'cc_exp_year' => '18',
+            'cc_exp_year' => '2018',
             'cc_exp_month' => '05'
         );
         $invoice = false;
