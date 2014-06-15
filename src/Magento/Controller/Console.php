@@ -106,19 +106,23 @@ class Console extends AbstractConsole
             ),
         );
 
-        $shippingMethod = 'premiumrate_nz_nationwide';
+        if(gethostname() == 'photon'){
+            $shippingMethod = 'flatrate_flatrate';
+        }else{
+            $shippingMethod = 'premiumrate_nz_nationwide';
+        }
 
         $paymentData = array(
             'po_number' => null,
-            'method' => 'banktransfer',
+            'method' => 'magebasedpspxpost',
             'cc_cid' => null,
-            'cc_owner' => null,
-            'cc_number' => null,
-            'cc_type' => null,
-            'cc_exp_year' => null,
-            'cc_exp_month' => null
+            'cc_owner' => 'M JOHNSTON',
+            'cc_number' => '4111111111111111',
+            'cc_type' => 'VI',
+            'cc_exp_year' => '18',
+            'cc_exp_month' => '05'
         );
-        $invoice = true;
+        $invoice = false;
 
         $availableProducts = $entityService->executeQueryAssoc('SELECT p.unique_id AS k, si.available AS v FROM {product:p:visible,enabled,type} JOIN {stockitem:si:available,pickable} ON si.parent_id = p.entity_id WHERE si.available > 1 AND p.visible = 1 AND p.enabled = 1 AND p.type = "simple"');
 
@@ -148,8 +152,6 @@ class Console extends AbstractConsole
 
                 $soap->call('shoppingCartCustomerSet', array($cid, $customerData, 1));
                 $soap->call('shoppingCartCustomerAddresses', array($cid, $addressData, 1));
-                $soap->call('shoppingCartShippingMethod', array($cid, $shippingMethod, 1));
-                $soap->call('shoppingCartPaymentMethod', array($cid, $paymentData, 1));
             }
 
             $patternId = array_rand($patterns);
@@ -166,7 +168,7 @@ class Console extends AbstractConsole
                 $j = 0;
                 do{
                     $j++;
-                    if($j >= $limit){
+                    if($j > $limit){
                         break;
                     }
                     $sku = array_rand($availableProducts);
@@ -180,8 +182,9 @@ class Console extends AbstractConsole
                 if(!$sku){
                     continue;
                 }
+                $doneProd[] = $sku;
 
-                $toAdd = array(
+                $toAdd[] = array(
                     'sku'=>$sku,
                     'quantity'=>$numProd,
                 );
@@ -190,30 +193,42 @@ class Console extends AbstractConsole
             }
 
             if(!count($toAdd)){
+                echo 'No products available, trying again'.PHP_EOL;
                 $preserveCart = true;
                 continue;
             }
 
             $soap->call('shoppingCartProductAdd', array($cid, $toAdd, 1));
 
+            $soap->call('shoppingCartShippingMethod', array($cid, $shippingMethod, 1));
+
+            $res = $soap->call('shoppingCartTotals', array($cid, 1));
+            var_export($res);
+            echo PHP_EOL;
+
+            $soap->call('shoppingCartPaymentMethod', array($cid, $paymentData, 1));
+
+            echo 'Placing order...'.PHP_EOL;
             $orderId = $soap->call('shoppingCartOrder', array($cid, 1));
 
             if(!$orderId){
                 throw new MagelinkException('Invalid order ID returned');
             }
 
-            $orderData = $soap->call('salesOrderInfo', array($orderId));
-
-            $itemIds = array();
-            foreach($orderData['items'] as $itm){
-                $itemIds[] = array('order_item_id'=>$itm['item_id'], 'qty'=>$itm['qty_ordered']);
-            }
-
             if($invoice){
+                echo 'Invoicing...'.PHP_EOL;
+
+                $orderData = $soap->call('salesOrderInfo', array($orderId));
+
+                $itemIds = array();
+                foreach($orderData['items'] as $itm){
+                    $itemIds[] = array('order_item_id'=>$itm['item_id'], 'qty'=>$itm['qty_ordered']);
+                }
+
                 $soap->call('salesOrderInvoiceCreate', array($orderId, $itemIds));
             }
 
-            echo 'Placed order'.PHP_EOL;
+            echo 'Placed order '.$orderId.PHP_EOL;
 
             $preserveCart = false;
 
