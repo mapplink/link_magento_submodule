@@ -137,6 +137,8 @@ class OrderGateway extends AbstractGateway
                 }else{
                     $data['storecredit_total'] = 0;
                 }
+                $data['order_total'] =
+                    $data['grand_total'] + $data['gift_total'] + $data['reward_total'] + $data['storecredit_total'];
 
                 $payments = array();
                 if (isset($order['payment'])) {
