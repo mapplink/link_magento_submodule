@@ -97,13 +97,17 @@ class CustomerGateway extends AbstractGateway {
 
         $timestamp = time();
 
+        $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'customer', 'retrieve') + (intval($this->_node->getConfig('time_delta_customer')) * 3600));
+
+        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'retr_time', 'Retrieving customers updated since ' . $retTime, array('type'=>'customer', 'timestamp'=>$retTime));
+
         if($this->_soap){
             $results = $this->_soap->call('customerCustomerList', array(
                 array(
                     'complex_filter'=>array(
                         array(
                             'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'customer', 'retrieve') + (intval($this->_node->getConfig('time_delta_customer')) * 3600))),
+                            'value'=>array('key'=>'gt', 'value'=>$retTime),
                         ),
                     ),
                 ), // filters

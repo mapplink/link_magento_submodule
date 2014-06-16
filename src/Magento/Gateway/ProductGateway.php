@@ -88,9 +88,13 @@ class ProductGateway extends AbstractGateway {
         $timestamp = time();
 
         foreach($this->_node->getStoreViews() as $store_id=>$store_view){
+            $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve') + (intval($this->_node->getConfig('time_delta_product')) * 3600));
+
+            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'retr_time', 'Retrieving products updated since ' . $retTime, array('type'=>'product', 'timestamp'=>$retTime));
+
             if($this->_db){
 
-                $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve') + (intval($this->_node->getConfig('time_delta_product')) * 3600)));
+                $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', $retTime);
 
                 if(!count($updatedProducts)){
                     continue;
@@ -177,7 +181,7 @@ class ProductGateway extends AbstractGateway {
                         'complex_filter'=>array(
                             array(
                                 'key'=>'updated_at',
-                                'value'=>array('key'=>'gt', 'value'=>date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve') + (intval($this->_node->getConfig('time_delta_product')) * 3600))),
+                                'value'=>array('key'=>'gt', 'value'=>$retTime),
                             ),
                         ),
                     ), // filters
