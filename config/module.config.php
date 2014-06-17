@@ -7,7 +7,7 @@ return array (
             'magento_soapv1'=>'Magento\Api\SoapV1',
             'magento_rest'=>'Magento\Api\Rest',
             'magento_db'=>'Magento\Api\Db',
-            'transform_order_total'=>'Magento\Transform\OrderTotal'
+            'transform_order_total'=>'Magento\Transform\OrderTotalTransform'
         ),
         'shared'=>array(
             'magento_soap'=>FALSE,
