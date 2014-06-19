@@ -221,6 +221,17 @@ class Db implements ServiceLocatorAwareInterface {
     }
 
     /**
+     * Update stock level for a single product
+     *
+     * @param int $product_id Product Entity ID
+     * @param float $qty Quantity available
+     * @param bool $is_in_stock Whether the product should be in stock
+     */
+    public function updateStock($product_id, $qty, $is_in_stock){
+        $this->getTableGateway('cataloginventory_stock_item')->update(array('qty'=>$qty, 'is_in_stock'=>$is_in_stock), array('product_id'=>$product_id, 'stock_id'=>1));
+    }
+
+    /**
      * Returns whether or not the given customer is subscribed to the newsletter in Magento (unconfirmed or confirmed)
      *
      * @param int $customer_id The Magento customer ID to look up the status for

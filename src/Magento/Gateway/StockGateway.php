@@ -163,14 +163,18 @@ class StockGateway extends AbstractGateway {
             $qty = $entity->getData('available');
             $is_in_stock = ($qty > 0);
 
-            $this->_soap->call('catalogInventoryStockItemUpdate', array(
-                'product'=>$local_id,
-                'productId'=>$local_id,
-                'data'=>array(
-                    'qty'=>$qty,
-                    'is_in_stock'=>($is_in_stock ? 1 : 0)
-                )
-            ));
+            if($this->_db){
+                $this->_db->updateStock($local_id, $qty, $is_in_stock ? 1 : 0);
+            }else{
+                $this->_soap->call('catalogInventoryStockItemUpdate', array(
+                    'product'=>$local_id,
+                    'productId'=>$local_id,
+                    'data'=>array(
+                        'qty'=>$qty,
+                        'is_in_stock'=>($is_in_stock ? 1 : 0)
+                    )
+                ));
+            }
         }else{
             // We don't care about any other attributes
         }
