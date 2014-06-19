@@ -59,7 +59,7 @@ class Console extends AbstractConsole
 
         echo 'Creating ' . $orderCount . ' orders'.PHP_EOL;
 
-        $customerEmail = 'matt@lero9.co.nz';
+        $customerEmail = 'lero9@test.lero9.co.nz';
         $customer = $entityService->loadEntity($nid, 'customer', 0, $customerEmail);
 
         $shipAddress = $customer->resolve('shipping_address');
