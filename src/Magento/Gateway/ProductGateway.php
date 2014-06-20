@@ -530,13 +530,17 @@ class ProductGateway extends AbstractGateway {
 
         if($type == \Entity\Update::TYPE_UPDATE || $local_id){
             $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'prod_update', 'Updating product ' . $entity->getUniqueId() . ' with ' . implode(', ', array_keys($data)), array('keys'=>array_keys($data), 'websites'=>$data['website_ids']));
-            $req = array(
-                $entity->getUniqueId(),
-                $data,
-                $entity->getStoreId(),
-                'sku'
-            );
-            $this->_soap->call('catalogProductUpdate', $req);
+            if($this->_db && $local_id){
+                $this->_db->updateEntityEav('catalog_product', $local_id, $entity->getStoreId(), $data);
+            }else{
+                $req = array(
+                    $entity->getUniqueId(),
+                    $data,
+                    $entity->getStoreId(),
+                    'sku'
+                );
+                $this->_soap->call('catalogProductUpdate', $req);
+            }
         }else if($type == \Entity\Update::TYPE_CREATE){
 
             $attSet = null;

@@ -53,7 +53,7 @@ class Console extends AbstractConsole
 
         $db->updateEntityEav('catalog_product', 9375, 1, array('price'=>'1500000', 'special_price'=>'1000000'));
 
-        $data = $db->loadEntityEav('catalog_product', 9375, false, array('price', 'special_price'));
+        var_export($db->loadEntityEav('catalog_product', 9375, false, array('price', 'special_price')));
 
     }
 

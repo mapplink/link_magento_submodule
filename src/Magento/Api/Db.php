@@ -270,6 +270,8 @@ class Db implements ServiceLocatorAwareInterface {
 
     /**
      * Update an entity in the Magento EAV system
+     *
+     * @todo Untested on multi-select / option type attributes.
      * @param string $entity_type
      * @param int $entity_id
      * @param int $store_id
@@ -317,11 +319,20 @@ class Db implements ServiceLocatorAwareInterface {
                     $doSourceTranslation = true;
 
                     foreach($atts as $code=>$aid){
-                        $sourceTranslation[$aid] = $this->loadAttributeOptions($aid, $store_id);
+                        $sourceTranslation[$aid] = array_flip($this->loadAttributeOptions($aid, $store_id));
                     }
                 }
 
                 foreach($atts as $code=>$aid){
+
+                    $value = $data[$code];
+                    if($doSourceTranslation){
+                        if(isset($sourceTranslation[$aid][$value])){
+                            $value = $sourceTranslation[$aid][$value];
+                        }else{
+                            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value ' . $value . ' for att ' . $attributesById[$aid]['attribute_code'], array('value'=>$value, 'options'=>$sourceTranslation[$aid]), array());
+                        }
+                    }
 
                     if($store_id > 0){
                         $resultsDefault = $this->getTableGateway($type)->select(array(
@@ -331,7 +342,7 @@ class Db implements ServiceLocatorAwareInterface {
                             'attribute_id'=>$aid,
                         ));
                         if(!$resultsDefault || !count($resultsDefault)){
-                            $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>0, 'attribute_id'=>$aid, 'value'=>$data[$code]));
+                            $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>0, 'attribute_id'=>$aid, 'value'=>$value));
                         }
                     }
                     $resultsStore = $this->getTableGateway($type)->select(array(
@@ -341,9 +352,9 @@ class Db implements ServiceLocatorAwareInterface {
                         'attribute_id'=>$aid,
                     ));
                     if(!$resultsStore || !count($resultsStore)){
-                        $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid, 'value'=>$data[$code]));
+                        $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid, 'value'=>$value));
                     }else{
-                        $this->getTableGateway($type)->update(array('value'=>$data[$code]), array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid));
+                        $this->getTableGateway($type)->update(array('value'=>$value), array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid));
                     }
                 }
             }
