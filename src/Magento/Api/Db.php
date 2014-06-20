@@ -330,7 +330,7 @@ class Db implements ServiceLocatorAwareInterface {
                             'store_id'=>0,
                             'attribute_id'=>$aid,
                         ));
-                        if(!$resultsDefault || !is_array($resultsDefault)){
+                        if(!$resultsDefault || !count($resultsDefault)){
                             $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>0, 'attribute_id'=>$aid, 'value'=>$data[$code]));
                         }
                     }
@@ -340,7 +340,7 @@ class Db implements ServiceLocatorAwareInterface {
                         'store_id'=>$store_id,
                         'attribute_id'=>$aid,
                     ));
-                    if(!$resultsStore || !is_array($resultsStore)){
+                    if(!$resultsStore || !count($resultsStore)){
                         $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid, 'value'=>$data[$code]));
                     }else{
                         $this->getTableGateway($type)->update(array('value'=>$data[$code]), array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid));
