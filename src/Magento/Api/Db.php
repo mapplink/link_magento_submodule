@@ -295,7 +295,9 @@ class Db implements ServiceLocatorAwareInterface {
                 }
             }
 
-            $this->getTableGateway($prefix.'_entity')->update($staticUpdate, array('entity_id'=>$entity_id));
+            if(count($staticUpdate)){
+                $this->getTableGateway($prefix.'_entity')->update($staticUpdate, array('entity_id'=>$entity_id));
+            }
 
             $attributesById = array();
             foreach($attributes as $code){
