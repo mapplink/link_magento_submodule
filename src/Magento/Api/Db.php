@@ -372,7 +372,7 @@ class Db implements ServiceLocatorAwareInterface {
         if(!$entityRow || !count($entityRow)){
             return null;
         }
-        $entityRow = array_shift($entityRow);
+        $entityRow = array_shift($entityRow->toArray());
 
         $attributesByType = $this->preprocessEavAttributes($entity_type, $attributes);
 
