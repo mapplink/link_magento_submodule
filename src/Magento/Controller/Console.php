@@ -20,7 +20,42 @@ class Console extends AbstractConsole
 
     protected $_tasks = array(
         'testorder',
+        'eavtest',
     );
+
+    protected function eavtestTask($nid){
+
+        $nid = intval($nid);
+
+        $params = $this->getRequest()->getParam('params');
+
+        $nodeType = 'magento';
+        /** @var \Node\Repository\NodeRepository $nodeRep */
+        $nodeRep = $this->getServiceLocator()
+            ->get('Doctrine\ORM\EntityManager')
+            ->getRepository('Node\Entity\Node');
+        $nodeEntity = $nodeRep->find($nid);
+        if (!$nodeEntity) {
+            throw new MagelinkException('Could not find Magento node');
+        }
+
+        $_node = new \Magento\Node();
+        if ($_node instanceof ServiceLocatorAwareInterface) {
+            $_node->setServiceLocator($this->getServiceLocator());
+        }
+        $_node->init($nodeEntity);
+
+        /** @var \Magento\Api\Db $db */
+        $db = $this->getServiceLocator()->get('magento_db');
+        if(!$db->init($_node)){
+            throw new MagelinkException('Failed to connect to DB');
+        }
+
+        $db->updateEntityEav('catalog_product', 9375, 1, array('price'=>'1500000', 'special_price'=>'1000000'));
+
+        $data = $db->loadEntityEav('catalog_product', 9375, false, array('price', 'special_price'));
+
+    }
 
     protected function testorderTask($nid){
 

@@ -269,6 +269,91 @@ class Db implements ServiceLocatorAwareInterface {
     }
 
     /**
+     * Update an entity in the Magento EAV system
+     * @param string $entity_type
+     * @param int $entity_id
+     * @param int $store_id
+     * @param array $data Key->value data to update, key is attribute ID.
+     * @throws \Exception
+     */
+    public function updateEntityEav($entity_type, $entity_id, $store_id, $data){
+        $this->_adapter->getDriver()->getConnection()->beginTransaction();
+        try{
+            $attributes = array_keys($data);
+
+            $entityTypeData = $this->getEntityType($entity_type);
+            $prefix = $this->getEntityPrefix($entity_type);
+
+
+            $staticUpdate = array();
+
+            $attributesByType = $this->preprocessEavAttributes($entity_type, $attributes);
+
+            if(isset($attributesByType['static'])){
+                foreach($attributesByType['static'] as $code){
+                    $staticUpdate[$code] = $data[$code];
+                }
+            }
+
+            $this->getTableGateway($prefix.'_entity')->update($staticUpdate, array('entity_id'=>$entity_id));
+
+            $attributesById = array();
+            foreach($attributes as $code){
+                $attr = $this->getAttribute($entity_type, $code);
+                $attributesById[$attr['attribute_id']] = $attr;
+            }
+
+            foreach($attributesByType as $type=>$atts){
+                if($type == 'static'){
+                    // Already processed earlier
+                    continue;
+                }
+                $doSourceTranslation = false;
+                $sourceTranslation = array();
+                if($type == 'source_int'){
+                    $type = $prefix . '_entity_int';
+                    $doSourceTranslation = true;
+
+                    foreach($atts as $code=>$aid){
+                        $sourceTranslation[$aid] = $this->loadAttributeOptions($aid, $store_id);
+                    }
+                }
+
+                foreach($atts as $code=>$aid){
+
+                    if($store_id > 0){
+                        $resultsDefault = $this->getTableGateway($type)->select(array(
+                            'entity_id'=>$entity_id,
+                            'entity_type_id'=>$entityTypeData['entity_type_id'],
+                            'store_id'=>0,
+                            'attribute_id'=>$aid,
+                        ));
+                        if(!$resultsDefault || !is_array($resultsDefault)){
+                            $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>0, 'attribute_id'=>$aid, 'value'=>$data[$code]));
+                        }
+                    }
+                    $resultsStore = $this->getTableGateway($type)->select(array(
+                        'entity_id'=>$entity_id,
+                        'entity_type_id'=>$entityTypeData['entity_type_id'],
+                        'store_id'=>$store_id,
+                        'attribute_id'=>$aid,
+                    ));
+                    if(!$resultsStore || !is_array($resultsStore)){
+                        $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid, 'value'=>$data[$code]));
+                    }else{
+                        $this->getTableGateway($type)->update(array('value'=>$data[$code]), array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>$store_id, 'attribute_id'=>$aid));
+                    }
+                }
+            }
+            $this->_adapter->getDriver()->getConnection()->commit();
+        }catch(\Exception $e){
+
+            $this->_adapter->getDriver()->getConnection()->rollback();
+            throw $e;
+        }
+    }
+
+    /**
      * Load a single entity from the EAV tables, with the specified attributes
      * @param string $entity_type The type of entity to load
      * @param int $entity_id The entity ID to load
@@ -645,6 +730,11 @@ class Db implements ServiceLocatorAwareInterface {
         $this->_attributeCache[$entity_type][$attribute_code] = null;
         return null;
     }
+
+    /**
+     * @var array
+     */
+    protected $_tgCache = array();
 
     /**
      * Returns a new TableGateway instance for the requested table
