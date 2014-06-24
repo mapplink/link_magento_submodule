@@ -93,6 +93,7 @@ class OrderGateway extends AbstractGateway
                 ), // filters
             ));
 
+$this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO,'salesOrderList','salesOrderList',array('results'=>$results));
             foreach ($results as $orderFromList) {
 
                 $order = $this->_soap->call('salesOrderInfo', array($orderFromList['increment_id']));
@@ -349,6 +350,7 @@ class OrderGateway extends AbstractGateway
                 }else{
                     $data['item_tax'] = 0;
                 }
+$this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO,'dataQuantity','dataQuantity',array('data'=>$data, 'dataQuantity'=>$data['quantity']));
                 $data['item_discount'] = ($data['quantity'] ? $data['total_discount'] / $data['quantity'] : 0);
 
                 $e = $es->createEntity($this->_node->getNodeId(), 'orderitem', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $unique_id, $data, $parent_id);
