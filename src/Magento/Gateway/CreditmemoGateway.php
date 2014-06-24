@@ -369,9 +369,17 @@ class CreditmemoGateway extends AbstractGateway {
             // Update credit memo item local and unique IDs
             foreach($creditmemo['items'] as $cItem){
                 foreach($items as $iEnt){
-                    if($iEnt->getData('sku') == $cItem['sku'] && $iEnt->getData('qty') == $cItem['qty']){
-                        $entityService->updateEntityUnique($this->_node->getNodeId(), $iEnt, $creditmemo['increment_id'].'-'.$cItem['sku'].'-'.$cItem['item_id']);
-                        try{$entityService->unlinkEntity($this->_node->getNodeId(), $iEnt);}catch(\Exception $e){} // Ignore errors
+                    if ($iEnt->getData('sku') == $cItem['sku'] && $iEnt->getData('qty') == $cItem['qty']) {
+
+                        $entityService->updateEntityUnique(
+                            $this->_node->getNodeId(),
+                            $iEnt, $creditmemo['increment_id'].'-'.$cItem['sku'].'-'.$cItem['item_id']
+                        );
+
+                        try{
+                            $entityService->unlinkEntity($this->_node->getNodeId(), $iEnt);
+                        }catch (\Exception $e) {} // Ignore errors
+
                         $entityService->linkEntity($this->_node->getNodeId(), $iEnt, $cItem['item_id']);
                         break;
                     }
