@@ -321,12 +321,14 @@ class CreditmemoGateway extends AbstractGateway {
             /** @var \Entity\Entity[] $items */
             $items = $entity->getItems();
             $itemData = array();
-            foreach($items as $itm){
-                $itemId = $entityService->getLocalId($this->_node->getNodeId(), $itm->getData('order_item'));
-                if(!$itemId){
-                    throw new \Magelink\Exception\NodeException('Invalid order item local ID for cmitem ' . $itm->getUniqueId() . ' and cm ' . $entity->getUniqueId() . ' (oitem ' . $itm->getData('order_item') . ')');
+            foreach($items as $item){
+                $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $item->getData('order_item'));
+                if(!$itemLocalId){
+                    $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
+                        .' and creditmemo '.$entity->getUniqueId().' (orderitem '.$item->getData('order_item').')';
+                    throw new \Magelink\Exception\NodeException($message);
                 }
-                $itemData[] = array('order_item_id'=>$itemId, 'qty'=>$itm->getData('qty', 0));
+                $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$item->getData('qty', 0));
             }
 
 

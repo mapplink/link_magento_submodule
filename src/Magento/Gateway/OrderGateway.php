@@ -93,7 +93,8 @@ class OrderGateway extends AbstractGateway
                 ), // filters
             ));
 
-$this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO,'salesOrderList','salesOrderList',array('results'=>$results));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_INFO,'salesOrderList','salesOrderList',array('results'=>$results));
             foreach ($results as $orderFromList) {
 
                 $order = $this->_soap->call('salesOrderInfo', array($orderFromList['increment_id']));
