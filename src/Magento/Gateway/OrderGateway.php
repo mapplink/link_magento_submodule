@@ -319,11 +319,11 @@ class OrderGateway extends AbstractGateway
      * @param $oid
      * @param EntityService $es
      */
-    protected function createItems($order, $oid, EntityService $entityService)
+    protected function createItems(array $order, $orderId, EntityService $entityService)
     {
-        $parent_id = $oid;
+        $parent_id = $orderId;
 
-        foreach($order['items'] as $item){
+        foreach ($order['items'] as $item) {
             $unique_id = $order['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
 
             $entity = $entityService
