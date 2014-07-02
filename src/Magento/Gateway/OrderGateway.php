@@ -319,17 +319,28 @@ class OrderGateway extends AbstractGateway
      * @param $oid
      * @param EntityService $es
      */
-    protected function createItems($order, $oid, EntityService $es)
+    protected function createItems($order, $oid, EntityService $entityService)
     {
         $parent_id = $oid;
 
         foreach($order['items'] as $item){
             $unique_id = $order['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
 
-            $e = $es->loadEntity($this->_node->getNodeId(), 'orderitem', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $unique_id);
-            if(!$e){
+            $entity = $entityService
+                ->loadEntity(
+                    $this->_node->getNodeId(),
+                    'orderitem',
+                    ($this->_node->isMultiStore() ? $order['store_id'] : 0),
+                    $unique_id
+                );
+            if (!$entity) {
                 $local_id = $item['item_id'];
-                $product = $es->loadEntity($this->_node->getNodeId(), 'product', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $item['sku']);
+                $product = $entityService->loadEntity(
+                    $this->_node->getNodeId(),
+                    'product',
+                    ($this->_node->isMultiStore() ? $order['store_id'] : 0),
+                    $item['sku']
+                );
                 $data = array(
                     'product'=>($product ? $product->getId() : null),
                     'sku'=>$item['sku'],
@@ -342,6 +353,7 @@ class OrderGateway extends AbstractGateway
                     'total_discount'=>(isset($item['base_discount_amount']) ? $item['base_discount_amount'] : 0),
                     'weight'=>(isset($item['row_weight']) ? $item['row_weight'] : 0),
                 );
+
                 if (isset($item['base_price_incl_tax'])) {
                     $data['item_tax'] = $item['base_price_incl_tax'] - $data['item_price'];
                 }elseif ($data['total_price'] && $data['total_price'] > 0) {
@@ -351,11 +363,22 @@ class OrderGateway extends AbstractGateway
                 }else{
                     $data['item_tax'] = 0;
                 }
-$this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO,'dataQuantity','dataQuantity',array('data'=>$data, 'dataQuantity'=>$data['quantity']));
+
                 $data['item_discount'] = ($data['quantity'] ? $data['total_discount'] / $data['quantity'] : 0);
 
-                $e = $es->createEntity($this->_node->getNodeId(), 'orderitem', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $unique_id, $data, $parent_id);
-                $es->linkEntity($this->_node->getNodeId(), $e, $local_id);
+                $this->getServiceLocator()->get('logService')
+                    ->log(\Log\Service\LogService::LEVEL_INFO,
+                        'dataQuantity','dataQuantity',
+                        array('data'=>$data, 'dataQuantity'=>$data['quantity'])
+                    );
+
+                $entity = $entityService->createEntity(
+                    $this->_node->getNodeId(),
+                    'orderitem',
+                    ($this->_node->isMultiStore() ? $order['store_id'] : 0),
+                    $unique_id, $data, $parent_id
+                );
+                $entityService->linkEntity($this->_node->getNodeId(), $entity, $local_id);
             }
         }
 
