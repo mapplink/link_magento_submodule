@@ -5,6 +5,7 @@ namespace Magento\Gateway;
 use Node\AbstractNode;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
+use Entity\Comment;
 use Entity\Service\EntityService;
 
 class OrderGateway extends AbstractGateway
@@ -280,7 +281,8 @@ class OrderGateway extends AbstractGateway
      * @param \Entity\Entity $orderEnt The order entity to attach to
      * @param EntityService $es The EntityService
      */
-    protected function updateStatusHistory($order, \Entity\Entity $orderEnt, EntityService $es){
+    protected function updateStatusHistory($order, \Entity\Entity $orderEnt, EntityService $es)
+    {
         $comments = $es->loadEntityComments($orderEnt);
         $referenceIds = array();
         $commentIds = array();
@@ -288,7 +290,8 @@ class OrderGateway extends AbstractGateway
             $referenceIds[] = $com->getReferenceId();
             $commentIds[] = $com->getCommentId();
         }
-        foreach($order['status_history'] as $histEntry){
+
+        foreach ($order['status_history'] as $histEntry) {
             if(isset($histEntry['comment']) && preg_match('/{([0-9]+)} - /', $histEntry['comment'], $matches)){
                 if(in_array($matches[1], $commentIds)){
                     continue; // Comment already loaded through another means
@@ -297,10 +300,19 @@ class OrderGateway extends AbstractGateway
             if(in_array($histEntry['created_at'], $referenceIds)){
                 continue; // Comment already loaded
             }
-            if($orderEnt->hasAttribute('delivery_instructions') && !$orderEnt->getData('delivery_instructions') && strpos($histEntry['comment'], 'Comment by customer: ') === 0){
-                $instructions = trim(substr($histEntry['comment'], strlen('Comment by customer: ')));
-                if(strlen($instructions)){
-                    $es->updateEntity($this->_node->getNodeId(), $orderEnt, array('delivery_instructions'=>$instructions));
+
+            $addCustomerComment = $orderEnt->hasAttribute('delivery_instructions')
+                && !$orderEnt->getData('delivery_instructions')
+                && strpos(strtolower($histEntry['comment']), Comment::CUSTOMER_COMMENT_PREFIX) === 0;
+
+            if ($addCustomerComment) {
+                $instructions = trim(substr($histEntry['comment'], strlen(Comment::CUSTOMER_COMMENT_PREFIX)));
+                if (strlen($instructions)) {
+                    $es->updateEntity(
+                        $this->_node->getNodeId(),
+                        $orderEnt,
+                        array('delivery_instructions'=>$instructions)
+                    );
                 }
             }
             $es->createEntityComment(

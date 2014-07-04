@@ -59,7 +59,8 @@ class Soap implements ServiceLocatorAwareInterface {
      * @throws \SoapFault
      * @return array|mixed Response data
      */
-    public function call($call, $data){
+    public function call($call, $data)
+    {
         if(!is_array($data)){
             if(is_object($data)){
                 $data = get_object_vars($data);
@@ -71,9 +72,19 @@ class Soap implements ServiceLocatorAwareInterface {
         try{
             $res = $this->_soapClient->call($call, $data);
         }catch(\SoapFault $sf){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR, 'soap_fault', 'SOAP Fault with call ' . $call . ': ' . $sf->getMessage(), array('keys'=>array_keys($data), 'code'=>$sf->getCode(), 'trace'=>$sf->getTraceAsString(), 'req'=>$this->_soapClient->getLastRequest(), 'resp'=>$this->_soapClient->getLastResponse()));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_ERROR,
+                    'soap_fault',
+                    'SOAP Fault with call ' . $call . ': ' . $sf->getMessage(),
+                    array(
+                        'keys'=>array_keys($data),
+                        'code'=>$sf->getCode(),
+                        'trace'=>$sf->getTraceAsString(),
+                        'req'=>$this->_soapClient->getLastRequest(),
+                        'resp'=>$this->_soapClient->getLastResponse())
+                );
             $this->forceStdoutDebug();
-            throw new \Magelink\Exception\MagelinkException('Soap Fault - ' . $sf->getMessage(), 0, $sf);// throw $sf;
+            throw new \Magelink\Exception\MagelinkException('Soap Fault - '.$sf->getMessage(), 0, $sf);
         }
         // NOTE: Uncomment the following for debugging
         // $this->forceStdoutDebug();
