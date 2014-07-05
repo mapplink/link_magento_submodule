@@ -1,4 +1,14 @@
 <?php
+/**
+ * Magento\Gateway
+ *
+ * @category Magento
+ * @package Magento\Gateway
+ * @author Matt Johnston
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Gateway;
 
@@ -7,30 +17,22 @@ use Node\Entity;
 use Magelink\Exception\MagelinkException;
 use Entity\Service\EntityService;
 
-class CreditmemoGateway extends AbstractGateway {
 
-    /**
-     * @var \Magento\Node
-     */
+class CreditmemoGateway extends AbstractGateway
+{
+    /** @var \Magento\Node */
     protected $_node;
 
-    /**
-     * @var \Node\Entity\Node
-     */
+    /** @var \Node\Entity\Node */
     protected $_nodeEnt;
 
-    /**
-     * @var \Magento\Api\Soap
-     */
+    /** @var \Magento\Api\Soap */
     protected $_soap = null;
-    /**
-     * @var \Magento\Api\Db
-     */
+
+    /** @var \Magento\Api\Db */
     protected $_db = null;
 
-    /**
-     * @var \Node\Service\NodeService
-     */
+    /** @var \Node\Service\NodeService */
     protected $_ns = null;
 
     /**
@@ -332,8 +334,9 @@ class CreditmemoGateway extends AbstractGateway {
             }
 
 
-            $res = $this->_soap->call('salesOrderCreditmemoCreate', array(
-                ($order->getData('original_order') != null ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
+            $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
+                ($order->getData('original_order') != null
+                    ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
                 array(
                     'qtys'=>$itemData,
                     'shipping_amount'=>$entity->getData('shipping_amount', 0),
@@ -345,51 +348,55 @@ class CreditmemoGateway extends AbstractGateway {
                 false,
                 $entity->getData('customer_balance', 0)
             ));
-            if(is_object($res)){
-                $res = $res->result;
-            }else if(is_array($res)){
-                if(isset($res['result'])){
-                    $res = $res['result'];
+            if(is_object($soapResult)){
+                $soapResult = $soapResult->result;
+            }else if(is_array($soapResult)){
+                if(isset($soapResult['result'])){
+                    $soapResult = $soapResult['result'];
                 }else{
-                    $res = array_shift($res);
+                    $soapResult = array_shift($soapResult);
                 }
             }
-            if(!$res){
-                throw new MagelinkException('Failed to get creditmemo ID from Magento for order ' . $order->getUniqueId());
+            if(!$soapResult){
+                $message = 'Failed to get creditmemo ID from Magento for order '.$order->getUniqueId();
+                throw new MagelinkException($message);
             }
-            $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $res);
+            $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $soapResult);
 
-            $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($res));
+            $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($soapResult));
             if(isset($creditmemo['result'])){
                 $creditmemo = $creditmemo['result'];
             }
             $local_id = $creditmemo['creditmemo_id'];
 
-            try{$entityService->unlinkEntity($this->_node->getNodeId(), $entity);}catch(\Exception $e){} // Ignore errors
+            try{
+                $entityService->unlinkEntity($this->_node->getNodeId(), $entity);
+            }catch (\Exception $e) {} // Ignore errors
+
             $entityService->linkEntity($this->_node->getNodeId(), $entity, $local_id);
 
             // Update credit memo item local and unique IDs
-            foreach($creditmemo['items'] as $cItem){
-                foreach($items as $iEnt){
-                    if ($iEnt->getData('sku') == $cItem['sku'] && $iEnt->getData('qty') == $cItem['qty']) {
+            foreach ($creditmemo['items'] as $item) {
+                foreach ($items as $itemEntity) {
 
+                    if ($itemEntity->getData('sku') == $item['sku'] && $itemEntity->getData('qty') == $item['qty']) {
                         $entityService->updateEntityUnique(
                             $this->_node->getNodeId(),
-                            $iEnt, $creditmemo['increment_id'].'-'.$cItem['sku'].'-'.$cItem['item_id']
+                            $itemEntity, $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id']
                         );
 
                         try{
-                            $entityService->unlinkEntity($this->_node->getNodeId(), $iEnt);
+                            $entityService->unlinkEntity($this->_node->getNodeId(), $itemEntity);
                         }catch (\Exception $e) {} // Ignore errors
 
-                        $entityService->linkEntity($this->_node->getNodeId(), $iEnt, $cItem['item_id']);
+                        $entityService->linkEntity($this->_node->getNodeId(), $itemEntity, $item['item_id']);
                         break;
                     }
                 }
             }
 
             $this->_soap->call('salesOrderCreditmemoAddComment', array(
-                $res,
+                $soapResult,
                 'FOR ORDER: ' . $order->getUniqueId(),
                 false,
                 false

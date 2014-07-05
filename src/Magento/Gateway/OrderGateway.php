@@ -661,8 +661,9 @@ class OrderGateway extends AbstractGateway
             $items[] = array('order_item_id'=>$local, 'qty'=>$qty);
         }
 
-        $res = $this->_soap->call('salesOrderCreditmemoCreate', array(
-            ($order->getData('original_order') != null ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
+        $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
+            ($order->getData('original_order') != null
+                ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
             array(
                 'qtys'=>$items,
                 'shipping_amount'=>$shippingRefund,
@@ -674,20 +675,20 @@ class OrderGateway extends AbstractGateway
             $sendComment,
             $creditRefund
         ));
-        if(is_object($res)){
-            $res = $res->result;
-        }else if(is_array($res)){
-            if(isset($res['result'])){
-                $res = $res['result'];
+        if(is_object($soapResult)){
+            $soapResult = $soapResult->result;
+        }else if(is_array($soapResult)){
+            if(isset($soapResult['result'])){
+                $soapResult = $soapResult['result'];
             }else{
-                $res = array_shift($res);
+                $soapResult = array_shift($soapResult);
             }
         }
-        if(!$res){
+        if(!$soapResult){
             throw new MagelinkException('Failed to get creditmemo ID from Magento for order ' . $order->getUniqueId());
         }
         $this->_soap->call('salesOrderCreditmemoAddComment', array(
-            $res,
+            $soapResult,
             'FOR ORDER: ' . $order->getUniqueId(),
             false,
             false
@@ -714,29 +715,41 @@ class OrderGateway extends AbstractGateway
         }
 
         $oid = ($order->getData('original_order') != null ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId());
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA, 'ship_send', 'Sending shipment for ' . $oid, array('ord'=>$order->getId(), 'items'=>$items, 'comment'=>$comment, 'notify'=>$notify, 'sendComment'=>$sendComment), array('node'=>$this->_node, 'entity'=>$order));
+        $this->getServiceLocator()->get('logService')
+            ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
+                'ship_send',
+                'Sending shipment for '.$oid,
+                array(
+                    'ord'=>$order->getId(),
+                    'items'=>$items,
+                    'comment'=>$comment,
+                    'notify'=>$notify,
+                    'sendComment'=>$sendComment
+                ),
+                array('node'=>$this->_node, 'entity'=>$order)
+            );
 
-        $res = $this->_soap->call('salesOrderShipmentCreate', array(
+        $soapResult = $this->_soap->call('salesOrderShipmentCreate', array(
             'orderIncrementId'=>$oid,
             'itemsQty'=>$items,
             'comment'=>$comment,
             'email'=>$notify,
             'includeComment'=>$sendComment
         ));
-        if(is_object($res)){
-            $res = $res->shipmentIncrementId;
-        }else if(is_array($res)){
-            if(isset($res['shipmentIncrementId'])){
-                $res = $res['shipmentIncrementId'];
+        if (is_object($soapResult)) {
+            $soapResult = $soapResult->shipmentIncrementId;
+        }elseif (is_array($soapResult)) {
+            if (isset($soapResult['shipmentIncrementId'])) {
+                $soapResult = $soapResult['shipmentIncrementId'];
             }else{
-                $res = array_shift($res);
+                $soapResult = array_shift($soapResult);
             }
         }
-        if(!$res){
+        if(!$soapResult){
             throw new MagelinkException('Failed to get shipment ID from Magento for order ' . $order->getUniqueId());
         }
         if($trackingCode != null){
-            $this->_soap->call('salesOrderShipmentAddTrack', array('shipmentIncrementId'=>$res, 'carrier'=>'custom', 'title'=>$order->getData('shipping_method', 'Shipping'), 'trackNumber'=>$trackingCode));
+            $this->_soap->call('salesOrderShipmentAddTrack', array('shipmentIncrementId'=>$soapResult, 'carrier'=>'custom', 'title'=>$order->getData('shipping_method', 'Shipping'), 'trackNumber'=>$trackingCode));
         }
     }
 
