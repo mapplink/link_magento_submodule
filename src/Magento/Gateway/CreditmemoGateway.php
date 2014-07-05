@@ -323,7 +323,7 @@ class CreditmemoGateway extends AbstractGateway
             /** @var \Entity\Entity[] $items */
             $items = $entity->getItems();
             $itemData = array();
-            foreach($items as $item){
+            foreach ($items as $item) {
                 $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $item->getData('order_item'));
                 if(!$itemLocalId){
                     $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
@@ -348,16 +348,17 @@ class CreditmemoGateway extends AbstractGateway
                 false,
                 $entity->getData('customer_balance', 0)
             ));
-            if(is_object($soapResult)){
+
+            if (is_object($soapResult)) {
                 $soapResult = $soapResult->result;
-            }else if(is_array($soapResult)){
+            }elseif (is_array($soapResult)) {
                 if(isset($soapResult['result'])){
                     $soapResult = $soapResult['result'];
                 }else{
                     $soapResult = array_shift($soapResult);
                 }
             }
-            if(!$soapResult){
+            if (!$soapResult) {
                 $message = 'Failed to get creditmemo ID from Magento for order '.$order->getUniqueId();
                 throw new MagelinkException($message);
             }
