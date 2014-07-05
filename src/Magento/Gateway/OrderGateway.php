@@ -1,4 +1,14 @@
 <?php
+/**
+ * Magento\Gateway\OrderGateway
+ *
+ * @category Magento
+ * @package Magento\Gateway
+ * @author Matt Johnston
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Gateway;
 
@@ -662,8 +672,7 @@ class OrderGateway extends AbstractGateway
         }
 
         $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
-            ($order->getData('original_order') != null
-                ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
+            ($order->getData('original_order') != null ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
             array(
                 'qtys'=>$items,
                 'shipping_amount'=>$shippingRefund,

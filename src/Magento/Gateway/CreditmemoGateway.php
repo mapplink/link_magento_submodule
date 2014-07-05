@@ -1,6 +1,6 @@
 <?php
 /**
- * Magento\Gateway
+ * Magento\Gateway\CreditmemoGateway
  *
  * @category Magento
  * @package Magento\Gateway
