@@ -227,7 +227,9 @@ class ProductGateway extends AbstractGateway {
         $this->_ns->setTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve', $timestamp);
     }
 
-    protected function processUpdate(\Entity\Service\EntityService $entityService, $product_id, $sku, $store_id, $parent_id, $data){
+    protected function processUpdate(\Entity\Service\EntityService $entityService, $product_id, $sku, $store_id,
+        $parent_id, $data)
+    {
         /** @var boolean $needsUpdate Whether we need to perform an entity update here */
         $needsUpdate = true;
 
@@ -235,22 +237,60 @@ class ProductGateway extends AbstractGateway {
         if(!$existingEntity){
             $existingEntity = $entityService->loadEntity($this->_node->getNodeId(), 'product', $store_id, $sku);
             if(!$existingEntity){
-                $existingEntity = $entityService->createEntity($this->_node->getNodeId(), 'product', $store_id, $sku, $data, $parent_id);
+                $existingEntity = $entityService->createEntity(
+                    $this->_node->getNodeId(),
+                    'product',
+                    $store_id,
+                    $sku,
+                    $data,
+                    $parent_id
+                );
                 $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $product_id);
-                $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_new', 'New product ' . $sku, array('sku'=>$sku), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                $this->getServiceLocator()->get('logService')
+                    ->log(\Log\Service\LogService::LEVEL_INFO,
+                        'ent_new',
+                        'New product '.$sku,
+                        array('sku'=>$sku),
+                        array('node'=>$this->_node, 'entity'=>$existingEntity)
+                    );
                 try{
-                    $stockEnt = $entityService->createEntity($this->_node->getNodeId(), 'stockitem', $store_id, $sku, array(), $existingEntity);
+                    $stockEnt = $entityService->createEntity(
+                        $this->_node->getNodeId(),
+                        'stockitem',
+                        $store_id,
+                        $sku,
+                        array(),
+                        $existingEntity
+                    );
                     $entityService->linkEntity($this->_node->getNodeId(), $stockEnt, $product_id);
                 }catch(\Exception $e){
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'already_stockitem', 'Already existing stockitem for new product ' . $sku, array('sku'=>$sku), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_WARN,
+                            'already_stockitem',
+                            'Already existing stockitem for new product '.$sku,
+                            array('sku'=>$sku),
+                            array('node'=>$this->_node, 'entity'=>$existingEntity)
+                        );
                 }
                 $needsUpdate = false;
             }else{
-                $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_link', 'Unlinked product ' . $sku, array('sku'=>$sku), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                $this->getServiceLocator()->get('logService')
+                    ->log(\Log\Service\LogService::LEVEL_INFO,
+                        'ent_link',
+                        'Unlinked product '.$sku,
+                        array('sku'=>$sku),
+                        array('node'=>$this->_node, 'entity'=>$existingEntity)
+                    );
                 $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $product_id);
             }
         }else{
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_update', 'Updated product ' . $sku, array('sku'=>$sku), array('node'=>$this->_node, 'entity'=>$existingEntity));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_INFO,
+                    'ent_update',
+                    'Updated product '.$sku,
+                    array('sku'=>$sku),
+                    array('node'=>$this->_node, 'entity'=>$existingEntity)
+                );
         }
         if($needsUpdate){
             $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, false);
