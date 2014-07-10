@@ -1,10 +1,21 @@
 <?php
+/**
+ * Magento\Gateway\OrderGateway
+ *
+ * @category Magento
+ * @package Magento\Gateway
+ * @author Matt Johnston
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Gateway;
 
 use Node\AbstractNode;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
+
 
 class ProductGateway extends AbstractGateway {
 
@@ -569,7 +580,17 @@ class ProductGateway extends AbstractGateway {
         }
 
         if($type == \Entity\Update::TYPE_UPDATE || $local_id){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'prod_update', 'Updating product ' . $entity->getUniqueId() . ' with ' . implode(', ', array_keys($data)), array('keys'=>array_keys($data), 'websites'=>$data['website_ids']));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_INFO,
+                    'prod_update',
+                    'Updating product '.$entity->getUniqueId().' with '.implode(', ', array_keys($data)),
+                    array(
+                        'keys'=>array_keys($data),
+                        'additional attributes'=>$data['additional_attributes'],
+                        'websites'=>$data['website_ids'],
+                        'data'=>$data
+                    )
+                );
             if($this->_db && $local_id){
                 $this->_db->updateEntityEav('catalog_product', $local_id, $entity->getStoreId(), $data);
             }else{
