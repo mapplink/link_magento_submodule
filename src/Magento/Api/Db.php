@@ -641,22 +641,24 @@ class Db implements ServiceLocatorAwareInterface {
                 $attributesByType['static'][$code] = $code;
                 continue;
             }
+
             $code = trim($code);
             if(!strlen($code)){
                 continue;
             }
+
             $attr = $this->getAttribute($entity_type, $code);
-            if($attr == null){
-                throw new MagelinkException('Invalid Magento attribute code ' . $code . ' for ' . $entity_type);
+            if ($attr == NULL) {
+                //*** ToDo throw new MagelinkException('Invalid Magento attribute code ' . $code . ' for ' . $entity_type);
+            }else{
+                $table = $this->getAttributeTable($prefix, $attr);
+
+                if(!isset($attributesByType[$table])){
+                    $attributesByType[$table] = array();
+                }
+
+                $attributesByType[$table][$code] = $attr['attribute_id'];
             }
-
-            $table = $this->getAttributeTable($prefix, $attr);
-
-            if(!isset($attributesByType[$table])){
-                $attributesByType[$table] = array();
-            }
-
-            $attributesByType[$table][$code] = $attr['attribute_id'];
         }
 
         return $attributesByType;
