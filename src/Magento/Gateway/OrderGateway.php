@@ -123,7 +123,8 @@ class OrderGateway extends AbstractGateway
 
                 $data = array(
                     'customer_email'=> array_key_exists('customer_email', $order) ? $order['customer_email'] : null,
-                    'customer_name'=>(array_key_exists('customer_firstname', $order) ? $order['customer_firstname'].' ' : '') . (array_key_exists('customer_lastname', $order) ? $order['customer_lastname'] : ''),
+                    'customer_name'=>(array_key_exists('customer_firstname', $order) ? $order['customer_firstname'].' ' : '')
+                        .(array_key_exists('customer_lastname', $order) ? $order['customer_lastname'] : ''),
                     'status'=>$order['status'],
                     'placed_at'=>$order['created_at'],
                     'grand_total'=>$order['grand_total'],
