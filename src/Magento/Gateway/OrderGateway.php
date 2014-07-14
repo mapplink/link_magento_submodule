@@ -89,9 +89,14 @@ class OrderGateway extends AbstractGateway
         $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'order', 'retrieve')
             + (intval($this->_node->getConfig('time_delta_order')) * 3600));
 
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'retr_time', 'Retrieving orders updated since ' . $retTime, array('type'=>'order', 'timestamp'=>$retTime));
+        $this->getServiceLocator()->get('logService')
+            ->log(\Log\Service\LogService::LEVEL_INFO,
+                'retr_time',
+                'Retrieving orders updated since ' . $retTime,
+                array('type'=>'order', 'timestamp'=>$retTime)
+            );
 
-        if($this->_db && false){
+        if($this->_db && FALSE){
             // TODO: Implement]
         }else if($this->_soap){
             $results = $this->_soap->call('salesOrderList', array(
@@ -100,10 +105,6 @@ class OrderGateway extends AbstractGateway
                         array(
                             'key'=>'updated_at',
                             'value'=>array('key'=>'gt', 'value'=>$retTime),
-                        ),
-                        array(
-                            'key'=>'increment_id',
-                            'value'=>array('key'=>'gt', 'value'=>'100000000')
                         )
                     ),
                 ), // filters
