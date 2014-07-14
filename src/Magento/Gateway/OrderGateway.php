@@ -86,7 +86,8 @@ class OrderGateway extends AbstractGateway
 
         $timestamp = time();
 
-        $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'order', 'retrieve') + (intval($this->_node->getConfig('time_delta_order')) * 3600));
+        $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'order', 'retrieve')
+            + (intval($this->_node->getConfig('time_delta_order')) * 3600));
 
         $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'retr_time', 'Retrieving orders updated since ' . $retTime, array('type'=>'order', 'timestamp'=>$retTime));
 
@@ -100,6 +101,10 @@ class OrderGateway extends AbstractGateway
                             'key'=>'updated_at',
                             'value'=>array('key'=>'gt', 'value'=>$retTime),
                         ),
+                        array(
+                            'key'=>'increment_id',
+                            'value'=>array('key'=>'gt', 'value'=>'100000000')
+                        )
                     ),
                 ), // filters
             ));
@@ -746,6 +751,7 @@ class OrderGateway extends AbstractGateway
             'email'=>$notify,
             'includeComment'=>$sendComment
         ));
+
         if (is_object($soapResult)) {
             $soapResult = $soapResult->shipmentIncrementId;
         }elseif (is_array($soapResult)) {
