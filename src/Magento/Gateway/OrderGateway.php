@@ -520,7 +520,7 @@ class OrderGateway extends AbstractGateway
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : null);
                 }
                 $this->_soap->call('salesOrderAddComment', array(
-                    ($entity->getData('original_order') != null ? $entity->resolve('original_order', 'order')->getUniqueId() : $entity->getUniqueId()),
+                    $entity->getRootOriginalOrder()->getUniqueId(),
                     $status,
                     $comment,
                     $notify
@@ -528,7 +528,7 @@ class OrderGateway extends AbstractGateway
                 return true;
                 break;
             case 'cancel':
-                if(!in_array($entity->getData('status'), array('pending', 'pending_dps', 'pending_ogone', 'pending_payment', 'payment_review', 'fraud', 'fraud_dps', 'pending_paypal'))){
+                if (!in_array($entity->getData('status'), array('pending', 'pending_dps', 'pending_ogone', 'pending_payment', 'payment_review', 'fraud', 'fraud_dps', 'pending_paypal'))){
                     throw new MagelinkException('Attempted to cancel non-pending order ' . $entity->getUniqueId() . ' (' . $entity->getData('status') . ')');
                 }
                 if($entity->getData('original_order') != null){

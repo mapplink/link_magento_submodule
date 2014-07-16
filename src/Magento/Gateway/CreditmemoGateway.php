@@ -304,20 +304,26 @@ class CreditmemoGateway extends AbstractGateway
      * @param int $type
      * @throws MagelinkException
      */
-    public function writeUpdates(\Entity\Entity $entity, $attributes, $type=\Entity\Update::TYPE_UPDATE)
+    public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE)
     {
-        if($type == \Entity\Update::TYPE_UPDATE){
+        if ($type == \Entity\Update::TYPE_UPDATE) {
             return; // We don't update, ever.
-        }else if($type == \Entity\Update::TYPE_DELETE){
+
+        }elseif ($type == \Entity\Update::TYPE_DELETE) {
             $this->_soap->call('salesOrderCreditmemoCancel', array($entity->getUniqueId()));
             return;
-        }else if($type == \Entity\Update::TYPE_CREATE){
+
+        }elseif ($type == \Entity\Update::TYPE_CREATE) {
             /** @var \Entity\Service\EntityService $entityService */
             $entityService = $this->getServiceLocator()->get('entityService');
 
             $order = $entity->getParent();
-            if(!$order || $order->getTypeStr() != 'order'){
-                throw new MagelinkException('Creditmemo parent not correctly set for Creditmemo ' . $entity->getId() . '!');
+            if (!$order || $order->getTypeStr() != 'order') {
+                throw new MagelinkException('Creditmemo parent not correctly set for Creditmemo '.$entity->getId());
+            }
+            $rootOrder = $entity->getRootParent();
+            if (!$rootOrder || $rootOrder->getTypeStr() != 'order') {
+                throw new MagelinkException('Creditmemo root parent not correctly set for Creditmemo '.$entity->getId());
             }
 
             /** @var \Entity\Entity[] $items */
@@ -334,9 +340,8 @@ class CreditmemoGateway extends AbstractGateway
             }
 
 
-            $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
-                ($order->getData('original_order') != null
-                    ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
+            $soapResult = $this->_soap->call('salesOrderCreditmemoCreate',
+                array($rootOrder->getUniqueId(),
                 array(
                     'qtys'=>$itemData,
                     'shipping_amount'=>$entity->getData('shipping_amount', 0),
@@ -344,8 +349,8 @@ class CreditmemoGateway extends AbstractGateway
                     'adjustment_negative'=>$entity->getData('adjustment_negative', 0),
                 ),
                 '',
-                false,
-                false,
+                FALSE,
+                FALSE,
                 $entity->getData('customer_balance', 0)
             ));
 
@@ -359,7 +364,8 @@ class CreditmemoGateway extends AbstractGateway
                 }
             }
             if (!$soapResult) {
-                $message = 'Failed to get creditmemo ID from Magento for order '.$order->getUniqueId();
+                $message = 'Failed to get creditmemo ID from Magento for order '.$order->getUniqueId()
+                    .' (Root original order '.$rootOrder->getUniqueId().').';
                 throw new MagelinkException($message);
             }
             $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $soapResult);
@@ -398,7 +404,7 @@ class CreditmemoGateway extends AbstractGateway
 
             $this->_soap->call('salesOrderCreditmemoAddComment', array(
                 $soapResult,
-                'FOR ORDER: ' . $order->getUniqueId(),
+                'FOR ORDER: '.$rootOrder->getUniqueId(),
                 false,
                 false
             ));
@@ -423,24 +429,28 @@ class CreditmemoGateway extends AbstractGateway
 
         $entity = $action->getEntity();
 
-        if(stripos($entity->getUniqueId(), 'TMP-') === 0){
+        if (stripos($entity->getUniqueId(), 'TMP-') === 0) {
             return false; // Hold off for now.
         }
 
-        switch($action->getType()){
+        switch ($action->getType()) {
             case 'comment':
                 $comment = $action->getData('comment');
-                $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : null);
-                $includeComment = ($action->hasData('includeComment') ? ($action->getData('includeComment') ? 'true' : 'false' ) : null);
-                $this->_soap->call('salesOrderCreditmemoAddComment', array($entity->getUniqueId(), $comment, $notify, $includeComment));
-                return true;
+                $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
+                $includeComment = ($action->hasData('includeComment')
+                    ? ($action->getData('includeComment') ? 'true' : 'false' ) : NULL);
+                $this->_soap->call('salesOrderCreditmemoAddComment', array(
+                    $entity->getUniqueId(), $comment, $notify, $includeComment
+                ));
+
+                return TRUE;
                 break;
             case 'cancel':
                 $this->_soap->call('salesOrderCreditmemoCancel', $entity->getUniqueId());
-                return true;
+                return TRUE;
                 break;
             default:
-                throw new MagelinkException('Unsupported action type ' . $action->getType() . ' for Magento Creditmemos.');
+                throw new MagelinkException('Unsupported action type '.$action->getType().' for Magento Credit Memos.');
         }
     }
 }
