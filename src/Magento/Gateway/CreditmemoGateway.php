@@ -354,7 +354,7 @@ class CreditmemoGateway extends AbstractGateway
                         .' and creditmemo '.$entity->getUniqueId().' (orderitem '.$item->getData('order_item').')';
                     throw new \Magelink\Exception\NodeException($message);
                 }
-                $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$qty));
+                $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$qty);
             }
 
 
