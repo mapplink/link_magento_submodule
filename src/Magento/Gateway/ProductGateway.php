@@ -586,7 +586,7 @@ class ProductGateway extends AbstractGateway {
                     'Updating product '.$entity->getUniqueId().' with '.implode(', ', array_keys($data)),
                     array(
                         'keys'=>array_keys($data),
-                        'additional attributes'=>$data['additional_attributes'],
+                        'additional attributes'=>(isset($data['additional_attributes']) ? $data['additional_attributes'] : NULL),
                         'websites'=>$data['website_ids'],
                         'data'=>$data
                     )
