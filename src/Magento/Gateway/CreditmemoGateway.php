@@ -337,21 +337,24 @@ class CreditmemoGateway extends AbstractGateway
                 switch ($item->getTypeStr()) {
                     case 'creditmemoitem':
                         $orderItemId = $item->getData('order_item');
+                        $qty = $item->getData('qty', 0);
                         break;
                     case 'orderitem':
                         $orderItemId = $item->getId();
+                        $qty = 0;
                         break;
                     default:
                         $message = 'Wrong type of the children of creditmemo '.$entity->getUniqueId().'.';
                         throw new \Magelink\Exception\NodeException($message);
                 }
+
                 $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $orderItemId);
                 if (!$itemLocalId) {
                     $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
                         .' and creditmemo '.$entity->getUniqueId().' (orderitem '.$item->getData('order_item').')';
                     throw new \Magelink\Exception\NodeException($message);
                 }
-                $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$item->getData('qty', 0));
+                $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$qty));
             }
 
 
