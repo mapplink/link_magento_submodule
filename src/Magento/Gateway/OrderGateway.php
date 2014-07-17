@@ -619,7 +619,8 @@ class OrderGateway extends AbstractGateway
      * @return array
      * @throws \Magelink\Exception\MagelinkException
      */
-    protected function preprocessRequestItems(\Entity\Entity $order, $rawItems=null){
+    protected function preprocessRequestItems(\Entity\Entity $order, $rawItems=null)
+    {
         /** @var \Entity\Service\EntityService $entityService */
         $entityService = $this->getServiceLocator()->get('entityService');
 
@@ -675,18 +676,26 @@ class OrderGateway extends AbstractGateway
         $itemsRefunded = NULL, $shippingRefund = 0, $creditRefund = 0, $adjustmentPositive = 0, $adjustmentNegative = 0)
     {
         $items = array();
-        foreach ($this->preprocessRequestItems($order, $itemsRefunded) as $local=>$qty) {
+
+        if (count($itemsRefunded)) {
+            $processItems = $itemsRefunded;
+        }else{
+            $processItems = array();
+            foreach ($order->getOrderItems() as $orderItem) {
+                $processItems[$orderItem->getId()] = 0;
+            }
+        }
+
+        foreach ($this->preprocessRequestItems($order, $processItems) as $local=>$qty) {
             $items[] = array('order_item_id'=>$local, 'qty'=>$qty);
         }
 
         $creditmemoData = array(
+            'qtys'=>$items,
             'shipping_amount'=>$shippingRefund,
             'adjustment_positive'=>$adjustmentPositive,
             'adjustment_negative'=>$adjustmentNegative,
         );
-        if (count($items)) {
-            $creditmemoData['qtys'] = $items;
-        }
 
         $rootOrder = $order->getRootOriginal();
         $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
