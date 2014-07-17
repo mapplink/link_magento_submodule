@@ -675,35 +675,43 @@ class OrderGateway extends AbstractGateway
         $itemsRefunded = NULL, $shippingRefund = 0, $creditRefund = 0, $adjustmentPositive = 0, $adjustmentNegative = 0)
     {
         $items = array();
-        foreach($this->preprocessRequestItems($order, $itemsRefunded) as $local=>$qty){
+        foreach ($this->preprocessRequestItems($order, $itemsRefunded) as $local=>$qty) {
             $items[] = array('order_item_id'=>$local, 'qty'=>$qty);
         }
 
+        $creditmemoData = array(
+            'shipping_amount'=>$shippingRefund,
+            'adjustment_positive'=>$adjustmentPositive,
+            'adjustment_negative'=>$adjustmentNegative,
+        );
+        if (count($items)) {
+            $creditmemoData['qtys'] = $items;
+        }
+
+        $rootOrder = $order->getRootOriginal();
         $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
-            ($order->getData('original_order') != null ? $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId()),
-            array(
-                'qtys'=>$items,
-                'shipping_amount'=>$shippingRefund,
-                'adjustment_positive'=>$adjustmentPositive,
-                'adjustment_negative'=>$adjustmentNegative,
-            ),
+            $rootOrder->getUniqueId(),
+            $creditmemoData,
             $comment,
             $notify,
             $sendComment,
             $creditRefund
         ));
-        if(is_object($soapResult)){
+
+        if (is_object($soapResult)) {
             $soapResult = $soapResult->result;
-        }else if(is_array($soapResult)){
-            if(isset($soapResult['result'])){
+        }elseif (is_array($soapResult)) {
+            if (isset($soapResult['result'])) {
                 $soapResult = $soapResult['result'];
             }else{
                 $soapResult = array_shift($soapResult);
             }
         }
+
         if(!$soapResult){
             throw new MagelinkException('Failed to get creditmemo ID from Magento for order ' . $order->getUniqueId());
         }
+
         $this->_soap->call('salesOrderCreditmemoAddComment', array(
             $soapResult,
             'FOR ORDER: ' . $order->getUniqueId(),
