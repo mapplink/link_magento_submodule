@@ -113,6 +113,15 @@ class CustomerGateway extends AbstractGateway {
                 ), // filters
             ));
 
+            if (!is_array($results)) {
+                $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR,
+                    'mag_soap_customer',
+                    'SOAP (customerCustomerList) did not return an array but '.gettype($results).' instead.',
+                    array('type'=>gettype($results), 'class'=>(is_object($results) ? get_class($results) : 'no object')),
+                    array('soap result'=>$results)
+                );
+            }
+
             /**$specialAtt = $this->_node->getConfig('customer_special_att');
             if(!strlen(trim($specialAtt))){
                 $specialAtt = false;
