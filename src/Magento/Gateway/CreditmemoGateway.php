@@ -340,19 +340,24 @@ class CreditmemoGateway extends AbstractGateway
             }
 
 
+            $creditmemoData = array(
+                'shipping_amount'=>$entity->getData('shipping_amount', 0),
+                'adjustment_positive'=>$entity->getData('adjustment_positive', 0),
+                'adjustment_negative'=>$entity->getData('adjustment_negative', 0),
+            );
+            if (count($itemData)) {
+                $creditmemoData['qtys'] = $itemData;
+            }
+
             $soapResult = $this->_soap->call('salesOrderCreditmemoCreate',
                 array($rootOrder->getUniqueId(),
-                array(
-                    'qtys'=>$itemData,
-                    'shipping_amount'=>$entity->getData('shipping_amount', 0),
-                    'adjustment_positive'=>$entity->getData('adjustment_positive', 0),
-                    'adjustment_negative'=>$entity->getData('adjustment_negative', 0),
-                ),
-                '',
-                FALSE,
-                FALSE,
-                $entity->getData('customer_balance', 0)
-            ));
+                    $creditmemoData,
+                    '',
+                    FALSE,
+                    FALSE,
+                    $entity->getData('customer_balance', 0)
+                )
+            );
 
             if (is_object($soapResult)) {
                 $soapResult = $soapResult->result;
