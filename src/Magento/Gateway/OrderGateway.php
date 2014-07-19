@@ -521,7 +521,7 @@ class OrderGateway extends AbstractGateway
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : null);
                 }
                 $this->_soap->call('salesOrderAddComment', array(
-                    $entity->getRootOriginalOrder()->getUniqueId(),
+                    $entity->getOriginalOrder()->getUniqueId(),
                     $status,
                     $comment,
                     $notify
