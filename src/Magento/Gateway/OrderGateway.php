@@ -698,9 +698,9 @@ class OrderGateway extends AbstractGateway
             'adjustment_negative'=>$adjustmentNegative,
         );
 
-        $rootOrder = $order->getRootOriginal();
+        $originalOrder = $order->getOriginalOrder();
         $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
-            $rootOrder->getUniqueId(),
+            $originalOrder->getUniqueId(),
             $creditmemoData,
             $comment,
             $notify,
