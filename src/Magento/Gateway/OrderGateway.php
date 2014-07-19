@@ -171,10 +171,11 @@ class OrderGateway extends AbstractGateway
                                     $payment['method'], $payment['cc_type'], $payment['amount_ordered']);
                             }
                         }elseif (isset($order['payment']['payment_id'])) {
-                            $methodExtended = $order['payment']['method']
-                                .(isset($order['payment']['cc_type']) && $order['payment']['cc_type']
-                                    ? '{{'.$order['payment']['cc_type'].'}}' : '');
-                            $payments[$methodExtended] = $order['payment']['amount_ordered'];
+                            $payments = $entityService->convertPaymentData(
+                                $order['payment']['method'],
+                                (isset($order['payment']['cc_type']) ? $order['payment']['cc_type'] : ''),
+                                $order['payment']['amount_ordered']
+                            );
                         }else{
                             throw new MagelinkException('Invalid payment details format for order '.$unique_id);
                         }
