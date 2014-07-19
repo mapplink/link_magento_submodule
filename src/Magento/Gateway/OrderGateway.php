@@ -719,12 +719,12 @@ class OrderGateway extends AbstractGateway
         }
 
         if(!$soapResult){
-            throw new MagelinkException('Failed to get creditmemo ID from Magento for order ' . $order->getUniqueId());
+            throw new MagelinkException('Failed to get creditmemo ID from Magento for order '.$order->getUniqueId());
         }
 
         $this->_soap->call('salesOrderCreditmemoAddComment', array(
             $soapResult,
-            'FOR ORDER: ' . $order->getUniqueId(),
+            'FOR ORDER: '.$order->getUniqueId(),
             false,
             false
         ));

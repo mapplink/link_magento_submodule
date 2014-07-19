@@ -321,15 +321,15 @@ class CreditmemoGateway extends AbstractGateway
             if (!$order || $order->getTypeStr() != 'order') {
                 throw new MagelinkException('Creditmemo parent not correctly set for Creditmemo '.$entity->getId());
             }
-            $rootOrder = $entity->getOriginalParent();
-            if (!$rootOrder || $rootOrder->getTypeStr() != 'order') {
+            $originalOrder = $entity->getOriginalParent();
+            if (!$originalOrder || $originalOrder->getTypeStr() != 'order') {
                 throw new MagelinkException('Creditmemo root parent not correctly set for Creditmemo '.$entity->getId());
             }
 
             /** @var \Entity\Entity[] $items */
             $items = $entity->getItems();
             if (!count($items)) {
-                $items = $rootOrder->getOrderItems();
+                $items = $originalOrder->getOrderItems();
             }
 
             $itemData = array();
@@ -366,7 +366,7 @@ class CreditmemoGateway extends AbstractGateway
             );
 
             $soapResult = $this->_soap->call('salesOrderCreditmemoCreate',
-                array($rootOrder->getUniqueId(),
+                array($originalOrder->getUniqueId(),
                     $creditmemoData,
                     '',
                     FALSE,
@@ -385,8 +385,8 @@ class CreditmemoGateway extends AbstractGateway
                 }
             }
             if (!$soapResult) {
-                $message = 'Failed to get creditmemo ID from Magento for order '.$order->getUniqueId()
-                    .' (Root original order '.$rootOrder->getUniqueId().').';
+                $message = 'Failed to get creditmemo ID from Magento for order '.$originalOrder->getUniqueId()
+                    .' (Hops order '.$order->getUniqueId().').';
                 throw new MagelinkException($message);
             }
             $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $soapResult);
@@ -425,7 +425,7 @@ class CreditmemoGateway extends AbstractGateway
 
             $this->_soap->call('salesOrderCreditmemoAddComment', array(
                 $soapResult,
-                'FOR ORDER: '.$rootOrder->getUniqueId(),
+                'FOR ORDER: '.$order->getUniqueId(),
                 false,
                 false
             ));
