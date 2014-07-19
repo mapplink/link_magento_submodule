@@ -321,7 +321,7 @@ class CreditmemoGateway extends AbstractGateway
             if (!$order || $order->getTypeStr() != 'order') {
                 throw new MagelinkException('Creditmemo parent not correctly set for Creditmemo '.$entity->getId());
             }
-            $rootOrder = $entity->getRootParent();
+            $rootOrder = $entity->getOriginalParent();
             if (!$rootOrder || $rootOrder->getTypeStr() != 'order') {
                 throw new MagelinkException('Creditmemo root parent not correctly set for Creditmemo '.$entity->getId());
             }
