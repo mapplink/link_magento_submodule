@@ -80,20 +80,20 @@ class CreditmemoGateway extends AbstractGateway
         if($this->_db && false){
             // TODO: Implement]
         }else if($this->_soap){
-
+            $timeStamp = $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'creditmemo', 'retrieve')
+                + (intval($this->_node->getConfig('time_delta_creditmemo')) * 3600);
             $results = $this->_soap->call('salesOrderCreditmemoList', array(
                 array(
                     'complex_filter'=>array(
                         array(
                             'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'creditmemo', 'retrieve') + (intval($this->_node->getConfig('time_delta_creditmemo')) * 3600))),
+                            'value'=>array('key'=>'gt', 'value'=>date('Y-m-d H:i:s', $timeStamp)),
                         ),
                     ),
                 ), // filters
             ));
 
-            foreach($results as $creditmemo){
-
+            foreach ($results as $creditmemo) {
                 $data = array();
 
                 $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($creditmemo['increment_id']));
@@ -120,7 +120,8 @@ class CreditmemoGateway extends AbstractGateway
                     'grand_total'=>'grand_total',
                     'hidden_tax'=>'hidden_tax_amount',
                 );
-                if($this->_node->getConfig('enterprise')){
+
+                if ($this->_node->getConfig('enterprise')) {
                     $map = array_merge($map, array(
                         'customer_balance'=>'customer_balance_amount',
                         'customer_balance_ref'=>'customer_bal_total_refunded',
@@ -137,7 +138,7 @@ class CreditmemoGateway extends AbstractGateway
                     ));
                 }
 
-                foreach($map as $att=>$key){
+                foreach ($map as $att=>$key) {
                     if(isset($creditmemo[$key])){
                         $data[$att] = $creditmemo[$key];
                     }else{
@@ -170,18 +171,19 @@ class CreditmemoGateway extends AbstractGateway
                         $data['shipping_address'] = null;
                     }
                 }*/
-                if(isset($creditmemo['order_id']) && $creditmemo['order_id']){
+                if (isset($creditmemo['order_id']) && $creditmemo['order_id']) {
                     $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'order', $store_id, $creditmemo['order_id']);
                     if($ent){
                         $parent_id = $ent->getId();
                     }
                 }
-                if(isset($creditmemo['comments'])){
+
+                if (isset($creditmemo['comments'])) {
                     foreach($creditmemo['comments'] as $com){
-                        if(isset($com['comment']) && preg_match('/FOR ORDER: ([0-9]+[a-zA-Z]*)/', $com['comment'], $matches)){
+                        if (isset($com['comment']) && preg_match('#FOR ORDER: ([0-9]+[a-zA-Z]*)#', $com['comment'], $matches)) {
                             $ent = $entityService->loadEntity($this->_node->getNodeId(), 'order', $store_id, $matches[1]);
                             if(!$ent){
-                                throw new MagelinkException('Comment referenced order ' . $matches[1] . ' on cm ' . $unique_id . ' but could not locate order!');
+                                throw new MagelinkException('Comment referenced order '.$matches[1].' on cm '.$unique_id.' but could not locate order!');
                             }else{
                                 $parent_id = $ent->getId();
                             }
@@ -253,24 +255,41 @@ class CreditmemoGateway extends AbstractGateway
      * Create all the CreditmemoItem entities for a given creditmemo
      * @param array $creditmemo
      * @param string $oid
-     * @param EntityService $es
+     * @param EntityService $entityService
      * @param bool $creationMode Whether this is for a newly created credit memo in magelink
      */
-    protected function createItems($creditmemo, $oid, EntityService $es, $creationMode){
+    protected function createItems($creditmemo, $oid, EntityService $entityService, $creationMode){
 
         $parent_id = $oid;
 
-        foreach($creditmemo['items'] as $item){
+        foreach ($creditmemo['items'] as $item) {
             $unique_id = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
-
             $local_id = $item['item_id'];
-            $product = $es->loadEntityLocal($this->_node->getNodeId(), 'product', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['product_id']);
-            $parent_item = $es->loadEntityLocal($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['parent_id']);
-            $order_item = $es->loadEntityLocal($this->_node->getNodeId(), 'orderitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $item['order_item_id']);
+
+            $product = $entityService->loadEntityLocal(
+                $this->_node->getNodeId(),
+                'product',
+                ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0),
+                $item['product_id']
+            );
+
+            $parent_item = $entityService->loadEntityLocal(
+                $this->_node->getNodeId(),
+                'creditmemoitem',
+                ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0),
+                $item['parent_id']
+            );
+
+            $order_item = $entityService->loadEntityLocal(
+                $this->_node->getNodeId(),
+                'orderitem',
+                ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0),
+                $item['order_item_id']
+            );
+
             $data = array(
                 'product'=>($product ? $product->getId() : null),
                 'parent_item'=>($parent_item ? $parent_item->getId() : null),
-                'order_item'=>($order_item ? $order_item->getId() : null),
                 'tax_amount'=>(isset($item['tax_amount']) ? $item['tax_amount'] : null),
                 'discount_amount'=>(isset($item['discount_amount']) ? $item['discount_amount'] : null),
                 'sku'=>(isset($item['sku']) ? $item['sku'] : null),
@@ -285,14 +304,15 @@ class CreditmemoGateway extends AbstractGateway
                 'hidden_tax_amount'=>(isset($item['hidden_tax_amount']) ? $item['hidden_tax_amount'] : null),
             );
 
-            $e = $es->loadEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id);
+            $e = $entityService->loadEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id);
             if(!$e){
                 $logLevel = ($creationMode ? \Log\Service\LogService::LEVEL_INFO : \Log\Service\LogService::LEVEL_WARN);
                 $this->getServiceLocator()->get('logService')->log($logLevel, 'ent_new_item', 'New creditmemo item ' . $unique_id . ' : ' . $local_id, array('uniq'=>$unique_id, 'local'=>$local_id), array('node'=>$this->_node, 'entity'=>$e));
-                $e = $es->createEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id, $data, $parent_id);
-                $es->linkEntity($this->_node->getNodeId(), $e, $local_id);
+                $e = $entityService->createEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id, $data, $parent_id);
+                $entityService->linkEntity($this->_node->getNodeId(), $e, $local_id);
             }else{
-                $es->updateEntity($this->_node->getNodeId(), $e, $data);
+                $data['order_item'] = ($order_item ? $order_item->getId() : NULL);
+                $entityService->updateEntity($this->_node->getNodeId(), $e, $data);
             }
         }
     }
