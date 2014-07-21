@@ -254,17 +254,17 @@ class CreditmemoGateway extends AbstractGateway
     /**
      * Create all the CreditmemoItem entities for a given creditmemo
      * @param array $creditmemo
-     * @param string $oid
+     * @param string $orderId
      * @param EntityService $entityService
      * @param bool $creationMode Whether this is for a newly created credit memo in magelink
      */
-    protected function createItems($creditmemo, $oid, EntityService $entityService, $creationMode){
+    protected function createItems($creditmemo, $orderId, EntityService $entityService, $creationMode){
 
-        $parent_id = $oid;
+        $parentId = $orderId;
 
         foreach ($creditmemo['items'] as $item) {
-            $unique_id = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
-            $local_id = $item['item_id'];
+            $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
+            $localId = $item['item_id'];
 
             $product = $entityService->loadEntityLocal(
                 $this->_node->getNodeId(),
@@ -304,15 +304,33 @@ class CreditmemoGateway extends AbstractGateway
                 'hidden_tax_amount'=>(isset($item['hidden_tax_amount']) ? $item['hidden_tax_amount'] : null),
             );
 
-            $e = $entityService->loadEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id);
-            if(!$e){
+            $entity = $entityService->loadEntity(
+                $this->_node->getNodeId(),
+                'creditmemoitem',
+                ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0),
+                $uniqueId
+            );
+            if (!$entity){
                 $logLevel = ($creationMode ? \Log\Service\LogService::LEVEL_INFO : \Log\Service\LogService::LEVEL_WARN);
-                $this->getServiceLocator()->get('logService')->log($logLevel, 'ent_new_item', 'New creditmemo item ' . $unique_id . ' : ' . $local_id, array('uniq'=>$unique_id, 'local'=>$local_id), array('node'=>$this->_node, 'entity'=>$e));
-                $e = $entityService->createEntity($this->_node->getNodeId(), 'creditmemoitem', ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0), $unique_id, $data, $parent_id);
-                $entityService->linkEntity($this->_node->getNodeId(), $e, $local_id);
-            }else{
+                $this->getServiceLocator()->get('logService')
+                    ->log($logLevel,
+                        'ent_new_item',
+                        'New creditmemo item '.$uniqueId.' : '.$localId,
+                        array('uniq'=>$uniqueId, 'local'=>$localId),
+                        array('node'=>$this->_node, 'entity'=>$entity)
+                    );
                 $data['order_item'] = ($order_item ? $order_item->getId() : NULL);
-                $entityService->updateEntity($this->_node->getNodeId(), $e, $data);
+                $entity = $entityService->createEntity(
+                    $this->_node->getNodeId(),
+                    'creditmemoitem',
+                    ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0),
+                    $uniqueId,
+                    $data,
+                    $parentId
+                );
+                $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+            }else{
+                $entityService->updateEntity($this->_node->getNodeId(), $entity, $data);
             }
         }
     }
