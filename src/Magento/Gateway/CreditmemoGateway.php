@@ -146,7 +146,6 @@ class CreditmemoGateway extends AbstractGateway
                     }
                 }
 
-                /**
                 if(isset($creditmemo['invoice_id']) && $creditmemo['invoice_id']){
                     $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'invoice', $store_id, $creditmemo['invoice_id']);
                     if($ent && $ent->getId()){
@@ -155,6 +154,7 @@ class CreditmemoGateway extends AbstractGateway
                         $data['invoice'] = null;
                     }
                 }
+
                 if(isset($creditmemo['billing_address_id']) && $creditmemo['billing_address_id']){
                     $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'address', $store_id, $creditmemo['billing_address_id']);
                     if($ent && $ent->getId()){
@@ -163,6 +163,7 @@ class CreditmemoGateway extends AbstractGateway
                         $data['billing_address'] = null;
                     }
                 }
+
                 if(isset($creditmemo['shipping_address_id']) && $creditmemo['shipping_address_id']){
                     $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'address', $store_id, $creditmemo['shipping_address_id']);
                     if($ent && $ent->getId()){
@@ -170,7 +171,8 @@ class CreditmemoGateway extends AbstractGateway
                     }else{
                         $data['shipping_address'] = null;
                     }
-                }*/
+                }
+
                 if (isset($creditmemo['order_id']) && $creditmemo['order_id']) {
                     $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'order', $store_id, $creditmemo['order_id']);
                     if($ent){
