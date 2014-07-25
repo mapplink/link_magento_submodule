@@ -134,11 +134,11 @@ class OrderGateway extends AbstractGateway
                             .(array_key_exists('customer_lastname', $order) ? $order['customer_lastname'] : ''),
                         'status'=>$order['status'],
                         'placed_at'=>$order['created_at'],
-                        'grand_total'=>$order['grand_total'],
+                        'grand_total'=>$order['base_grand_total'],
                         'weight_total'=>(array_key_exists('weight', $order) ? $order['weight'] : 0),
-                        'discount_total'=>(array_key_exists('discount_amount', $order) ? $order['discount_amount'] : 0),
-                        'shipping_total'=>(array_key_exists('shipping_amount', $order) ? $order['shipping_amount'] : 0),
-                        'tax_total'=>(array_key_exists('tax_amount', $order) ? $order['tax_amount'] : 0),
+                        'discount_total'=>(array_key_exists('base_discount_amount', $order) ? $order['base_discount_amount'] : 0),
+                        'shipping_total'=>(array_key_exists('base_shipping_amount', $order) ? $order['base_shipping_amount'] : 0),
+                        'tax_total'=>(array_key_exists('base_tax_amount', $order) ? $order['base_tax_amount'] : 0),
                         'shipping_method'=>(array_key_exists('shipping_method', $order) ? $order['shipping_method'] : null)
                     );
                     if (array_key_exists('base_gift_cards_amount', $order)) {
