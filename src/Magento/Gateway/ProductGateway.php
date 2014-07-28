@@ -516,14 +516,15 @@ class ProductGateway extends AbstractGateway {
 
             // Normal attribute
             switch ($attributeCode) {
+                case 'price':
+                case 'special_price':
+                case 'special_from_date':
+                case 'special_to_date':
+                    $value = ($value ? $value : NULL);
                 case 'name':
                 case 'description':
                 case 'short_description':
-                case 'price':
-                case 'special_price':
                 case 'weight':
-                case 'special_from_date':
-                case 'special_to_date':
                     // Same name in both systems
                     $data[$attributeCode] = $value;
                     break;
@@ -574,7 +575,7 @@ class ProductGateway extends AbstractGateway {
                 );
         }
 
-        $local_id = $entityService->getLocalId($this->_node->getNodeId(), $entity);
+        $localId = $entityService->getLocalId($this->_node->getNodeId(), $entity);
 
         $data['website_ids'] = array($entity->getStoreId());
         if(count($this->_node->getStoreViews()) && $type != \Entity\Update::TYPE_DELETE){
@@ -583,27 +584,42 @@ class ProductGateway extends AbstractGateway {
                     continue;
                 }
 
-                $res = $entityService->loadEntity($this->_node->getNodeId(), $entity->getType(), $store_id, $entity->getUniqueId());
-                if($res){
-                    if(!in_array($res->getStoreId(), $data['website_ids'])){
-                        $data['website_ids'][] = $res->getStoreId();
+                $loadedEntity = $entityService->loadEntity(
+                    $this->_node->getNodeId(), $entity->getType(), $store_id, $entity->getUniqueId());
+                if ($loadedEntity) {
+                    if (!in_array($loadedEntity->getStoreId(), $data['website_ids'])) {
+                        $data['website_ids'][] = $loadedEntity->getStoreId();
                     }
-                    if($type == \Entity\Update::TYPE_CREATE && !$local_id){
-                        $local_id = $entityService->getLocalId($this->_node->getNodeId(), $res);
-                        if($local_id){
-                            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'prod_storedup', 'Product exists in other store, forcing local ID for ' . $entity->getUniqueId() . ' to ' . $local_id, array('local_id'=>$local_id, 'resid'=>$res->getId()), array('entity'=>$entity));
-                            $entityService->linkEntity($this->_node->getNodeId(), $entity, $local_id);
+
+                    if($type == \Entity\Update::TYPE_CREATE && !$localId){
+                        $message = 'Product exists in other store, ';
+                        $localId = $entityService->getLocalId($this->_node->getNodeId(), $loadedEntity);
+                        if ($localId) {
+                            $this->getServiceLocator()->get('logService')
+                                ->log(\Log\Service\LogService::LEVEL_INFO,
+                                    'prod_storedup',
+                                    $message.'forcing local ID for '.$entity->getUniqueId().' to '.$localId,
+                                    array('local_id'=>$localId, 'loadedEntityId'=>$loadedEntity->getId()),
+                                    array('entity'=>$entity)
+                                );
+                            $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
                             $type = \Entity\Update::TYPE_UPDATE;
                             break;
                         }else{
-                            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'prod_storenew', 'Product exists in other store, but no local ID: ' . $entity->getUniqueId(), array('resid'=>$res->getId()), array('entity'=>$entity));
+                            $this->getServiceLocator()->get('logService')
+                                ->log(\Log\Service\LogService::LEVEL_INFO,
+                                    'prod_storenew',
+                                    'Product exists in other store, but no local ID: '.$entity->getUniqueId(),
+                                    array('loadedEntityId'=>$loadedEntity->getId()),
+                                    array('entity'=>$entity)
+                                );
                         }
                     }
                 }
             }
         }
 
-        if($type == \Entity\Update::TYPE_UPDATE || $local_id){
+        if($type == \Entity\Update::TYPE_UPDATE || $localId){
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_INFO,
                     'prod_update',
@@ -615,8 +631,8 @@ class ProductGateway extends AbstractGateway {
                         'data'=>$data
                     )
                 );
-            if($this->_db && $local_id){
-                $this->_db->updateEntityEav('catalog_product', $local_id, $entity->getStoreId(), $data);
+            if($this->_db && $localId){
+                $this->_db->updateEntityEav('catalog_product', $localId, $entity->getStoreId(), $data);
             }else{
                 $req = array(
                     $entity->getUniqueId(),
