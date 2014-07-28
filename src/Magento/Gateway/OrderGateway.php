@@ -168,12 +168,12 @@ class OrderGateway extends AbstractGateway
                         if (is_array($order['payment']) && !isset($order['payment']['payment_id'])) {
                             foreach ($order['payment'] as $payment) {
                                 $payments = $entityService->convertPaymentData(
-                                    $payment['method'], $payment['amount_ordered'], $payment['cc_type']);
+                                    $payment['method'], $payment['base_amount_ordered'], $payment['cc_type']);
                             }
                         }elseif (isset($order['payment']['payment_id'])) {
                             $payments = $entityService->convertPaymentData(
                                 $order['payment']['method'],
-                                $order['payment']['amount_ordered'],
+                                $order['payment']['base_amount_ordered'],
                                 (isset($order['payment']['cc_type']) ? $order['payment']['cc_type'] : '')
                             );
                         }else{
