@@ -480,6 +480,7 @@ class ProductGateway extends AbstractGateway {
                 'multi_data'=>array()
             )
         );
+        $removeSingleData = $removeMultiData = TRUE;
 
         foreach ($data as $code=>$value) {
             $isCustomAttribute = in_array($code, $customAttributes);
@@ -487,15 +488,27 @@ class ProductGateway extends AbstractGateway {
                 if (is_array($data[$code])) {
                     // TODO (maybe): Implement
                     throw new MagelinkException("This gateway doesn't support multi_data custom attributes yet.");
+                    $removeMultiData = FALSE;
                 }else{
                     $soapData['additional_attributes']['single_data'][] = array(
                         'key'=>$code,
                         'value'=>$value,
                     );
+                    $removeSingleData = FALSE;
                 }
             }else{
                 $soapData[$code] = $value;
             }
+        }
+
+        if ($removeSingleData) {
+            unset($data['additional_attributes']['single_data']);
+        }
+        if ($removeMultiData) {
+            unset($data['additional_attributes']['multi_data']);
+        }
+        if ($removeSingleData && $removeMultiData) {
+            unset($data['additional_attributes']);
         }
 
         return $soapData;
@@ -596,11 +609,6 @@ class ProductGateway extends AbstractGateway {
                     // Warn unsupported attribute
                     break;
             }
-        }
-
-        if (count($data['additional_attributes']['single_data']) === 0
-              && count($data['additional_attributes']['multi_data']) === 0) {
-            unset($data['additional_attributes']);
         }
 
         if (!count($data)) {
