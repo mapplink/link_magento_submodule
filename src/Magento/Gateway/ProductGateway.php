@@ -98,13 +98,18 @@ class ProductGateway extends AbstractGateway {
 
         $timestamp = time();
 
-        foreach($this->_node->getStoreViews() as $store_id=>$store_view){
-            $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve') + (intval($this->_node->getConfig('time_delta_product')) * 3600));
+        foreach ($this->_node->getStoreViews() as $store_id=>$store_view) {
+            $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve')
+                + (intval($this->_node->getConfig('time_delta_product')) * 3600));
 
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'retr_time', 'Retrieving products updated since ' . $retTime, array('type'=>'product', 'timestamp'=>$retTime));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_INFO,
+                    'retr_time',
+                    'Retrieving products updated since '.$retTime,
+                    array('type'=>'product', 'timestamp'=>$retTime)
+                );
 
-            if($this->_db){
-
+            if ($this->_db) {
                 $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', $retTime);
 
                 if(!count($updatedProducts)){
@@ -175,7 +180,7 @@ class ProductGateway extends AbstractGateway {
                     if(isset($this->_attributeSets[intval($rawData['attribute_set_id'])])){
                         $data['product_class'] = $this->_attributeSets[intval($rawData['attribute_set_id'])]['name'];
                     }else{
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_set', 'Unknown attribute set ID ' . $rawData['attribute_set_id'], array('set'=>$rawData['attribute_set_id'], 'sku'=>$rawData['sku']));
+                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_set', 'Unknown attribute set ID '.$rawData['attribute_set_id'], array('set'=>$rawData['attribute_set_id'], 'sku'=>$rawData['sku']));
                     }
                     $parent_id = null; // TODO: Calculate
                     $sku = $rawData['sku'];
@@ -209,7 +214,7 @@ class ProductGateway extends AbstractGateway {
                         $data['product_class'] = $this->_attributeSets[intval($data['set'])]['name'];
                         unset($data['set']);
                     }else{
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_set', 'Unknown attribute set ID ' . $data['set'], array('set'=>$data['set'], 'sku'=>$data['sku']));
+                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_set', 'Unknown attribute set ID '.$data['set'], array('set'=>$data['set'], 'sku'=>$data['sku']));
                     }
 
                     if(isset($data[''])){
@@ -440,7 +445,7 @@ class ProductGateway extends AbstractGateway {
             foreach($res['additional_attributes'] as $pair){
                 $att = trim(strtolower($pair['key']));
                 if(!in_array($att, $additional)){
-                    throw new MagelinkException('Invalid attribute returned by Magento: ' . $att);
+                    throw new MagelinkException('Invalid attribute returned by Magento: '.$att);
                 }
                 if(isset($pair['value'])){
                     $data[$att] = $pair['value'];
@@ -460,6 +465,43 @@ class ProductGateway extends AbstractGateway {
     }
 
     /**
+     * Restructure data for soap call and return this array
+     * @param array $data
+     * @param array $customAttributes
+     * @return array $soapData
+     * @throws \Magelink\Exception\MagelinkException
+     */
+    protected function getUpdateDataForSoapCall(array $data, array $customAttributes)
+    {
+        // Restructure data for soap call
+        $soapData = array(
+            'additional_attributes'=>array(
+                'single_data'=>array(),
+                'multi_data'=>array()
+            )
+        );
+
+        foreach ($data as $code=>$value) {
+            $isCustomAttribute = in_array($code, $customAttributes);
+            if ($isCustomAttribute) {
+                if (is_array($data[$code])) {
+                    // TODO (maybe): Implement
+                    throw new MagelinkException("This gateway doesn't support multi_data custom attributes yet.");
+                }else{
+                    $soapData['additional_attributes']['single_data'][] = array(
+                        'key'=>$code,
+                        'value'=>$value,
+                    );
+                }
+            }else{
+                $soapData[$code] = $value;
+            }
+        }
+
+        return $soapData;
+    }
+
+    /**
      * Write out all the updates to the given entity.
      * @param \Entity\Entity $entity
      * @param string[] $attributes
@@ -470,30 +512,29 @@ class ProductGateway extends AbstractGateway {
         /** @var \Entity\Service\EntityService $entityService */
         $entityService = $this->getServiceLocator()->get('entityService');
 
-        $additional = $this->_node->getConfig('product_attributes');
-        if (is_string($additional)) {
-            $additional = explode(',', $additional);
+        $customAttributes = $this->_node->getConfig('product_attributes');
+        if (is_string($customAttributes)) {
+            $customAttributes = explode(',', $customAttributes);
         }
-        if (!$additional || !is_array($additional)) {
-            $additional = array();
+        if (!$customAttributes || !is_array($customAttributes)) {
+            $customAttributes = array();
         }
 
         $this->getServiceLocator()->get('logService')
             ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
                 'mag_prod_write_update',
                 'Attributes for update of product '.$entity->getUniqueId().': '.var_export($attributes, TRUE),
-                array('attributes'=>$attributes, 'additional'=>$additional),
+                array('attributes'=>$attributes, 'custom'=>$customAttributes),
                 array('entity'=>$entity)
             );
 
-        $data = array(
-            'additional_attributes'=>array(
-                'single_data'=>array(),
-                'multi_data'=>array(),
-            ),
-        );
+        $data = array();
+        $attributeCodes = array_unique(array_merge(
+            //array('special_price', 'special_from_date', 'special_to_date'), // force update off these attributes
+            //$customAttributes,
+            $attributes
+        ));
 
-        $attributeCodes = array_merge($attributes, $additional);
         foreach ($attributeCodes as $attributeCode) {
 
             if (strlen(trim($attributeCode)) == 0) {
@@ -501,77 +542,59 @@ class ProductGateway extends AbstractGateway {
             }
 
             $value = $entity->getData($attributeCode);
-            if (in_array($attributeCode, $additional)) {
-                // Custom attribute
-                if (is_array($value)) {
-                    // TODO implement (maybe)
-                    throw new MagelinkException('This gateway does not yet support multi_data additional attributes');
-                }else{
-                    switch ($attributeCode) {
-                        case 'barcode':
-                        case 'bin_location':
-                        case 'msrp':
-                            $data['additional_attributes']['single_data'][] = array(
-                                'key'=>$attributeCode,
-                                'value'=>$value,
-                            );
-                            break;
-                        case 'brand':
-                        case 'size':
-                            // Ignore these attributes
-                            break;
-                        default:
-                            $message = 'Additional attribute '.$attributeCode.' is neither on the whitelist'
-                                .' nor on the blacklist.';
-                            $this->getServiceLocator()->get('logService')
-                                ->log(\Log\Service\LogService::LEVEL_ERROR, 'mag_prod_attribute', $message, array());
+            switch ($attributeCode) {
+                // Normal attributes
+                case 'price':
+                case 'special_price':
+                case 'special_from_date':
+                case 'special_to_date':
+                    $value = ($value ? $value : NULL);
+                case 'name':
+                case 'description':
+                case 'short_description':
+                case 'weight':
+                // Custom attributes
+                case 'barcode':
+                case 'bin_location':
+                case 'msrp':
+                    // Same name in both systems
+                    $data[$attributeCode] = $value;
+                    break;
+
+                case 'enabled':
+                    $data['status'] = ($value == 1 ? 2 : 1);
+                    break;
+                case 'visible':
+                    $data['visibility'] = ($value == 1 ? 4 : 1);
+                    break;
+                case 'taxable':
+                    $data['tax_class_id'] = ($value == 1 ? 2 : 1);
+                    break;
+
+                // ToDo (maybe): Add logic for this custom attributes
+                case 'brand':
+                case 'size':
+                    // Ignore attributes
+                    break;
+
+                case 'product_class':
+                case 'type':
+                    if($type != \Entity\Update::TYPE_CREATE){
+                        // ToDo: Log error (but no exception)
+                    }else{
+                        // Ignore attributes
                     }
-                }
-            }else{
-                // Normal attribute
-                switch ($attributeCode) {
-                    case 'price':
-                    case 'special_price':
-                    case 'special_from_date':
-                    case 'special_to_date':
-                        $value = ($value ? $value : NULL);
-                    case 'name':
-                    case 'description':
-                    case 'short_description':
-                    case 'weight':
-                        // Same name in both systems
-                        $data[$attributeCode] = $value;
-                        break;
-                    case 'product_class':
-                        if($type != \Entity\Update::TYPE_CREATE){
-                            // TODO log error (but no exception)
-                        }
-                        break;
-                    case 'type':
-                        if($type != \Entity\Update::TYPE_CREATE){
-                            // TODO log error (but no exception)
-                        }
-                        break;
-                    case 'enabled':
-                        $data['status'] = ($value == 1 ? 2 : 1);
-                        break;
-                    case 'visible':
-                        $data['visibility'] = ($value == 1 ? 4 : 1);
-                        break;
-                    case 'taxable':
-                        $data['tax_class_id'] = ($value == 1 ? 2 : 1);
-                        break;
-                    default:
-                        $this->getServiceLocator()->get('logService')
-                            ->log(\Log\Service\LogService::LEVEL_WARN,
-                                'prod_inv_data',
-                                'Unsupported attribute for update of '.$entity->getUniqueId().': '.$attributeCode,
-                                array('attribute'=>$attributeCode),
-                                array('entity'=>$entity)
-                            );
-                        // Warn unsupported attribute
-                        break;
-                }
+                    break;
+                default:
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_WARN,
+                            'mag_prod_inv_data',
+                            'Unsupported attribute for update of '.$entity->getUniqueId().': '.$attributeCode,
+                            array('attribute'=>$attributeCode),
+                            array('entity'=>$entity)
+                        );
+                    // Warn unsupported attribute
+                    break;
             }
         }
 
@@ -583,7 +606,7 @@ class ProductGateway extends AbstractGateway {
         if (!count($data)) {
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_WARN,
-                    'prod_noupd',
+                    'mag_prod_noupd',
                     'No update required for '.$entity->getUniqueId().' but requested was '.implode(', ', $attributes),
                     array('attributes'=>$attributes),
                     array('entity'=>$entity)
@@ -635,89 +658,144 @@ class ProductGateway extends AbstractGateway {
             }
         }
 
-        if($type == \Entity\Update::TYPE_UPDATE || $localId){
-            $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_INFO,
-                    'prod_update',
-                    'Updating product '.$entity->getUniqueId().' with '.implode(', ', array_keys($data)),
-                    array(
-                        'keys'=>array_keys($data),
-                        'additional attributes'=>(isset($data['additional_attributes']) ? $data['additional_attributes'] : NULL),
-                        'websites'=>$data['website_ids'],
-                        'data'=>$data
-                    )
-                );
-            if($this->_db && $localId){
-                $this->_db->updateEntityEav('catalog_product', $localId, $entity->getStoreId(), $data);
+        $soapData = $this->getUpdateDataForSoapCall($data, $customAttributes);
+        if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
+
+            $logData = array(
+                'type'=>$entity->getData('type'),
+                'websites'=>$data['website_ids'],
+                'data keys'=>array_keys($data),
+                'data'=>$data
+            );
+
+            $updateViaDbApi =  $this->_db && $localId;
+            if ($updateViaDbApi) {
+                $message = 'DB';
             }else{
-                $req = array(
+                $message = 'SOAP';
+                $logData['soap data keys'] = array_keys($soapData);
+                $logData['soap data'] = $soapData;
+
+            }
+
+            $message = 'Updating product ('.$message.'): '
+                .$entity->getUniqueId().' with '.implode(', ', array_keys($data));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_INFO, 'mag_prod_update', $message, $logData);
+
+            if ($updateViaDbApi) {
+                $tablePrefix = 'catalog_product';
+                $this->_db->updateEntityEav(
+                    $tablePrefix,
+                    $localId,
+                    $entity->getStoreId(),
+                    $data
+                );
+            }else{
+                $request = array(
                     $entity->getUniqueId(),
-                    $data,
+                    $soapData,
                     $entity->getStoreId(),
                     'sku'
                 );
-                $this->_soap->call('catalogProductUpdate', $req);
+                $this->_soap->call('catalogProductUpdate', $request);
             }
-        }else if($type == \Entity\Update::TYPE_CREATE){
+        }elseif ($type == \Entity\Update::TYPE_CREATE ){
 
-            $attributeSet = null;
-            foreach($this->_attributeSets as $setId=>$set){
-                if($set['name'] == $entity->getData('product_class', 'default')){
+            $attributeSet = NULL;
+            foreach ($this->_attributeSets as $setId=>$set) {
+                if ($set['name'] == $entity->getData('product_class', 'default')) {
                     $attributeSet = $setId;
                     break;
                 }
             }
-            if($attributeSet == null){
-                throw new \Magelink\Exception\SyncException('Invalid product class ' . $entity->getData('product_class', 'default'));
+            if ($attributeSet === NULL) {
+                $message = 'Invalid product class '.$entity->getData('product_class', 'default');
+                throw new \Magelink\Exception\SyncException($message);
             }
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'prod_create', 'Creating product ' . $entity->getUniqueId() . ' with ' . implode(', ', array_keys($data)), array('type'=>$entity->getData('type'), 'set'=>$attributeSet, 'keys'=>array_keys($data), 'websites'=>$data['website_ids']));
-            $req = array(
+
+            $message = 'Creating product (SOAP): '.$entity->getUniqueId().' with '.implode(', ', array_keys($data));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_INFO,
+                    'mag_prod_create',
+                    $message,
+                    array(
+                        'type'=>$entity->getData('type'),
+                        'websites'=>$data['website_ids'],
+                        'set'=>$attributeSet,
+                        'data keys'=>array_keys($data),
+                        'data'=>$data,
+                        'soap data keys'=>array_keys($soapData),
+                        'soap data'=>$soapData
+                    )
+                );
+
+            $request = array(
                 $entity->getData('type'),
                 $attributeSet,
                 $entity->getUniqueId(),
-                $data,
+                $soapData,
                 $entity->getStoreId()
             );
-            /** @var \SoapFault $fault */
-            $fault = null;
+
             try{
-                $res = $this->_soap->call('catalogProductCreate', $req);
-            }catch(\SoapFault $sf){
-                if($sf->getMessage() == 'The value of attribute "SKU" must be unique'){
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'prod_dupfault', 'Creating product ' . $entity->getUniqueId() . ' hit SKU duplicate fault', array(), array('entity'=>$entity));
+                $soapResult = $this->_soap->call('catalogProductCreate', $request);
+                $soapFault = NULL;
+            }catch(\SoapFault $soapFault){
+                $soapResult = FALSE;
+                if ($soapFault->getMessage() == 'The value of attribute "SKU" must be unique') {
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_WARN,
+                            'prod_dupfault',
+                            'Creating product '.$entity->getUniqueId().' hit SKU duplicate fault',
+                            array(),
+                            array('entity'=>$entity)
+                        );
+
                     $check = $this->_soap->call('catalogProductInfo', array(
                         $entity->getUniqueId(),
                         0, // store ID
                         array(),
                         'sku'
                     ));
-                    if(!$check || !count($check)){
+
+                    if (!$check || !count($check)) {
                         throw new MagelinkException('Magento complained duplicate SKU but we cannot find a duplicate!');
+
                     }else{
-                        $found = false;
-                        foreach($check as $row){
+                        $found = FALSE;
+                        foreach ($check as $row) {
                             if($row['sku'] == $entity->getUniqueId()){
-                                $found = true;
+                                $found = TRUE;
+
                                 $entityService->linkEntity($this->_node->getNodeId(), $entity, $row['product_id']);
-                                $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'prod_dupres', 'Creating product ' . $entity->getUniqueId() . ' resolved SKU duplicate fault', array('local_id'=>$row['product_id']), array('entity'=>$entity));
+                                $this->getServiceLocator()->get('logService')
+                                    ->log(\Log\Service\LogService::LEVEL_WARN,
+                                        'prod_dupres',
+                                        'Creating product '.$entity->getUniqueId().' resolved SKU duplicate fault',
+                                        array('local_id'=>$row['product_id']),
+                                        array('entity'=>$entity)
+                                    );
                             }
                         }
-                        if(!$found){
-                            throw new MagelinkException('Magento found duplicate SKU but we could not replicate - database fault? ' . $entity->getUniqueId());
+
+                        if (!$found) {
+                            $message = 'Magento found duplicate SKU '.$entity->getUniqueId()
+                                .' but we could not replicate. Database fault?';
+                            throw new MagelinkException($message);
                         }
                     }
                 }
-                $res = false;
-                $fault = $sf;
             }
-            if(!$res){
-                throw new MagelinkException('Error creating product in Magento (' . $entity->getUniqueId() . '!', 0, $fault);
+
+            if (!$soapResult) {
+                $message = 'Error creating product in Magento ('.$entity->getUniqueId().'!';
+                throw new MagelinkException($message, 0, $soapFault);
             }
-            $entityService->linkEntity($this->_node->getNodeId(), $entity, $res);
+
+            $entityService->linkEntity($this->_node->getNodeId(), $entity, $soapResult);
         }
     }
-
-
 
     /**
      * Write out the given action.
@@ -739,7 +817,8 @@ class ProductGateway extends AbstractGateway {
                 return true;
                 break;
             default:
-                throw new MagelinkException('Unsupported action type ' . $action->getType() . ' for Magento Orders.');
+                throw new MagelinkException('Unsupported action type '.$action->getType().' for Magento Orders.');
         }
     }
+    
 }
