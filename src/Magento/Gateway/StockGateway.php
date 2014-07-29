@@ -165,7 +165,7 @@ class StockGateway extends AbstractGateway {
                         ->log(\Log\Service\LogService::LEVEL_ERROR,
                             'stock_nolocal',
                             'Stock update for '.$entity->getUniqueId().' had no local ID!',
-                            array('data'=>$entity->getAllData()),
+                            array('data'=>$entity->getAllSetData()),
                             array('node'=>$this->_node, 'entity'=>$entity)
                         );
                     return;
