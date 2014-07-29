@@ -272,111 +272,129 @@ class Db implements ServiceLocatorAwareInterface {
      * Update an entity in the Magento EAV system
      *
      * @todo Untested on multi-select / option type attributes.
-     * @param string $entity_type
-     * @param int $entity_id
-     * @param int $store_id
+     * @param string $entityType
+     * @param int $entityId
+     * @param int $storeId
      * @param array $data Key->value data to update, key is attribute ID.
      * @throws \Exception
      */
-    public function updateEntityEav($entity_type, $entity_id, $store_id, $data){
+    public function updateEntityEav($entityType, $entityId, $storeId, $data)
+    {
         $this->_adapter->getDriver()->getConnection()->beginTransaction();
         try{
+            $staticUpdate = array();
             $attributes = array_keys($data);
 
-            $entityTypeData = $this->getEntityType($entity_type);
-            $prefix = $this->getEntityPrefix($entity_type);
+            $entityTypeData = $this->getEntityType($entityType);
+            $prefix = $this->getEntityPrefix($entityType);
 
-
-            $staticUpdate = array();
-
-            $attributesByType = $this->preprocessEavAttributes($entity_type, $attributes);
-
-            if(isset($attributesByType['static'])){
-                foreach($attributesByType['static'] as $code){
+            $attributesByType = $this->preprocessEavAttributes($entityType, $attributes);
+            if (isset($attributesByType['static'])) {
+                foreach ($attributesByType['static'] as $code) {
                     $staticUpdate[$code] = $data[$code];
                 }
+                unset($attributesByType['static']);
             }
 
-            if(count($staticUpdate)){
-                $this->getTableGateway($prefix.'_entity')->update($staticUpdate, array('entity_id'=>$entity_id));
+            if (count($staticUpdate)) {
+                $this->getTableGateway($prefix.'_entity')
+                    ->update($staticUpdate, array('entity_id'=>$entityId));
             }
 
             $attributesById = array();
-            foreach($attributes as $code){
-                $attr = $this->getAttribute($entity_type, $code);
+            foreach ($attributes as $code) {
+                $attr = $this->getAttribute($entityType, $code);
                 $attributesById[$attr['attribute_id']] = $attr;
             }
 
-            foreach($attributesByType as $type=>$atts){
-                if($type == 'static'){
-                    // Already processed earlier
-                    continue;
-                }
-                $doSourceTranslation = false;
+            foreach ($attributesByType as $type=>$singleTypeAttributes) {
+
+                $doSourceTranslation = FALSE;
                 $sourceTranslation = array();
                 if($type == 'source_int'){
                     $type = $prefix . '_entity_int';
                     $doSourceTranslation = true;
 
-                    foreach($atts as $code=>$aid){
-                        $sourceTranslation[$aid] = array_flip($this->loadAttributeOptions($aid, $store_id));
+                    foreach ($singleTypeAttributes as $code=>$attributeId) {
+                        $sourceTranslation[$attributeId] =
+                            array_flip($this->loadAttributeOptions($attributeId, $storeId));
                     }
                 }
 
-                foreach($atts as $code=>$aid){
+                foreach($singleTypeAttributes as $code=>$attributeId){
 
                     $value = $data[$code];
                     if($doSourceTranslation){
-                        if(isset($sourceTranslation[$aid][$value])){
-                            $value = $sourceTranslation[$aid][$value];
+                        if(isset($sourceTranslation[$attributeId][$value])){
+                            $value = $sourceTranslation[$attributeId][$value];
                         }else{
-                            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value ' . $value . ' for att ' . $attributesById[$aid]['attribute_code'], array('value'=>$value, 'options'=>$sourceTranslation[$aid]), array());
+                            $message = 'DB API found unmatched value '.$value
+                                .' for attribute '.$attributesById[$attributeId]['attribute_code'];
+                            $this->getServiceLocator()->get('logService')
+                                ->log(\Log\Service\LogService::LEVEL_WARN,
+                                    'invalid_value',
+                                    $message,
+                                    array('value'=>$value, 'options'=>$sourceTranslation[$attributeId]),
+                                    array()
+                                );
                         }
                     }
 
-                    if($store_id > 0){
-                        $resultsDefault = $this->getTableGateway($type)->select(array(
-                            'entity_id'=>$entity_id,
-                            'entity_type_id'=>$entityTypeData['entity_type_id'],
-                            'store_id'=>0,
-                            'attribute_id'=>$aid,
-                        ));
+                    if($storeId > 0){
+                        $resultsDefault = $this->getTableGateway($type)
+                            ->select(array(
+                                'entity_id'=>$entityId,
+                                'entity_type_id'=>$entityTypeData['entity_type_id'],
+                                'store_id'=>0,
+                                'attribute_id'=>$attributeId,
+                            ));
+
                         if(!$resultsDefault || !count($resultsDefault)){
-                            $this->getTableGateway($type)->insert(array('entity_id'=>$entity_id, 'entity_type_id'=>$entityTypeData['entity_type_id'], 'store_id'=>0, 'attribute_id'=>$aid, 'value'=>$value));
+                            $this->getTableGateway($type)
+                                ->insert(array(
+                                    'entity_id'=>$entityId,
+                                    'entity_type_id'=>$entityTypeData['entity_type_id'],
+                                    'store_id'=>0,
+                                    'attribute_id'=>$attributeId,
+                                    'value'=>$value
+                                ));
                         }
                     }
+
                     $resultsStore = $this->getTableGateway($type)->select(array(
-                        'entity_id'=>$entity_id,
+                        'entity_id'=>$entityId,
                         'entity_type_id'=>$entityTypeData['entity_type_id'],
-                        'store_id'=>$store_id,
-                        'attribute_id'=>$aid,
+                        'store_id'=>$storeId,
+                        'attribute_id'=>$attributeId,
                     ));
+
                     if(!$resultsStore || !count($resultsStore)){
                         $this->getTableGateway($type)->insert(array(
-                            'entity_id'=>$entity_id,
+                            'entity_id'=>$entityId,
                             'entity_type_id'=>$entityTypeData['entity_type_id'],
-                            'store_id'=>$store_id,
-                            'attribute_id'=>$aid,
+                            'store_id'=>$storeId,
+                            'attribute_id'=>$attributeId,
                             'value'=>$value)
                         );
                     }else{
                         $this->getTableGateway($type)->update(
                             array('value'=>$value),
                             array(
-                                'entity_id'=>$entity_id,
+                                'entity_id'=>$entityId,
                                 'entity_type_id'=>$entityTypeData['entity_type_id'],
-                                'store_id'=>$store_id,
-                                'attribute_id'=>$aid
+                                'store_id'=>$storeId,
+                                'attribute_id'=>$attributeId
                             )
                         );
                     }
                 }
             }
-            $this->_adapter->getDriver()->getConnection()->commit();
-        }catch(\Exception $e){
 
+            $this->_adapter->getDriver()->getConnection()->commit();
+
+        }catch(\Exception $exception){
             $this->_adapter->getDriver()->getConnection()->rollback();
-            throw $e;
+            throw $exception;
         }
     }
 
