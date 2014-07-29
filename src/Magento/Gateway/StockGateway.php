@@ -147,15 +147,27 @@ class StockGateway extends AbstractGateway {
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type=\Entity\Update::TYPE_UPDATE)
     {
-        if(in_array('available', $attributes)){
+        if (in_array('available', $attributes)) {
             /** @var \Entity\Service\EntityService $entityService */
             $entityService = $this->getServiceLocator()->get('entityService');
             $local_id = $entityService->getLocalId($this->_node->getNodeId(), $entity);
-            if(!$local_id){
-                $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'stock_prodlocal', 'Stock update for ' . $entity->getUniqueId() . ' had to use parent local!', array('parent'=>$entity->getParentId()), array('node'=>$this->_node, 'entity'=>$entity));
+            if (!$local_id) {
+                $this->getServiceLocator()->get('logService')
+                    ->log(\Log\Service\LogService::LEVEL_WARN,
+                        'stock_prodlocal',
+                        'Stock update for '.$entity->getUniqueId().' had to use parent local!',
+                        array('parent'=>$entity->getParentId()),
+                        array('node'=>$this->_node, 'entity'=>$entity)
+                    );
                 $local_id = $entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
-                if(!$local_id){
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR, 'stock_nolocal', 'Stock update for ' . $entity->getUniqueId() . ' had no local ID!', array('data'=>$entity->getAllData()), array('node'=>$this->_node, 'entity'=>$entity));
+                if (!$local_id) {
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_ERROR,
+                            'stock_nolocal',
+                            'Stock update for '.$entity->getUniqueId().' had no local ID!',
+                            array('data'=>$entity->getAllData()),
+                            array('node'=>$this->_node, 'entity'=>$entity)
+                        );
                     return;
                 }
             }
@@ -163,7 +175,7 @@ class StockGateway extends AbstractGateway {
             $qty = $entity->getData('available');
             $is_in_stock = ($qty > 0);
 
-            if($this->_db){
+            if ($this->_db) {
                 $this->_db->updateStock($local_id, $qty, $is_in_stock ? 1 : 0);
             }else{
                 $this->_soap->call('catalogInventoryStockItemUpdate', array(
