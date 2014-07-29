@@ -46,7 +46,7 @@ class ProductGateway extends AbstractGateway {
     /**
      * @var array Copy of attribute sets, loaded from Magento
      */
-    protected $_attSets = null;
+    protected $_attributeSets = null;
 
     /**
      * Initialize the gateway and perform any setup actions required.
@@ -78,9 +78,9 @@ class ProductGateway extends AbstractGateway {
         $this->_ns = $this->getServiceLocator()->get('nodeService');
 
         $attSets = $this->_soap->call('catalogProductAttributeSetList', array());
-        $this->_attSets = array();
+        $this->_attributeSets = array();
         foreach($attSets as $arr){
-            $this->_attSets[$arr['set_id']] = $arr;
+            $this->_attributeSets[$arr['set_id']] = $arr;
         }
     }
 
@@ -172,8 +172,8 @@ class ProductGateway extends AbstractGateway {
                         }
                     }
 
-                    if(isset($this->_attSets[intval($rawData['attribute_set_id'])])){
-                        $data['product_class'] = $this->_attSets[intval($rawData['attribute_set_id'])]['name'];
+                    if(isset($this->_attributeSets[intval($rawData['attribute_set_id'])])){
+                        $data['product_class'] = $this->_attributeSets[intval($rawData['attribute_set_id'])]['name'];
                     }else{
                         $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_set', 'Unknown attribute set ID ' . $rawData['attribute_set_id'], array('set'=>$rawData['attribute_set_id'], 'sku'=>$rawData['sku']));
                     }
@@ -205,8 +205,8 @@ class ProductGateway extends AbstractGateway {
                         $data = array_merge($data, $this->loadFullProduct($prod['product_id'], $store_id, $entityConfigService));
                     }
 
-                    if(isset($this->_attSets[intval($data['set'])])){
-                        $data['product_class'] = $this->_attSets[intval($data['set'])]['name'];
+                    if(isset($this->_attributeSets[intval($data['set'])])){
+                        $data['product_class'] = $this->_attributeSets[intval($data['set'])]['name'];
                         unset($data['set']);
                     }else{
                         $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_set', 'Unknown attribute set ID ' . $data['set'], array('set'=>$data['set'], 'sku'=>$data['sku']));
@@ -493,7 +493,8 @@ class ProductGateway extends AbstractGateway {
             ),
         );
 
-        foreach ($attributes as $attributeCode) {
+        $attributeCodes = array_merge($attributes, $additional);
+        foreach ($attributeCodes as $attributeCode) {
 
             if (strlen(trim($attributeCode)) == 0) {
                 continue;
@@ -503,60 +504,74 @@ class ProductGateway extends AbstractGateway {
             if (in_array($attributeCode, $additional)) {
                 // Custom attribute
                 if (is_array($value)) {
-                    // TODO implement
+                    // TODO implement (maybe)
                     throw new MagelinkException('This gateway does not yet support multi_data additional attributes');
                 }else{
-                    $data['additional_attributes']['single_data'][] = array(
-                        'key'=>$attributeCode,
-                        'value'=>$value,
-                    );
+                    switch ($attributeCode) {
+                        case 'barcode':
+                        case 'bin_location':
+                        case 'msrp':
+                            $data['additional_attributes']['single_data'][] = array(
+                                'key'=>$attributeCode,
+                                'value'=>$value,
+                            );
+                            break;
+                        case 'brand':
+                        case 'size':
+                            // Ignore these attributes
+                            break;
+                        default:
+                            $message = 'Additional attribute '.$attributeCode.' is neither on the whitelist'
+                                .' nor on the blacklist.';
+                            $this->getServiceLocator()->get('logService')
+                                ->log(\Log\Service\LogService::LEVEL_ERROR, 'mag_prod_attribute', $message, array());
+                    }
                 }
-                continue;
-            }
-
-            // Normal attribute
-            switch ($attributeCode) {
-                case 'price':
-                case 'special_price':
-                case 'special_from_date':
-                case 'special_to_date':
-                    $value = ($value ? $value : NULL);
-                case 'name':
-                case 'description':
-                case 'short_description':
-                case 'weight':
-                    // Same name in both systems
-                    $data[$attributeCode] = $value;
-                    break;
-                case 'product_class':
-                    if($type != \Entity\Update::TYPE_CREATE){
-                        // TODO log error (but no exception)
-                    }
-                    break;
-                case 'type':
-                    if($type != \Entity\Update::TYPE_CREATE){
-                        // TODO log error (but no exception)
-                    }
-                    break;
-                case 'enabled':
-                    $data['status'] = ($value == 1 ? 2 : 1);
-                    break;
-                case 'visible':
-                    $data['visibility'] = ($value == 1 ? 4 : 1);
-                    break;
-                case 'taxable':
-                    $data['tax_class_id'] = ($value == 1 ? 2 : 1);
-                    break;
-                default:
-                    $this->getServiceLocator()->get('logService')
-                        ->log(\Log\Service\LogService::LEVEL_WARN,
-                            'prod_inv_data',
-                            'Unsupported attribute for update of '.$entity->getUniqueId().': '.$attributeCode,
-                            array('attribute'=>$attributeCode),
-                            array('entity'=>$entity)
-                        );
-                    // Warn unsupported attribute
-                    break;
+            }else{
+                // Normal attribute
+                switch ($attributeCode) {
+                    case 'price':
+                    case 'special_price':
+                    case 'special_from_date':
+                    case 'special_to_date':
+                        $value = ($value ? $value : NULL);
+                    case 'name':
+                    case 'description':
+                    case 'short_description':
+                    case 'weight':
+                        // Same name in both systems
+                        $data[$attributeCode] = $value;
+                        break;
+                    case 'product_class':
+                        if($type != \Entity\Update::TYPE_CREATE){
+                            // TODO log error (but no exception)
+                        }
+                        break;
+                    case 'type':
+                        if($type != \Entity\Update::TYPE_CREATE){
+                            // TODO log error (but no exception)
+                        }
+                        break;
+                    case 'enabled':
+                        $data['status'] = ($value == 1 ? 2 : 1);
+                        break;
+                    case 'visible':
+                        $data['visibility'] = ($value == 1 ? 4 : 1);
+                        break;
+                    case 'taxable':
+                        $data['tax_class_id'] = ($value == 1 ? 2 : 1);
+                        break;
+                    default:
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_WARN,
+                                'prod_inv_data',
+                                'Unsupported attribute for update of '.$entity->getUniqueId().': '.$attributeCode,
+                                array('attribute'=>$attributeCode),
+                                array('entity'=>$entity)
+                            );
+                        // Warn unsupported attribute
+                        break;
+                }
             }
         }
 
@@ -578,7 +593,8 @@ class ProductGateway extends AbstractGateway {
         $localId = $entityService->getLocalId($this->_node->getNodeId(), $entity);
 
         $data['website_ids'] = array($entity->getStoreId());
-        if(count($this->_node->getStoreViews()) && $type != \Entity\Update::TYPE_DELETE){
+        if (count($this->_node->getStoreViews()) && $type != \Entity\Update::TYPE_DELETE) {
+
             foreach($this->_node->getStoreViews() as $store_id=>$store_name){
                 if($store_id == $entity->getStoreId()){
                     continue;
@@ -645,7 +661,7 @@ class ProductGateway extends AbstractGateway {
         }else if($type == \Entity\Update::TYPE_CREATE){
 
             $attributeSet = null;
-            foreach($this->_attSets as $setId=>$set){
+            foreach($this->_attributeSets as $setId=>$set){
                 if($set['name'] == $entity->getData('product_class', 'default')){
                     $attributeSet = $setId;
                     break;
