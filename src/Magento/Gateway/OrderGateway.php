@@ -498,14 +498,17 @@ class OrderGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $entity = $action->getEntity();
+        /** @var \Entity\Wrapper\Order */
+        $order = $action->getEntity();
+        $orderStatus = $order->getData('status');
 
-        switch($action->getType()){
+        $success = TRUE;
+        switch ($action->getType()) {
             case 'comment':
-                $status = ($action->hasData('status') ? $action->getData('status') : $entity->getData('status'));
+                $status = ($action->hasData('status') ? $action->getData('status') : $orderStatus);
                 $comment = $action->getData('comment');
-                if($comment == null && $action->getData('body')){
-                    if($action->getData('title') != null){
+                if ($comment == NULL && $action->getData('body')) {
+                    if ($action->getData('title') != NULL) {
                         $comment = $action->getData('title').' - ';
                     }else{
                         $comment = '';
@@ -515,101 +518,123 @@ class OrderGateway extends AbstractGateway
                     }
                     $comment .= $action->getData('body');
                 }
-                if($action->hasData('customer_visible')){
+
+                if ($action->hasData('customer_visible')) {
                     $notify = $action->getData('customer_visible') ? 'true' : 'false';
                 }else{
-                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : null);
+                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                 }
+
                 $this->_soap->call('salesOrderAddComment', array(
-                    $entity->getOriginalOrder()->getUniqueId(),
+                    $order->getOriginalOrder()->getUniqueId(),
                     $status,
                     $comment,
                     $notify
                 ));
-                return true;
                 break;
             case 'cancel':
-                if (!in_array($entity->getData('status'), array('pending', 'pending_dps', 'pending_ogone', 'pending_payment', 'payment_review', 'fraud', 'fraud_dps', 'pending_paypal'))){
-                    throw new MagelinkException('Attempted to cancel non-pending order ' . $entity->getUniqueId() . ' (' . $entity->getData('status') . ')');
+                $isCancelable = strpos($orderStatus, 'pending' === 0)
+                    || in_array($orderStatus, 'payment_review', 'fraud', 'fraud_dps');
+                if ($isCancelable){
+                    $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
+                    throw new MagelinkException($message);
+                    $success = FALSE;
                 }
-                if($entity->getData('original_order') != null){
+
+                if($order->getData('original_order') != NULL){
                     throw new MagelinkException('Attempted to cancel child order!');
                 }
-                $this->_soap->call('salesOrderCancel', $entity->getUniqueId());
+
+                $this->_soap->call('salesOrderCancel', $order->getUniqueId());
                 return true;
                 break;
             case 'hold':
-                if($entity->getData('original_order') != null){
+                if ($order->isSegregated()) {
                     throw new MagelinkException('Attempted to hold child order!');
+                    $success = FALSE;
+                }else{
+                    $this->_soap->call('salesOrderHold', $order->getUniqueId());
                 }
-                $this->_soap->call('salesOrderHold', $entity->getUniqueId());
-                return true;
                 break;
             case 'unhold':
-                if($entity->getData('original_order') != null){
+                if ($order->isSegregated()) {
                     throw new MagelinkException('Attempted to unhold child order!');
+                    $success = FALSE;
+                }else{
+                    $this->_soap->call('salesOrderUnhold', $order->getUniqueId());
                 }
-                $this->_soap->call('salesOrderUnhold', $entity->getUniqueId());
-                return true;
                 break;
             case 'ship':
-                if($entity->getData('status') != 'processing'){
-                    throw new MagelinkException('Invalid order status for shipment: ' . $entity->getUniqueId() . ' has ' . $entity->getData('status'));
+                if (strpos($orderStatus, 'processing') === 0) {
+                    $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
+                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
+                    $sendComment = ($action->hasData('send_comment') ?
+                        ($action->getData('send_comment') ? 'true' : 'false' ) : NULL);
+                    $itemsShipped = ($action->hasData('items') ? $action->getData('items') : NULL);
+                    $trackingCode = ($action->hasData('tracking_code') ? $action->getData('tracking_code') : NULL);
+
+                    $this->actionShip($order, $comment, $notify, $sendComment, $itemsShipped, $trackingCode);
+                }else{
+                    $message = 'Invalid order status for shipment: '
+                        .$order->getUniqueId().' has '.$order->getData('status');
+                    throw new MagelinkException($message);
+                    $success = FALSE;
                 }
-                $comment = ($action->hasData('comment') ? $action->getData('comment') : null);
-                $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : null);
-                $sendComment = ($action->hasData('send_comment') ? ($action->getData('send_comment') ? 'true' : 'false' ) : null);
-                $itemsShipped = ($action->hasData('items') ? $action->getData('items') : null);
-                $trackingCode = ($action->hasData('tracking_code') ? $action->getData('tracking_code') : null);
-                $this->actionShip($entity, $comment, $notify, $sendComment, $itemsShipped, $trackingCode);
-                return true;
                 break;
             case 'creditmemo':
-                if($entity->getData('status') != 'processing' && $entity->getData('status') != 'complete'){
-                    throw new MagelinkException('Invalid order status for creditmemo: ' . $entity->getUniqueId() . ' has ' . $entity->getData('status'));
-                }
-                $comment = ($action->hasData('comment') ? $action->getData('comment') : null);
-                $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : null);
-                $sendComment = ($action->hasData('send_comment') ? ($action->getData('send_comment') ? 'true' : 'false' ) : null);
-                $itemsRefunded = ($action->hasData('items') ? $action->getData('items') : null);
-                $shipping_refund = ($action->hasData('shipping_refund') ? $action->getData('shipping_refund') : 0);
-                $credit_refund = ($action->hasData('credit_refund') ? $action->getData('credit_refund') : 0);
-                $adjustment_positive = ($action->hasData('adjustment_positive') ? $action->getData('adjustment_positive') : 0);
-                $adjustment_negative = ($action->hasData('adjustment_negative') ? $action->getData('adjustment_negative') : 0);
+                if (strpos($orderStatus, 'processing') !== 0 && $orderStatus != 'complete') {
+                    $message = 'Invalid order status for creditmemo: '.$order->getUniqueId().' has '.$orderStatus;
+                    throw new MagelinkException($message);
+                    $success = FALSE;
+                }else{
+                    $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
+                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
+                    $sendComment = ($action->hasData('send_comment') ?
+                        ($action->getData('send_comment') ? 'true' : 'false' ) : NULL);
+                    $itemsRefunded = ($action->hasData('items') ? $action->getData('items') : NULL);
+                    $shippingRefund = ($action->hasData('shipping_refund') ? $action->getData('shipping_refund') : 0);
+                    $creditRefund = ($action->hasData('credit_refund') ? $action->getData('credit_refund') : 0);
+                    $adjustmentPositive =
+                        ($action->hasData('adjustment_positive') ? $action->getData('adjustment_positive') : 0);
+                    $adjustmentNegative =
+                        ($action->hasData('adjustment_negative') ? $action->getData('adjustment_negative') : 0);
 
-                $message = 'Magento, create creditmemo: Passing values orderIncrementId '.$entity->getUniqueId()
-                    .'creditmemoData: [qtys=>'.var_export($itemsRefunded, TRUE).', shipping_amount=>'.$shipping_refund
-                    .', adjustment_positive=>'.$adjustment_positive.', adjustment_negative=>'.$adjustment_negative
-                    .'], comment '.$comment.', notifyCustomer '.$notify.', includeComment '.$sendComment
-                    .', refundToStoreCreditAmount '.$credit_refund.'.';
-                $this->getServiceLocator()->get('logService')
-                    ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
-                        'mag_cr_cmemo',
-                        $message,
-                        array(
-                            'entity (order)' => $entity,
-                            'action' => $action,
-                            'action data' => $action->getData(),
-                            'orderIncrementId' => $entity->getUniqueId(),
-                            'creditmemoData' => array(
-                                'qtys' => $itemsRefunded,
-                                'shipping_amount' => $shipping_refund,
-                                'adjustment_positive' => $adjustment_positive,
-                                'adjustment_negative' => $adjustment_negative
-                            ),
-                            'comment' => $comment,
-                            'notifyCustomer' => $notify,
-                            'includeComment' => $sendComment,
-                            'refundToStoreCreditAmount' => $credit_refund
-                        )
-                    );
-                $this->actionCreditmemo($entity, $comment, $notify, $sendComment,
-                    $itemsRefunded, $shipping_refund, $credit_refund, $adjustment_positive, $adjustment_negative);
-                return true;
+                    $message = 'Magento, create creditmemo: Passing values orderIncrementId '.$order->getUniqueId()
+                        .'creditmemoData: [qtys=>'.var_export($itemsRefunded, TRUE).', shipping_amount=>'.$shippingRefund
+                        .', adjustment_positive=>'.$adjustmentPositive.', adjustment_negative=>'.$adjustmentNegative
+                        .'], comment '.$comment.', notifyCustomer '.$notify.', includeComment '.$sendComment
+                        .', refundToStoreCreditAmount '.$creditRefund.'.';
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
+                            'mag_cr_cmemo',
+                            $message,
+                            array(
+                                'entity (order)' => $order,
+                                'action' => $action,
+                                'action data' => $action->getData(),
+                                'orderIncrementId' => $order->getUniqueId(),
+                                'creditmemoData' => array(
+                                    'qtys' => $itemsRefunded,
+                                    'shipping_amount' => $shippingRefund,
+                                    'adjustment_positive' => $adjustmentPositive,
+                                    'adjustment_negative' => $adjustmentNegative
+                                ),
+                                'comment' => $comment,
+                                'notifyCustomer' => $notify,
+                                'includeComment' => $sendComment,
+                                'refundToStoreCreditAmount' => $creditRefund
+                            )
+                        );
+                    $this->actionCreditmemo($order, $comment, $notify, $sendComment,
+                        $itemsRefunded, $shippingRefund, $creditRefund, $adjustmentPositive, $adjustmentNegative);
+                }
                 break;
             default:
-                throw new MagelinkException('Unsupported action type ' . $action->getType() . ' for Magento Orders.');
+                throw new MagelinkException('Unsupported action type '.$action->getType().' for Magento Orders.');
+                $success = FALSE;
         }
+
+        return $success;
     }
 
     /**
