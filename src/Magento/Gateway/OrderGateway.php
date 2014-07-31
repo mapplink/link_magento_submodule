@@ -498,7 +498,7 @@ class OrderGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        /** @var \Entity\Wrapper\Order */
+        /** @var \Entity\Wrapper\Order $order */
         $order = $action->getEntity();
         $orderStatus = $order->getData('status');
 
@@ -535,18 +535,17 @@ class OrderGateway extends AbstractGateway
             case 'cancel':
                 $isCancelable = strpos($orderStatus, 'pending' === 0)
                     || in_array($orderStatus, 'payment_review', 'fraud', 'fraud_dps');
-                if ($isCancelable){
-                    $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
-                    throw new MagelinkException($message);
-                    $success = FALSE;
+                if ($orderStatus !== 'canceled') {
+                    if ($isCancelable){
+                        $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
+                        throw new MagelinkException($message);
+                        $success = FALSE;
+                    }elseif ($order->isSegregated()){
+                        throw new MagelinkException('Attempted to cancel child order!');
+                    }else{
+                        $this->_soap->call('salesOrderCancel', $order->getUniqueId());
+                    }
                 }
-
-                if($order->getData('original_order') != NULL){
-                    throw new MagelinkException('Attempted to cancel child order!');
-                }
-
-                $this->_soap->call('salesOrderCancel', $order->getUniqueId());
-                return true;
                 break;
             case 'hold':
                 if ($order->isSegregated()) {
@@ -582,11 +581,7 @@ class OrderGateway extends AbstractGateway
                 }
                 break;
             case 'creditmemo':
-                if (strpos($orderStatus, 'processing') !== 0 && $orderStatus != 'complete') {
-                    $message = 'Invalid order status for creditmemo: '.$order->getUniqueId().' has '.$orderStatus;
-                    throw new MagelinkException($message);
-                    $success = FALSE;
-                }else{
+                if (strpos($orderStatus, 'processing') === 0 || $orderStatus == 'complete') {
                     $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                     $sendComment = ($action->hasData('send_comment') ?
@@ -627,7 +622,11 @@ class OrderGateway extends AbstractGateway
                         );
                     $this->actionCreditmemo($order, $comment, $notify, $sendComment,
                         $itemsRefunded, $shippingRefund, $creditRefund, $adjustmentPositive, $adjustmentNegative);
-                }
+                }else{
+                    $message = 'Invalid order status for creditmemo: '.$order->getUniqueId().' has '.$orderStatus;
+                    throw new MagelinkException($message);
+                    $success = FALSE;
+            }
                 break;
             default:
                 throw new MagelinkException('Unsupported action type '.$action->getType().' for Magento Orders.');
