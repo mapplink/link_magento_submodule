@@ -184,14 +184,14 @@ class OrderGateway extends AbstractGateway
                         $data['payment_method'] = $payments;
                     }
 
-                    if(isset($order['customer_id']) && $order['customer_id']){
-                        $cust = $entityService
+                    if (isset($order['customer_id']) && $order['customer_id'] ){
+                        $customer = $entityService
                             ->loadEntityLocal($this->_node->getNodeId(), 'customer', $store_id, $order['customer_id']);
                         //$cust = $entityService->loadEntity($this->_node->getNodeId(), 'customer', $store_id, $order['customer_email'])
-                        if($cust && $cust->getId()){
-                            $data['customer'] = $cust;
+                        if ($customer && $customer->getId()) {
+                            $data['customer'] = $customer;
                         }else{
-                            $data['customer'] = null;
+                            $data['customer'] = NULL;
                         }
                     }
 
