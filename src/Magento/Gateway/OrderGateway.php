@@ -534,7 +534,7 @@ class OrderGateway extends AbstractGateway
                 break;
             case 'cancel':
                 $isCancelable = strpos($orderStatus, 'pending' === 0)
-                    || in_array($orderStatus, 'payment_review', 'fraud', 'fraud_dps');
+                    || in_array($orderStatus, array('payment_review', 'fraud', 'fraud_dps'));
                 if ($orderStatus !== 'canceled') {
                     if ($isCancelable){
                         $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
