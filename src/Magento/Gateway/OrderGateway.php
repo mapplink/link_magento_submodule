@@ -536,7 +536,7 @@ class OrderGateway extends AbstractGateway
                 $isCancelable = strpos($orderStatus, 'pending' === 0)
                     || in_array($orderStatus, array('payment_review', 'fraud', 'fraud_dps'));
                 if ($orderStatus !== 'canceled') {
-                    if ($isCancelable){
+                    if (!$isCancelable){
                         $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
                         throw new MagelinkException($message);
                         $success = FALSE;
