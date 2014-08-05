@@ -252,20 +252,24 @@ class Db implements ServiceLocatorAwareInterface {
 
     /**
      * Get a list of entity IDs that have changed since the given timestamp. Relies on updated_at being set correctly.
-     * @param string $entity_type
-     * @param string $changed_since A date in the MySQL date format (i.e. 2014-01-01 01:01:01)
+     * @param string $entityType
+     * @param string $changedSince A date in the MySQL date format (i.e. 2014-01-01 01:01:01)
      * @return array
      */
-    public function getChangedEntityIds($entity_type, $changed_since){
-        $sql = 'SELECT entity_id FROM ' . $this->getEntityPrefix($entity_type) . '_entity WHERE updated_at >= "' . $changed_since . '"';
+    public function getChangedEntityIds($entityType, $changedSince)
+    {
+        $sql = "SELECT entity_id FROM ".$this->getEntityPrefix($entityType)."_entity"
+            ." WHERE updated_at >= '".$changedSince."';";
 
         $this->debugSql($sql);
-        $retArr = array();
-        $res = $this->_adapter->query($sql, \Zend\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
-        foreach($res as $row){
-            $retArr[] = intval($row['entity_id']);
+        $localEntityIds = array();
+
+        $result = $this->_adapter->query($sql, \Zend\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+        foreach ($result as $tableRow) {
+            $localEntityIds[] = intval($tableRow['entity_id']);
         }
-        return $retArr;
+
+        return $localEntityIds;
     }
 
     /**
