@@ -47,11 +47,11 @@ return array (
                 'db_username'=>array('label'=>'Database Username','type'=>'Text', 'required'=>FALSE),
                 'db_password'=>array('label'=>'Database Password','type'=>'Text', 'required'=>FALSE),
 
-
                 'load_full_product'=>array('label'=>'Load full product data', 'type'=>'Checkbox', 'default'=>FALSE),
                 'load_stock'=>array('label'=>'Load stock data (SLOW)', 'type'=>'Checkbox', 'default'=>FALSE),
                 'load_full_customer'=>array('label'=>'Load full customer data', 'type'=>'Checkbox', 'default'=>FALSE),
                 'load_full_order'=>array('label'=>'Load full order data', 'type'=>'Checkbox', 'default'=>FALSE),
+
                 'product_attributes'=>array(
                     'label'=>'Extra product attributes to load',
                     'type'=>'Text',
