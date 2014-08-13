@@ -298,48 +298,58 @@ class OrderGateway extends AbstractGateway
      * Insert any new status history entries as entity comments
      * @param array $order The full order data
      * @param \Entity\Entity $orderEnt The order entity to attach to
-     * @param EntityService $es The EntityService
+     * @param EntityService $entityService The EntityService
      */
-    protected function updateStatusHistory($order, \Entity\Entity $orderEnt, EntityService $es)
+    protected function updateStatusHistory($order, \Entity\Entity $orderEntity, EntityService $entityService)
     {
-        $comments = $es->loadEntityComments($orderEnt);
         $referenceIds = array();
         $commentIds = array();
+        $comments = $entityService->loadEntityComments($orderEntity);
+
         foreach($comments as $com){
             $referenceIds[] = $com->getReferenceId();
             $commentIds[] = $com->getCommentId();
         }
 
-        foreach ($order['status_history'] as $histEntry) {
-            if(isset($histEntry['comment']) && preg_match('/{([0-9]+)} - /', $histEntry['comment'], $matches)){
+        foreach ($order['status_history'] as $historyItem) {
+            if (isset($historyItem['comment']) && preg_match('/{([0-9]+)} - /', $historyItem['comment'], $matches)) {
                 if(in_array($matches[1], $commentIds)){
                     continue; // Comment already loaded through another means
                 }
             }
-            if(in_array($histEntry['created_at'], $referenceIds)){
+            if (in_array($historyItem['created_at'], $referenceIds)) {
                 continue; // Comment already loaded
             }
 
-            $addCustomerComment = $orderEnt->hasAttribute('delivery_instructions')
-                && !$orderEnt->getData('delivery_instructions')
-                && strpos(strtolower($histEntry['comment']), Comment::CUSTOMER_COMMENT_PREFIX) === 0;
+            if (!isset($historyItem['comment'])) {
+                $historyItem['comment'] = '(no comment)';
+            }
+            if (!isset($historyItem['status'])) {
+                $historyItem['status'] = '(no status)';
+            }
+            $notifyCustomer = isset($historyItem['is_customer_notified']) && $historyItem['is_customer_notified'] == '1';
+
+            $addCustomerComment = $orderEntity->hasAttribute('delivery_instructions')
+                && !$orderEntity->getData('delivery_instructions')
+                && strpos(strtolower($historyItem['comment']), Comment::CUSTOMER_COMMENT_PREFIX) === 0;
 
             if ($addCustomerComment) {
-                $instructions = trim(substr($histEntry['comment'], strlen(Comment::CUSTOMER_COMMENT_PREFIX)));
+                $instructions = trim(substr($historyItem['comment'], strlen(Comment::CUSTOMER_COMMENT_PREFIX)));
                 if (strlen($instructions)) {
-                    $es->updateEntity(
+                    $entityService->updateEntity(
                         $this->_node->getNodeId(),
-                        $orderEnt,
+                        $orderEntity,
                         array('delivery_instructions'=>$instructions)
                     );
                 }
             }
-            $es->createEntityComment(
-                $orderEnt,
+            $entityService->createEntityComment(
+                $orderEntity,
                 'Magento',
-                'Status History Event: ' . $histEntry['created_at'] . ' - ' . $histEntry['status'],
-                (isset($histEntry['comment']) ? $histEntry['comment'] : '(no comment)'), $histEntry['created_at'],
-                (isset($histEntry['is_customer_notified']) && $histEntry['is_customer_notified']=='1')
+                'Status History Event: '.$historyItem['created_at'].' - '.$historyItem['status'],
+                $historyItem['comment'],
+                $historyItem['created_at'],
+                $notifyCustomer
             );
         }
     }
