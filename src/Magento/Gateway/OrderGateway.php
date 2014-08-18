@@ -196,7 +196,7 @@ class OrderGateway extends AbstractGateway
                     }
 
                     /** @var boolean $needsUpdate Whether we need to perform an entity update here */
-                    $needsUpdate = true;
+                    $needsUpdate = TRUE;
 
                     $existingEntity = $entityService->loadEntityLocal(
                         $this->_node->getNodeId(),
@@ -204,14 +204,14 @@ class OrderGateway extends AbstractGateway
                         $store_id,
                         $local_id
                     );
-                    if(!$existingEntity){
+                    if (!$existingEntity) {
                         $existingEntity = $entityService->loadEntity(
                             $this->_node->getNodeId(),
                             'order',
                             $store_id,
                             $unique_id
                         );
-                        if(!$existingEntity){
+                        if (!$existingEntity) {
                             $entityService->beginEntityTransaction('magento-order-'.$unique_id);
                             try{
                                 $data = array_merge(
@@ -272,6 +272,12 @@ class OrderGateway extends AbstractGateway
                             $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                         }
                     }else{
+                        $attributesNotToUpdate = array('grand_total');
+                        foreach ($attributesNotToUpdate as $code) {
+                            if ($existingEntity->getData($code, NULL) !== NULL) {
+                                unset($data[$code]);
+                            }
+                        }
                         $this->getServiceLocator()->get('logService')
                             ->log(\Log\Service\LogService::LEVEL_INFO,
                                 'ent_update',
@@ -281,7 +287,7 @@ class OrderGateway extends AbstractGateway
                             );
                     }
 
-                    if($needsUpdate){
+                    if ($needsUpdate) {
                         $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
                     }
                     $this->updateStatusHistory($order, $existingEntity, $entityService);
