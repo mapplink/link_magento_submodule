@@ -75,7 +75,7 @@ class Soap implements ServiceLocatorAwareInterface {
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_ERROR,
                     'soap_fault',
-                    'SOAP Fault with call ' . $call . ': ' . $sf->getMessage(),
+                    'SOAP Fault with call '.$call.': '.$sf->getMessage(),
                     array(
                         'keys'=>array_keys($data),
                         'code'=>$sf->getCode(),
