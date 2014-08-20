@@ -298,18 +298,18 @@ class OrderGateway extends AbstractGateway
                         }
 
                         $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
+                    }
 
-                        if ($orderComment) {
-                            if (!is_array($orderComment)) {
-                                $orderComment = array($orderComment=>$orderComment);
-                            }
-                            $entityService->createEntityComment(
-                                $existingEntity,
-                                'HOPS',
-                                key($orderComment),
-                                current($orderComment)
-                            );
+                    if ($orderComment) {
+                        if (!is_array($orderComment)) {
+                            $orderComment = array($orderComment=>$orderComment);
                         }
+                        $entityService->createEntityComment(
+                            $existingEntity,
+                            'Magento/HOPS',
+                            key($orderComment),
+                            current($orderComment)
+                        );
                     }
 
                     $this->updateStatusHistory($order, $existingEntity, $entityService);
