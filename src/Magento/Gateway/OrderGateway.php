@@ -124,9 +124,9 @@ class OrderGateway extends AbstractGateway
                         $order[$key] = $orderFromList[$key];
                     }
 
-                    $store_id = ($this->_node->isMultiStore() ? $order['store_id'] : 0);
-                    $unique_id = $order['increment_id'];
-                    $local_id = $order['order_id'];
+                    $storeId = ($this->_node->isMultiStore() ? $order['store_id'] : 0);
+                    $uniqueId = $order['increment_id'];
+                    $localId = $order['order_id'];
 
                     $data = array(
                         'customer_email'=> array_key_exists('customer_email', $order) ? $order['customer_email'] : null,
@@ -177,7 +177,7 @@ class OrderGateway extends AbstractGateway
                                 (isset($order['payment']['cc_type']) ? $order['payment']['cc_type'] : '')
                             );
                         }else{
-                            throw new MagelinkException('Invalid payment details format for order '.$unique_id);
+                            throw new MagelinkException('Invalid payment details format for order '.$uniqueId);
                         }
                     }
                     if(count($payments)){
@@ -186,8 +186,7 @@ class OrderGateway extends AbstractGateway
 
                     if (isset($order['customer_id']) && $order['customer_id'] ){
                         $customer = $entityService
-                            ->loadEntityLocal($this->_node->getNodeId(), 'customer', $store_id, $order['customer_id']);
-                        //$cust = $entityService->loadEntity($this->_node->getNodeId(), 'customer', $store_id, $order['customer_email'])
+                            ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $order['customer_id']);
                         if ($customer && $customer->getId()) {
                             $data['customer'] = $customer;
                         }else{
@@ -197,22 +196,24 @@ class OrderGateway extends AbstractGateway
 
                     /** @var boolean $needsUpdate Whether we need to perform an entity update here */
                     $needsUpdate = TRUE;
+                    $orderComment = FALSE;
 
                     $existingEntity = $entityService->loadEntityLocal(
                         $this->_node->getNodeId(),
                         'order',
-                        $store_id,
-                        $local_id
+                        $storeId,
+                        $localId
                     );
+
                     if (!$existingEntity) {
                         $existingEntity = $entityService->loadEntity(
                             $this->_node->getNodeId(),
                             'order',
-                            $store_id,
-                            $unique_id
+                            $storeId,
+                            $uniqueId
                         );
                         if (!$existingEntity) {
-                            $entityService->beginEntityTransaction('magento-order-'.$unique_id);
+                            $entityService->beginEntityTransaction('magento-order-'.$uniqueId);
                             try{
                                 $data = array_merge(
                                     $this->createAddresses($order, $entityService),
@@ -221,17 +222,18 @@ class OrderGateway extends AbstractGateway
                                 $existingEntity = $entityService->createEntity(
                                     $this->_node->getNodeId(),
                                     'order',
-                                    $store_id,
-                                    $unique_id,
+                                    $storeId,
+                                    $uniqueId,
                                     $data,
                                     NULL
                                 );
-                                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
+                                $orderComment = array('Initial sync'=>'Order #'.$uniqueId.' synced to HOPS.');
 
                                 $this->getServiceLocator()->get('logService')
                                     ->log(\Log\Service\LogService::LEVEL_INFO,
-                                        'ent_new', 'New order '.$unique_id,
-                                        array('sku'=>$unique_id),
+                                        'ent_new', 'New order '.$uniqueId,
+                                        array('sku'=>$uniqueId),
                                         array('node'=>$this->_node, 'entity'=>$existingEntity)
                                     );
 
@@ -240,7 +242,7 @@ class OrderGateway extends AbstractGateway
                                 try{
                                     $this->_soap->call('salesOrderAddComment',
                                             array(
-                                                $unique_id,
+                                                $uniqueId,
                                                 $existingEntity->getData('status'),
                                                 'Order retrieved by MageLink, Entity #'.$existingEntity->getId(),
                                                 FALSE
@@ -250,14 +252,14 @@ class OrderGateway extends AbstractGateway
                                     $this->getServiceLocator()->get('logService')
                                         ->log(\Log\Service\LogService::LEVEL_ERROR,
                                             'ent_comment_err',
-                                            'Failed to write comment on order '.$unique_id,
+                                            'Failed to write comment on order '.$uniqueId,
                                             array(),
                                             array('node'=>$this->_node, 'entity'=>$existingEntity)
                                         );
                                 }
-                                $entityService->commitEntityTransaction('magento-order-'.$unique_id);
+                                $entityService->commitEntityTransaction('magento-order-'.$uniqueId);
                             }catch(\Exception $e){
-                                $entityService->rollbackEntityTransaction('magento-order-'.$unique_id);
+                                $entityService->rollbackEntityTransaction('magento-order-'.$uniqueId);
                                 throw $e;
                             }
                             $needsUpdate = FALSE;
@@ -265,11 +267,11 @@ class OrderGateway extends AbstractGateway
                             $this->getServiceLocator()->get('logService')
                                 ->log(\Log\Service\LogService::LEVEL_WARN,
                                     'ent_link',
-                                    'Unlinked order '.$unique_id,
-                                    array('sku'=>$unique_id),
+                                    'Unlinked order '.$uniqueId,
+                                    array('sku'=>$uniqueId),
                                     array('node'=>$this->_node, 'entity'=>$existingEntity)
                                 );
-                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                         }
                     }else{
                         $attributesNotToUpdate = array('grand_total');
@@ -281,15 +283,35 @@ class OrderGateway extends AbstractGateway
                         $this->getServiceLocator()->get('logService')
                             ->log(\Log\Service\LogService::LEVEL_INFO,
                                 'ent_update',
-                                'Updated order '.$unique_id,
-                                array('sku'=>$unique_id),
+                                'Updated order '.$uniqueId,
+                                array('sku'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
                             );
                     }
 
                     if ($needsUpdate) {
+                        $oldStatus = $existingEntity->getData('status', NULL);
+                        $statusChanged = $oldStatus != $data['status'];
+                        if (!$orderComment && $statusChanged) {
+                            $orderComment = array(
+                                'Status change'=>'Order #'.$uniqueId.' moved from '.$oldStatus.' to '.$data['status']);
+                        }
+
                         $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
+
+                        if ($orderComment) {
+                            if (!is_array($orderComment)) {
+                                $orderComment = array($orderComment=>$orderComment);
+                            }
+                            $entityService->createEntityComment(
+                                $existingEntity,
+                                'HOPS',
+                                key($orderComment),
+                                current($orderComment)
+                            );
+                        }
                     }
+
                     $this->updateStatusHistory($order, $existingEntity, $entityService);
                 }
             }
@@ -371,17 +393,17 @@ class OrderGateway extends AbstractGateway
         $parent_id = $orderId;
 
         foreach ($order['items'] as $item) {
-            $unique_id = $order['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
+            $uniqueId = $order['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
 
             $entity = $entityService
                 ->loadEntity(
                     $this->_node->getNodeId(),
                     'orderitem',
                     ($this->_node->isMultiStore() ? $order['store_id'] : 0),
-                    $unique_id
+                    $uniqueId
                 );
             if (!$entity) {
-                $local_id = $item['item_id'];
+                $localId = $item['item_id'];
                 $product = $entityService->loadEntity(
                     $this->_node->getNodeId(),
                     'product',
@@ -423,9 +445,9 @@ class OrderGateway extends AbstractGateway
                     $this->_node->getNodeId(),
                     'orderitem',
                     ($this->_node->isMultiStore() ? $order['store_id'] : 0),
-                    $unique_id, $data, $parent_id
+                    $uniqueId, $data, $parent_id
                 );
-                $entityService->linkEntity($this->_node->getNodeId(), $entity, $local_id);
+                $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
             }
         }
 
@@ -462,9 +484,9 @@ class OrderGateway extends AbstractGateway
             return null;
         }
 
-        $unique_id = 'order-'.$order['increment_id'].'-'.$type;
+        $uniqueId = 'order-'.$order['increment_id'].'-'.$type;
 
-        $e = $es->loadEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $unique_id);
+        $e = $es->loadEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $uniqueId);
         // DISABLED: Generally doesn't work.
         //if(!$e){
         //    $e = $es->loadEntityLocal($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $addressData['address_id']);
@@ -483,7 +505,7 @@ class OrderGateway extends AbstractGateway
                 'company'=>(isset($addressData['company']) ? $addressData['company'] : null)
             );
 
-            $e = $es->createEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $unique_id, $data);
+            $e = $es->createEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $uniqueId, $data);
             $es->linkEntity($this->_node->getNodeId(), $e, $addressData['address_id']);
         }
         return $e;
