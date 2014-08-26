@@ -549,7 +549,7 @@ class OrderGateway extends AbstractGateway
                 ));
                 break;
             case 'cancel':
-                $isCancelable = strpos($orderStatus, 'pending' === 0)
+                $isCancelable = (strpos($orderStatus, 'pending') === 0)
                     || in_array($orderStatus, array('payment_review', 'fraud', 'fraud_dps'));
                 if ($orderStatus !== 'canceled') {
                     if (!$isCancelable){
