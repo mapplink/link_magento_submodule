@@ -97,8 +97,8 @@ class OrderGateway extends AbstractGateway
             );
 
         if($this->_db && FALSE){
-            // TODO: Implement]
-        }else if($this->_soap){
+            // TODO: Implement
+        }elseif ($this->_soap) {
             $results = $this->_soap->call('salesOrderList', array(
                 array(
                     'complex_filter'=>array(
@@ -115,79 +115,79 @@ class OrderGateway extends AbstractGateway
             foreach ($results as $orderFromList) {
                 // Check if order has a magento increment id
                 if (intval($orderFromList['increment_id']) > 100000000) {
-                    $order = $this->_soap->call('salesOrderInfo', array($orderFromList['increment_id']));
-                    if (isset($order['result'])) {
-                        $order = $order['result'];
+                    $orderData = $this->_soap->call('salesOrderInfo', array($orderFromList['increment_id']));
+                    if (isset($orderData['result'])) {
+                        $orderData = $orderData['result'];
                     }
                     // Inserting missing fields from salesOrderList in the salesOrderInfo array
-                    foreach(array_diff(array_keys($orderFromList), array_keys($order)) as $key){
-                        $order[$key] = $orderFromList[$key];
+                    foreach(array_diff(array_keys($orderFromList), array_keys($orderData)) as $key){
+                        $orderData[$key] = $orderFromList[$key];
                     }
 
-                    $store_id = ($this->_node->isMultiStore() ? $order['store_id'] : 0);
-                    $unique_id = $order['increment_id'];
-                    $local_id = $order['order_id'];
+                    $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
+                    $uniqueId = $orderData['increment_id'];
+                    $localId = $orderData['order_id'];
 
                     $data = array(
-                        'customer_email'=> array_key_exists('customer_email', $order) ? $order['customer_email'] : null,
-                        'customer_name'=>(array_key_exists('customer_firstname', $order) ? $order['customer_firstname'].' ' : '')
-                            .(array_key_exists('customer_lastname', $order) ? $order['customer_lastname'] : ''),
-                        'status'=>$order['status'],
-                        'placed_at'=>$order['created_at'],
-                        'grand_total'=>$order['base_grand_total'],
-                        'weight_total'=>(array_key_exists('weight', $order) ? $order['weight'] : 0),
-                        'discount_total'=>(array_key_exists('base_discount_amount', $order) ? $order['base_discount_amount'] : 0),
-                        'shipping_total'=>(array_key_exists('base_shipping_amount', $order) ? $order['base_shipping_amount'] : 0),
-                        'tax_total'=>(array_key_exists('base_tax_amount', $order) ? $order['base_tax_amount'] : 0),
-                        'shipping_method'=>(array_key_exists('shipping_method', $order) ? $order['shipping_method'] : null)
+                        'customer_email'=>array_key_exists('customer_email', $orderData) ? $orderData['customer_email'] : NULL,
+                        'customer_name'=>(array_key_exists('customer_firstname', $orderData) ? $orderData['customer_firstname'].' ' : '')
+                            .(array_key_exists('customer_lastname', $orderData) ? $orderData['customer_lastname'] : ''),
+                        'status'=>$orderData['status'],
+                        'placed_at'=>$orderData['created_at'],
+                        'grand_total'=>$orderData['base_grand_total'],
+                        'weight_total'=>(array_key_exists('weight', $orderData) ? $orderData['weight'] : 0),
+                        'discount_total'=>(array_key_exists('base_discount_amount', $orderData) ? $orderData['base_discount_amount'] : 0),
+                        'shipping_total'=>(array_key_exists('base_shipping_amount', $orderData) ? $orderData['base_shipping_amount'] : 0),
+                        'tax_total'=>(array_key_exists('base_tax_amount', $orderData) ? $orderData['base_tax_amount'] : 0),
+                        'shipping_method'=>(array_key_exists('shipping_method', $orderData) ? $orderData['shipping_method'] : NULL)
                     );
-                    if (array_key_exists('base_gift_cards_amount', $order)) {
-                        $data['giftcard_total'] = $order['base_gift_cards_amount'];
-                    }elseif (array_key_exists('base_gift_cards_amount_invoiced', $order)) {
-                        $data['giftcard_total'] = $order['base_gift_cards_amount_invoiced'];
+                    if (array_key_exists('base_gift_cards_amount', $orderData)) {
+                        $data['giftcard_total'] = $orderData['base_gift_cards_amount'];
+                    }elseif (array_key_exists('base_gift_cards_amount_invoiced', $orderData)) {
+                        $data['giftcard_total'] = $orderData['base_gift_cards_amount_invoiced'];
                     }else{
                         $data['giftcard_total'] = 0;
                     }
-                    if (array_key_exists('base_reward_currency_amount', $order)) {
-                        $data['reward_total'] = $order['base_reward_currency_amount'];
-                    }elseif (array_key_exists('base_reward_currency_amount_invoiced', $order)) {
-                        $data['reward_total'] = $order['base_reward_currency_amount_invoiced'];
+                    if (array_key_exists('base_reward_currency_amount', $orderData)) {
+                        $data['reward_total'] = $orderData['base_reward_currency_amount'];
+                    }elseif (array_key_exists('base_reward_currency_amount_invoiced', $orderData)) {
+                        $data['reward_total'] = $orderData['base_reward_currency_amount_invoiced'];
                     }else{
                         $data['reward_total'] = 0;
                     }
-                    if (array_key_exists('base_customer_balance_amount', $order)) {
-                        $data['storecredit_total'] = $order['base_customer_balance_amount'];
-                    }elseif (array_key_exists('base_customer_balance_amount_invoiced', $order)) {
-                        $data['storecredit_total'] = $order['base_customer_balance_amount_invoiced'];
+                    if (array_key_exists('base_customer_balance_amount', $orderData)) {
+                        $data['storecredit_total'] = $orderData['base_customer_balance_amount'];
+                    }elseif (array_key_exists('base_customer_balance_amount_invoiced', $orderData)) {
+                        $data['storecredit_total'] = $orderData['base_customer_balance_amount_invoiced'];
                     }else{
                         $data['storecredit_total'] = 0;
                     }
 
                     $payments = array();
-                    if (isset($order['payment'])) {
-                        if (is_array($order['payment']) && !isset($order['payment']['payment_id'])) {
-                            foreach ($order['payment'] as $payment) {
+                    if (isset($orderData['payment'])) {
+                        if (is_array($orderData['payment']) && !isset($orderData['payment']['payment_id'])) {
+                            foreach ($orderData['payment'] as $payment) {
                                 $payments = $entityService->convertPaymentData(
                                     $payment['method'], $payment['base_amount_ordered'], $payment['cc_type']);
                             }
-                        }elseif (isset($order['payment']['payment_id'])) {
+                        }elseif (isset($orderData['payment']['payment_id'])) {
                             $payments = $entityService->convertPaymentData(
-                                $order['payment']['method'],
-                                $order['payment']['base_amount_ordered'],
-                                (isset($order['payment']['cc_type']) ? $order['payment']['cc_type'] : '')
+                                $orderData['payment']['method'],
+                                $orderData['payment']['base_amount_ordered'],
+                                (isset($orderData['payment']['cc_type']) ? $orderData['payment']['cc_type'] : '')
                             );
                         }else{
-                            throw new MagelinkException('Invalid payment details format for order '.$unique_id);
+                            throw new MagelinkException('Invalid payment details format for order '.$uniqueId);
                         }
                     }
                     if(count($payments)){
                         $data['payment_method'] = $payments;
                     }
 
-                    if (isset($order['customer_id']) && $order['customer_id'] ){
+                    if (isset($orderData['customer_id']) && $orderData['customer_id'] ){
                         $customer = $entityService
-                            ->loadEntityLocal($this->_node->getNodeId(), 'customer', $store_id, $order['customer_id']);
-                        //$cust = $entityService->loadEntity($this->_node->getNodeId(), 'customer', $store_id, $order['customer_email'])
+                            ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_id']);
+                        // $customer = $entityService->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_email'])
                         if ($customer && $customer->getId()) {
                             $data['customer'] = $customer;
                         }else{
@@ -201,46 +201,48 @@ class OrderGateway extends AbstractGateway
                     $existingEntity = $entityService->loadEntityLocal(
                         $this->_node->getNodeId(),
                         'order',
-                        $store_id,
-                        $local_id
+                        $storeId,
+                        $localId
                     );
+
                     if (!$existingEntity) {
                         $existingEntity = $entityService->loadEntity(
                             $this->_node->getNodeId(),
                             'order',
-                            $store_id,
-                            $unique_id
+                            $storeId,
+                            $uniqueId
                         );
+
                         if (!$existingEntity) {
-                            $entityService->beginEntityTransaction('magento-order-'.$unique_id);
+                            $entityService->beginEntityTransaction('magento-order-'.$uniqueId);
                             try{
                                 $data = array_merge(
-                                    $this->createAddresses($order, $entityService),
+                                    $this->createAddresses($orderData, $entityService),
                                     $data
                                 );
                                 $existingEntity = $entityService->createEntity(
                                     $this->_node->getNodeId(),
                                     'order',
-                                    $store_id,
-                                    $unique_id,
+                                    $storeId,
+                                    $uniqueId,
                                     $data,
                                     NULL
                                 );
-                                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
 
                                 $this->getServiceLocator()->get('logService')
                                     ->log(\Log\Service\LogService::LEVEL_INFO,
-                                        'ent_new', 'New order '.$unique_id,
-                                        array('sku'=>$unique_id),
+                                        'ent_new', 'New order '.$uniqueId,
+                                        array('sku'=>$uniqueId),
                                         array('node'=>$this->_node, 'entity'=>$existingEntity)
                                     );
 
-                                $this->createItems($order, $existingEntity->getId(), $entityService);
+                                $this->createItems($orderData, $existingEntity->getId(), $entityService);
 
                                 try{
                                     $this->_soap->call('salesOrderAddComment',
                                             array(
-                                                $unique_id,
+                                                $uniqueId,
                                                 $existingEntity->getData('status'),
                                                 'Order retrieved by MageLink, Entity #'.$existingEntity->getId(),
                                                 FALSE
@@ -250,14 +252,14 @@ class OrderGateway extends AbstractGateway
                                     $this->getServiceLocator()->get('logService')
                                         ->log(\Log\Service\LogService::LEVEL_ERROR,
                                             'ent_comment_err',
-                                            'Failed to write comment on order '.$unique_id,
+                                            'Failed to write comment on order '.$uniqueId,
                                             array(),
                                             array('node'=>$this->_node, 'entity'=>$existingEntity)
                                         );
                                 }
-                                $entityService->commitEntityTransaction('magento-order-'.$unique_id);
+                                $entityService->commitEntityTransaction('magento-order-'.$uniqueId);
                             }catch(\Exception $e){
-                                $entityService->rollbackEntityTransaction('magento-order-'.$unique_id);
+                                $entityService->rollbackEntityTransaction('magento-order-'.$uniqueId);
                                 throw $e;
                             }
                             $needsUpdate = FALSE;
@@ -265,11 +267,11 @@ class OrderGateway extends AbstractGateway
                             $this->getServiceLocator()->get('logService')
                                 ->log(\Log\Service\LogService::LEVEL_WARN,
                                     'ent_link',
-                                    'Unlinked order '.$unique_id,
-                                    array('sku'=>$unique_id),
+                                    'Unlinked order '.$uniqueId,
+                                    array('sku'=>$uniqueId),
                                     array('node'=>$this->_node, 'entity'=>$existingEntity)
                                 );
-                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                         }
                     }else{
                         $attributesNotToUpdate = array('grand_total');
@@ -281,8 +283,8 @@ class OrderGateway extends AbstractGateway
                         $this->getServiceLocator()->get('logService')
                             ->log(\Log\Service\LogService::LEVEL_INFO,
                                 'ent_update',
-                                'Updated order '.$unique_id,
-                                array('sku'=>$unique_id),
+                                'Updated order '.$uniqueId,
+                                array('sku'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
                             );
                     }
@@ -290,7 +292,7 @@ class OrderGateway extends AbstractGateway
                     if ($needsUpdate) {
                         $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
                     }
-                    $this->updateStatusHistory($order, $existingEntity, $entityService);
+                    $this->updateStatusHistory($orderData, $existingEntity, $entityService);
                 }
             }
         }else{
@@ -302,11 +304,11 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Insert any new status history entries as entity comments
-     * @param array $order The full order data
+     * @param array $orderData The full order data
      * @param \Entity\Entity $orderEnt The order entity to attach to
      * @param EntityService $entityService The EntityService
      */
-    protected function updateStatusHistory($order, \Entity\Entity $orderEntity, EntityService $entityService)
+    protected function updateStatusHistory($orderData, \Entity\Entity $orderEntity, EntityService $entityService)
     {
         $referenceIds = array();
         $commentIds = array();
@@ -317,7 +319,7 @@ class OrderGateway extends AbstractGateway
             $commentIds[] = $com->getCommentId();
         }
 
-        foreach ($order['status_history'] as $historyItem) {
+        foreach ($orderData['status_history'] as $historyItem) {
             if (isset($historyItem['comment']) && preg_match('/{([0-9]+)} - /', $historyItem['comment'], $matches)) {
                 if(in_array($matches[1], $commentIds)){
                     continue; // Comment already loaded through another means
@@ -362,30 +364,30 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Create all the OrderItem entities for a given order
-     * @param $order
+     * @param $orderData
      * @param $oid
      * @param EntityService $es
      */
-    protected function createItems(array $order, $orderId, EntityService $entityService)
+    protected function createItems(array $orderData, $orderId, EntityService $entityService)
     {
-        $parent_id = $orderId;
+        $parentId = $orderId;
 
-        foreach ($order['items'] as $item) {
-            $unique_id = $order['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
+        foreach ($orderData['items'] as $item) {
+            $uniqueId = $orderData['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
 
             $entity = $entityService
                 ->loadEntity(
                     $this->_node->getNodeId(),
                     'orderitem',
-                    ($this->_node->isMultiStore() ? $order['store_id'] : 0),
-                    $unique_id
+                    ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
+                    $uniqueId
                 );
             if (!$entity) {
-                $local_id = $item['item_id'];
+                $localId = $item['item_id'];
                 $product = $entityService->loadEntity(
                     $this->_node->getNodeId(),
                     'product',
-                    ($this->_node->isMultiStore() ? $order['store_id'] : 0),
+                    ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
                     $item['sku']
                 );
                 $data = array(
@@ -422,10 +424,10 @@ class OrderGateway extends AbstractGateway
                 $entity = $entityService->createEntity(
                     $this->_node->getNodeId(),
                     'orderitem',
-                    ($this->_node->isMultiStore() ? $order['store_id'] : 0),
-                    $unique_id, $data, $parent_id
+                    ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
+                    $uniqueId, $data, $parentId
                 );
-                $entityService->linkEntity($this->_node->getNodeId(), $entity, $local_id);
+                $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
             }
         }
 
@@ -433,17 +435,18 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Create the Address entities for a given order and pass them back as the appropraite attributes
-     * @param $order
-     * @param EntityService $es
+     * @param $orderData
+     * @param EntityService $entityService
      * @return array
      */
-    protected function createAddresses($order, EntityService $es){
+    protected function createAddresses(array $orderData, EntityService $entityService)
+    {
         $data = array();
-        if(isset($order['shipping_address'])){
-            $data['shipping_address'] = $this->createAddressEntity($order['shipping_address'], $order, 'shipping', $es);
+        if(isset($orderData['shipping_address'])){
+            $data['shipping_address'] = $this->createAddressEntity($orderData['shipping_address'], $orderData, 'shipping', $entityService);
         }
-        if(isset($order['billing_address'])){
-            $data['billing_address'] = $this->createAddressEntity($order['billing_address'], $order, 'billing', $es);
+        if(isset($orderData['billing_address'])){
+            $data['billing_address'] = $this->createAddressEntity($orderData['billing_address'], $orderData, 'billing', $entityService);
         }
         return $data;
     }
@@ -451,26 +454,34 @@ class OrderGateway extends AbstractGateway
     /**
      * Creates an individual address entity (billing or shipping)
      * @param array $addressData
-     * @param array $order
+     * @param array $orderData
      * @param string $type "billing" or "shipping"
-     * @param EntityService $es
+     * @param EntityService $entityService
      * @return \Entity\Entity|null
      */
-    protected function createAddressEntity($addressData, $order, $type, EntityService $es){
-
-        if(!array_key_exists('address_id', $addressData) || $addressData['address_id'] == null){
-            return null;
+    protected function createAddressEntity(array $addressData, array $orderData, $type, EntityService $entityService)
+    {
+        if (!array_key_exists('address_id', $addressData) || $addressData['address_id'] == NULL) {
+            return NULL;
         }
 
-        $unique_id = 'order-'.$order['increment_id'].'-'.$type;
+        $uniqueId = 'order-'.$orderData['increment_id'].'-'.$type;
 
-        $e = $es->loadEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $unique_id);
+        $entity = $entityService->loadEntity(
+            $this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $orderData['store_id'] : 0), $uniqueId
+        );
+/*
         // DISABLED: Generally doesn't work.
-        //if(!$e){
-        //    $e = $es->loadEntityLocal($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $addressData['address_id']);
-        //}
-
-        if(!$e){
+        if (!$entity) {
+            $entity = $entityService->loadEntityLocal(
+                $this->_node->getNodeId(),
+                'address',
+                ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
+                $addressData['address_id']
+            );
+        }
+*/
+        if (!$entity) {
             $data = array(
                 'first_name'=>(isset($addressData['firstname']) ? $addressData['firstname'] : null),
                 'last_name'=>(isset($addressData['lastname']) ? $addressData['lastname'] : null),
@@ -483,10 +494,17 @@ class OrderGateway extends AbstractGateway
                 'company'=>(isset($addressData['company']) ? $addressData['company'] : null)
             );
 
-            $e = $es->createEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $order['store_id'] : 0), $unique_id, $data);
-            $es->linkEntity($this->_node->getNodeId(), $e, $addressData['address_id']);
+            $entity = $entityService->createEntity(
+                $this->_node->getNodeId(),
+                'address',
+                ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
+                $uniqueId,
+                $data
+            );
+            $entityService->linkEntity($this->_node->getNodeId(), $entity, $addressData['address_id']);
         }
-        return $e;
+
+        return $entity;
     }
 
     /**
@@ -557,9 +575,25 @@ class OrderGateway extends AbstractGateway
                         throw new MagelinkException($message);
                         $success = FALSE;
                     }elseif ($order->isSegregated()){
-                        throw new MagelinkException('Attempted to cancel child order!');
+                        throw new MagelinkException('Attempted to cancel child order '.$order->getUniqueId().' !');
+                        $success = FALSE;
                     }else{
                         $this->_soap->call('salesOrderCancel', $order->getUniqueId());
+
+                        // Update status straight away
+                        $changedOrder = $this->_soap->call('salesOrderInfo', array($order->getUniqueId()));
+                        if (isset($changedOrder['result'])) {
+                            $changedOrder = $changedOrder['result'];
+                        }
+
+                        $changedOrderData = array('status'=>$changedOrder['status']);
+                        $entityService->updateEntity(
+                            $this->_node->getNodeId(),
+                            $order,
+                            $changedOrderData,
+                            FALSE
+                        );
+                        $this->updateStatusHistory($changedOrderData, $order, $entityService);
                     }
                 }
                 break;
@@ -685,12 +719,12 @@ class OrderGateway extends AbstractGateway
             foreach($rawItems as $eid=>$qty){
                 $ie = $entityService->loadEntityId($this->_node->getNodeId(), $eid);
                 if($ie->getTypeStr() != 'orderitem' || $ie->getParentId() != $order->getId() || $ie->getStoreId() != $order->getStoreId()){
-                    throw new MagelinkException('Invalid item ' . $eid . ' passed to preprocessRequestItems for order ' . $order->getId());
+                    throw new MagelinkException('Invalid item '.$eid.' passed to preprocessRequestItems for order '.$order->getId());
                 }
                 if($qty == null){
                     $qty = $ie->getData('quantity');
                 }else if($qty > $ie->getData('quantity')){
-                    throw new MagelinkException('Invalid item quantity ' . $qty . ' for item ' . $eid . ' in order ' . $order->getId() . ' - max was ' . $ie->getData('quantity'));
+                    throw new MagelinkException('Invalid item quantity '.$qty.' for item '.$eid.' in order '.$order->getId().' - max was '.$ie->getData('quantity'));
                 }
                 $localid = $entityService->getLocalId($this->_node->getNodeId(), $ie);
                 $items[$localid] = $qty;
