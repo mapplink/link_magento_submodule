@@ -596,10 +596,10 @@ class OrderGateway extends AbstractGateway
                             $changedOrderData,
                             FALSE
                         );
-                        $changedOrderData['status_history'] = array(
+                        $changedOrderData['status_history'] = array(array(
                             'comment'=>'HOPS updated status from Magento after abandoning order to '.$newStatus.'.',
                             'created_at'=>date('Y/m/s H:i:s')
-                        );
+                        ));
                         $this->updateStatusHistory($changedOrderData, $order, $entityService);
                     }
                 }
