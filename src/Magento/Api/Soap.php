@@ -61,16 +61,18 @@ class Soap implements ServiceLocatorAwareInterface {
      */
     public function call($call, $data)
     {
-        if(!is_array($data)){
-            if(is_object($data)){
+        if (!is_array($data)) {
+            if (is_object($data)) {
                 $data = get_object_vars($data);
             }else{
                 $data = array($data);
             }
         }
+
         array_unshift($data, $this->_sessionId);
+
         try{
-            $res = $this->_soapClient->call($call, $data);
+            $result = $this->_soapClient->call($call, $data);
         }catch(\SoapFault $sf){
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_ERROR,
@@ -86,9 +88,15 @@ class Soap implements ServiceLocatorAwareInterface {
             $this->forceStdoutDebug();
             throw new \Magelink\Exception\MagelinkException('Soap Fault - '.$sf->getMessage(), 0, $sf);
         }
-        // NOTE: Uncomment the following for debugging
-        // $this->forceStdoutDebug();
-        return $this->_processResponse($res);
+        // $this->forceStdoutDebug(); // Uncomment for debugging
+
+        $result = $this->_processResponse($result);
+/* ToDo (maybe): Investigate if that could be centralised
+        if (isset($result['result'])) {
+            $result = $result['result'];
+        }
+*/
+        return $result;
     }
 
     public function forceStdoutDebug(){
@@ -100,22 +108,26 @@ class Soap implements ServiceLocatorAwareInterface {
      * @param mixed $array
      * @return array
      */
-    protected function _processResponse($array){
-        if(is_object($array)){
+    protected function _processResponse($array)
+    {
+        if (is_object($array)) {
             $array = get_object_vars($array);
         }
-        $res = $array;
-        if(is_array($array)){
-            foreach($res as $key=>$v){
-                if(is_object($v) || is_array($v)){
-                    $res[$key] = $this->_processResponse($v);
+
+        $result = $array;
+        if (is_array($array)) {
+            foreach ($result as $key=>$value) {
+                if (is_object($value) || is_array($value)){
+                    $result[$key] = $this->_processResponse($value);
                 }
             }
         }
-        if(is_object($res)){
-            $res = get_object_vars($res);
+
+        if (is_object($result)) {
+            $result = get_object_vars($result);
         }
-        return $res;
+
+        return $result;
     }
 
     protected $_serviceLocator;

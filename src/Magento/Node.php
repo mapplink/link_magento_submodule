@@ -39,32 +39,42 @@ class Node extends AbstractNode {
         }
     }
 
-    protected $_storeViews = null;
+    protected $_storeViews = NULL;
 
     /**
      * Return a data array of all store views
      * @return array
      */
-    public function getStoreViews(){
+    public function getStoreViews()
+    {
+        if ($this->_storeViews === NULL) {
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_INFO,
+                    'storeviews',
+                    'Loading store views',
+                    array(),
+                    array('node'=>$this)
+                );
 
-        if($this->_storeViews != null){
-            return $this->_storeViews;
-        }
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'storeviews', 'Loading store views', array(), array('node'=>$this));
-        $this->_storeViews = array();
-        $soap = $this->getApi('soap');
+            $soap = $this->getApi('soap');
+            if (!$soap) {
+                throw new \Magelink\Exception\SyncException('Failed to initialize SOAP api for store view fetch');
+            }else{
+                /** @var \Magento\Api|Soap $soap */
+                $result = $soap->call('storeList', array());
+                if (count($result)) {
+                    if (isset($result['result'])) {
+                        $result = $result['result'];
+                    }
 
-        if(!$soap){
-            throw new \Magelink\Exception\SyncException('Failed to initialize SOAP api for store view fetch');
+                    $this->_storeViews = array();
+                    foreach ($result as $storeView) {
+                        $this->_storeViews[$storeView['store_id']] = $storeView;
+                    }
+                }
+            }
         }
-        /** @var \Magento\Api|Soap $soap */
-        $res = $soap->call('storeList', array());
-        if(isset($res['result'])){
-            $res = $res['result'];
-        }
-        foreach($res as $sV){
-            $this->_storeViews[$sV['store_id']] = $sV;
-        }
+
         return $this->_storeViews;
     }
 
