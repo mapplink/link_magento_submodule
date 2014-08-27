@@ -534,6 +534,8 @@ class OrderGateway extends AbstractGateway
 
         /** @var \Entity\Wrapper\Order $order */
         $order = $action->getEntity();
+        // Reload order because entity might have changed in the meantime
+        $order = $entityService->reloadEntity($order);
         $orderStatus = $order->getData('status');
 
         $success = TRUE;
@@ -560,11 +562,11 @@ class OrderGateway extends AbstractGateway
                 }
 
                 $this->_soap->call('salesOrderAddComment', array(
-                    $order->getOriginalOrder()->getUniqueId(),
-                    $status,
-                    $comment,
-                    $notify
-                ));
+                        $order->getOriginalOrder()->getUniqueId(),
+                        $status,
+                        $comment,
+                        $notify
+                    ));
                 break;
             case 'cancel':
                 $isCancelable = (strpos($orderStatus, 'pending') === 0)
@@ -595,7 +597,9 @@ class OrderGateway extends AbstractGateway
                             FALSE
                         );
                         $changedOrderData['status_history'] = array(
-                            'comment'=>'HOPS updated status from Magento after abandoning order to '.$newStatus.'.');
+                            'comment'=>'HOPS updated status from Magento after abandoning order to '.$newStatus.'.',
+                            'created_at'=>date('Y/m/s H:i:s')
+                        );
                         $this->updateStatusHistory($changedOrderData, $order, $entityService);
                     }
                 }
