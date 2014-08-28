@@ -30,26 +30,33 @@ class Soap implements ServiceLocatorAwareInterface {
      * @return bool Whether we successfully connected
      * @throws \Magelink\Exception\MagelinkException If this API has already been initialized
      */
-    public function init(Node $magentoNode){
-        if($this->_soapClient !== null){
+    public function init(Node $magentoNode)
+    {
+        if($this->_soapClient !== NULL){
             throw new \Magelink\Exception\MagelinkException('Tried to initialize Soap API twice!');
+            $success = FALSE;
+        }else{
+            $username = $magentoNode->getConfig('soap_username');
+            $password = $magentoNode->getConfig('soap_password');
+            if (!$username || !$password) {
+                // No auth passed, SOAP unavailable
+                $success = FALSE;
+            }else{
+                $this->_soapClient = new Client(
+                    $magentoNode->getConfig('web_url').'api/v2_soap?wsdl=1',
+                    array('soap_version'=>SOAP_1_1)
+                );
+
+                $loginResult = $this->_soapClient->call(
+                    'login', array($magentoNode->getConfig('soap_username'), $magentoNode->getConfig('soap_password'))
+                );
+                //$loginResult = $this->_processResponse($loginRes);
+                $this->_sessionId = $loginResult;
+                $success = (bool) $loginResult;
+            }
         }
 
-        $username = $magentoNode->getConfig('soap_username');
-        $password = $magentoNode->getConfig('soap_password');
-        if(!$username || !$password){
-            // No auth passed, SOAP unavailable
-            return false;
-        }
-
-        $this->_soapClient = new Client($magentoNode->getConfig('web_url').'api/v2_soap?wsdl=1', array('soap_version'=>SOAP_1_1));
-        $loginRes = $this->_soapClient->call('login', array($magentoNode->getConfig('soap_username'), $magentoNode->getConfig('soap_password')));
-        //$loginRes = $this->_processResponse($loginRes);
-        $this->_sessionId = $loginRes;
-        if($loginRes){
-            return true;
-        }
-        return false;
+        return $success;
     }
 
     /**

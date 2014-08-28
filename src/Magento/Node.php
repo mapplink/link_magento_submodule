@@ -23,20 +23,27 @@ class Node extends AbstractNode {
      * @param string $type The type of API to establish - must be available as a service with the name "magento_{type}"
      * @return object|false
      */
-    public function getApi($type){
+    public function getApi($type)
+    {
         if(isset($this->_api[$type])){
             return $this->_api[$type];
         }
 
         $this->_api[$type] = $this->getServiceLocator()->get('magento_' . $type);
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'init_api', 'Creating API instance ' . $type, array('type'=>$type), array('node'=>$this));
-        $res = $this->_api[$type]->init($this);
-        if($res){
-            return $this->_api[$type];
-        }else{
-            $this->_api[$type] = false;
-            return false;
+        $this->getServiceLocator()->get('logService')
+            ->log(\Log\Service\LogService::LEVEL_INFO,
+                'init_api',
+                'Creating API instance '.$type,
+                array('type'=>$type),
+                array('node'=>$this)
+            );
+
+        $apiExists = $this->_api[$type]->init($this);
+        if (!$apiExists) {
+            $this->_api[$type] = FALSE;
         }
+
+        return $this->_api[$type];
     }
 
     protected $_storeViews = NULL;
