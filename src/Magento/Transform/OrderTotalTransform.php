@@ -31,13 +31,15 @@ class OrderTotalTransform extends AbstractTransform
      */
     public function apply()
     {
-        $data = $this->_entity->getArrayCopy();
-        $orderTotal = $data['grand_total'] - $data['shipping_total']
-            + $data['giftcard_total'] + $data['reward_total'] + $data['storecredit_total'];
+        $order = $this->_entity;
+        $data = $order->getArrayCopy();
 
-        return array(
-            'order_total'=> $orderTotal
-        );
+        $orderTotal = $data['grand_total'] - $data['shipping_total'];
+        foreach ($order::getNonCashPaymentCodes() as $code) {
+            $orderTotal += $data[$code];
+        }
+
+        return array('order_total'=> $orderTotal);
     }
 
 }

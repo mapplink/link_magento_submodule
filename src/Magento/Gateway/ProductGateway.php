@@ -261,9 +261,9 @@ class ProductGateway extends AbstractGateway {
         $needsUpdate = true;
 
         $existingEntity = $entityService->loadEntityLocal($this->_node->getNodeId(), 'product', $store_id, $product_id);
-        if(!$existingEntity){
+        if (!$existingEntity) {
             $existingEntity = $entityService->loadEntity($this->_node->getNodeId(), 'product', $store_id, $sku);
-            if(!$existingEntity){
+            if (!$existingEntity) {
                 $existingEntity = $entityService->createEntity(
                     $this->_node->getNodeId(),
                     'product',
