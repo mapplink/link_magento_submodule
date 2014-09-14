@@ -17,36 +17,8 @@ use Node\Entity;
 use Magelink\Exception\MagelinkException;
 
 
-class ProductGateway extends AbstractGateway {
-
-    /**
-     * @var \Magento\Node
-     */
-    protected $_node;
-
-    /**
-     * @var \Node\Entity\Node
-     */
-    protected $_nodeEnt;
-
-    /**
-     * @var \Magento\Api\Soap
-     */
-    protected $_soap = null;
-    /**
-     * @var \Magento\Api\Db
-     */
-    protected $_db = null;
-
-    /**
-     * @var \Node\Service\NodeService
-     */
-    protected $_ns = null;
-
-    /**
-     * @var array Copy of attribute sets, loaded from Magento
-     */
-    protected $_attributeSets = null;
+class ProductGateway extends AbstractGateway
+{
 
     /**
      * Initialize the gateway and perform any setup actions required.
@@ -56,32 +28,22 @@ class ProductGateway extends AbstractGateway {
      * @throws \Magelink\Exception\MagelinkException
      * @return boolean
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entity_type)
+    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
     {
-        if(!($node instanceof \Magento\Node)){
-            throw new \Magelink\Exception\MagelinkException('Invalid node type for this gateway');
-        }
-        if($entity_type != 'product'){
+        if ($entityType != 'product') {
+            $success = FALSE;
             throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
+        }else{
+            $success = parent::init($node, $nodeEntity, $entityType);
+
+            $attributeSets = $this->_soap->call('catalogProductAttributeSetList', array());
+            $this->_attributeSets = array();
+            foreach ($attributeSets as $attributeSetArray){
+                $this->_attributeSets[$attributeSetArray['set_id']] = $attributeSetArray;
+            }
         }
 
-        $this->_node = $node;
-        $this->_nodeEnt = $nodeEntity;
-
-        $this->_soap = $node->getApi('soap');
-        if(!$this->_soap){
-            throw new MagelinkException('SOAP is required for Magento Products');
-        }
-        $this->_db = $node->getApi('db');
-
-
-        $this->_ns = $this->getServiceLocator()->get('nodeService');
-
-        $attSets = $this->_soap->call('catalogProductAttributeSetList', array());
-        $this->_attributeSets = array();
-        foreach($attSets as $arr){
-            $this->_attributeSets[$arr['set_id']] = $arr;
-        }
+        return $success;
     }
 
     /**
@@ -96,23 +58,23 @@ class ProductGateway extends AbstractGateway {
         /** @var \Node\Service\NodeService $nodeService */
         $nodeService = $this->getServiceLocator()->get('nodeService');
 
-        $timestamp = time();
+        $timestamp = time() - $this->apiOverlappingSeconds;
 
         foreach ($this->_node->getStoreViews() as $store_id=>$store_view) {
-            $lastRetrievalTime = date('Y-m-d H:i:s',
-                $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve')
+            $lastRetrieve = date('Y-m-d H:i:s',
+                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve')
                     + (intval($this->_node->getConfig('time_delta_product')) * 3600)
             );
 
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_INFO,
                     'retr_time',
-                    'Retrieving products updated since '.$lastRetrievalTime,
-                    array('type'=>'product', 'timestamp'=>$lastRetrievalTime)
+                    'Retrieving products updated since '.$lastRetrieve,
+                    array('type'=>'product', 'timestamp'=>$lastRetrieve)
                 );
 
             if ($this->_db) {
-                $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', $lastRetrievalTime);
+                $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', $lastRetrieve);
 
                 if(!count($updatedProducts)){
                     continue;
@@ -201,7 +163,7 @@ class ProductGateway extends AbstractGateway {
                         'complex_filter'=>array(
                             array(
                                 'key'=>'updated_at',
-                                'value'=>array('key'=>'gt', 'value'=>$lastRetrievalTime),
+                                'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
                             ),
                         ),
                     ), // filters
@@ -242,7 +204,7 @@ class ProductGateway extends AbstractGateway {
                 throw new \Magelink\Exception\NodeException('No valid API available for sync');
             }
         }
-        $this->_ns->setTimestamp($this->_nodeEnt->getNodeId(), 'product', 'retrieve', $timestamp);
+        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve', $timestamp);
     }
 
     /**

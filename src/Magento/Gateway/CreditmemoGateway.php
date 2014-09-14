@@ -20,20 +20,6 @@ use Entity\Service\EntityService;
 
 class CreditmemoGateway extends AbstractGateway
 {
-    /** @var \Magento\Node */
-    protected $_node;
-
-    /** @var \Node\Entity\Node */
-    protected $_nodeEnt;
-
-    /** @var \Magento\Api\Soap */
-    protected $_soap = null;
-
-    /** @var \Magento\Api\Db */
-    protected $_db = null;
-
-    /** @var \Node\Service\NodeService */
-    protected $_ns = null;
 
     /**
      * Initialize the gateway and perform any setup actions required.
@@ -43,26 +29,16 @@ class CreditmemoGateway extends AbstractGateway
      * @throws \Magelink\Exception\MagelinkException
      * @return boolean
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entity_type)
+    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
     {
-        if(!($node instanceof \Magento\Node)){
-            throw new \Magelink\Exception\MagelinkException('Invalid node type for this gateway');
-        }
-        if($entity_type != 'creditmemo'){
+        if ($entityType != 'creditmemo') {
+            $success = FALSE;
             throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
+        }else{
+            $success = parent::init($node, $nodeEntity, $entityType);
         }
 
-        $this->_node = $node;
-        $this->_nodeEnt = $nodeEntity;
-
-        $this->_soap = $node->getApi('soap');
-        if(!$this->_soap){
-            throw new MagelinkException('SOAP is required for Magento Creditmemos');
-        }
-        $this->_db = $node->getApi('db');
-
-        $this->_ns = $this->getServiceLocator()->get('nodeService');
-
+        return $success;
     }
 
     /**
@@ -75,19 +51,22 @@ class CreditmemoGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = time();
+        $timestamp = time() - $this->apiOverlappingSeconds;
 
-        if($this->_db && false){
-            // TODO: Implement]
-        }else if($this->_soap){
-            $timeStamp = $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'creditmemo', 'retrieve')
+        if ($this->_db) {
+            // ToDo: Implement
+        }elseif ($this->_soap) {
+            $lastRetrieve = $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve')
                 + (intval($this->_node->getConfig('time_delta_creditmemo')) * 3600);
             $results = $this->_soap->call('salesOrderCreditmemoList', array(
                 array(
                     'complex_filter'=>array(
                         array(
                             'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>date('Y-m-d H:i:s', $timeStamp)),
+                            'value'=>array(
+                                'key'=>'gt',
+                                'value'=>date('Y-m-d H:i:s', $lastRetrieve)
+                            ),
                         ),
                     ),
                 ), // filters
@@ -230,7 +209,7 @@ class CreditmemoGateway extends AbstractGateway
             // Nothing worked
             throw new \Magelink\Exception\NodeException('No valid API available for sync');
         }
-        $this->_ns->setTimestamp($this->_nodeEnt->getNodeId(), 'creditmemo', 'retrieve', $timestamp);
+        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $timestamp);
     }
 
     /**

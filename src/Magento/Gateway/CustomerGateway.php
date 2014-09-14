@@ -7,82 +7,43 @@ use Node\Entity;
 use Magelink\Exception\MagelinkException;
 use Entity\Service\EntityService;
 
-class CustomerGateway extends AbstractGateway {
-
-    /**
-     * @var \Magento\Node
-     */
-    protected $_node;
-
-    /**
-     * @var \Node\Entity\Node
-     */
-    protected $_nodeEnt;
-
-    /**
-     * @var \Magento\Api\Soap
-     */
-    protected $_soap = null;
-
-    /**
-     * @var \Magento\Api\SoapV1
-     */
-    protected $_soapv1 = null;
-
-    /**
-     * @var \Magento\Api\Db
-     */
-    protected $_db = null;
-
-    /**
-     * @var \Node\Service\NodeService
-     */
-    protected $_ns = null;
-
-    /**
-     * @var array[]
-     */
-    protected $_custGroups = array();
+class CustomerGateway extends AbstractGateway
+{
 
     /**
      * Initialize the gateway and perform any setup actions required.
      * @param AbstractNode $node
      * @param Entity\Node $nodeEntity
-     * @param string $entity_type
+     * @param string $entityType
      * @throws \Magelink\Exception\MagelinkException
      * @return boolean
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entity_type)
+    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
     {
-        if(!($node instanceof \Magento\Node)){
-            throw new \Magelink\Exception\MagelinkException('Invalid node type for this gateway');
-        }
-        if($entity_type != 'customer'){
+        if ($entityType != 'customer') {
+            $success = FALSE;
             throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
-        }
+        }else{
+            $success = parent::init($node, $nodeEntity, $entityType);
 
-        $this->_node = $node;
-        $this->_nodeEnt = $nodeEntity;
+            if ($this->_node->getConfig('customer_attributes')
+                && strlen($this->_node->getConfig('customer_attributes'))) {
 
-        $this->_soap = $node->getApi('soap');
-        if(!$this->_soap){
-            throw new MagelinkException('SOAP is required for Magento Customers');
-        }
-        if($this->_node->getConfig('customer_attributes') && strlen($this->_node->getConfig('customer_attributes'))){
-            $this->_soapv1 = $node->getApi('soapv1');
-            if(!$this->_soapv1){
-                throw new MagelinkException('SOAP v1 is required for extended customer attributes');
+                $this->_soapv1 = $node->getApi('soapv1');
+                if (!$this->_soapv1) {
+                    $success = FALSE;
+                    throw new MagelinkException('SOAP v1 is required for extended customer attributes');
+                }
+            }
+
+            $groups = $this->_soap->call('customerGroupList', array());
+            $this->_custGroups = array();
+            foreach ($groups as $groupArray) {
+                $this->_custGroups[$groupArray['customer_group_id']] = $groupArray;
             }
         }
-        $this->_db = $node->getApi('db');
 
-        $this->_ns = $this->getServiceLocator()->get('nodeService');
-
-        $groups = $this->_soap->call('customerGroupList', array());
-        $this->_custGroups = array();
-        foreach($groups as $arr){
-            $this->_custGroups[$arr['customer_group_id']] = $arr;
-        }
+        return $success;
     }
 
     /**
@@ -95,11 +56,18 @@ class CustomerGateway extends AbstractGateway {
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = time();
+        $timestamp = time() - $this->apiOverlappingSeconds;
 
-        $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'customer', 'retrieve') + (intval($this->_node->getConfig('time_delta_customer')) * 3600));
+        $lastRetrieve = date('Y-m-d H:i:s',
+            $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve')
+                + (intval($this->_node->getConfig('time_delta_customer')) * 3600));
 
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'retr_time', 'Retrieving customers updated since ' . $retTime, array('type'=>'customer', 'timestamp'=>$retTime));
+        $this->getServiceLocator()->get('logService')
+            ->log(\Log\Service\LogService::LEVEL_INFO,
+                'retr_time',
+                'Retrieving customers updated since '.$lastRetrieve,
+                array('type'=>'customer', 'timestamp'=>$lastRetrieve)
+            );
 
         if($this->_soap){
             $results = $this->_soap->call('customerCustomerList', array(
@@ -107,7 +75,7 @@ class CustomerGateway extends AbstractGateway {
                     'complex_filter'=>array(
                         array(
                             'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>$retTime),
+                            'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
                         ),
                     ),
                 ), // filters
@@ -122,7 +90,7 @@ class CustomerGateway extends AbstractGateway {
                 );
             }
 
-            /**$specialAtt = $this->_node->getConfig('customer_special_att');
+            /**$specialAtt = $this->_node->getConfig('customer_special_attributes');
             if(!strlen(trim($specialAtt))){
                 $specialAtt = false;
             }else{
@@ -224,7 +192,7 @@ class CustomerGateway extends AbstractGateway {
             // Nothing worked
             throw new \Magelink\Exception\NodeException('No valid API available for sync');
         }
-        $this->_ns->setTimestamp($this->_nodeEnt->getNodeId(), 'customer', 'retrieve', $timestamp);
+        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve', $timestamp);
     }
 
     /**

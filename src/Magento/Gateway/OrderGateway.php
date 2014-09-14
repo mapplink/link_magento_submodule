@@ -20,29 +20,6 @@ use Entity\Service\EntityService;
 
 class OrderGateway extends AbstractGateway
 {
-    /**
-     * @var \Magento\Node
-     */
-    protected $_node;
-
-    /**
-     * @var \Node\Entity\Node
-     */
-    protected $_nodeEnt;
-
-    /**
-     * @var \Magento\Api\Soap
-     */
-    protected $_soap = null;
-    /**
-     * @var \Magento\Api\Db
-     */
-    protected $_db = null;
-
-    /**
-     * @var \Node\Service\NodeService
-     */
-    protected $_ns = null;
 
     /**
      * Initialize the gateway and perform any setup actions required.
@@ -52,26 +29,16 @@ class OrderGateway extends AbstractGateway
      * @throws \Magelink\Exception\MagelinkException
      * @return boolean
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entity_type)
+    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
     {
-        if(!($node instanceof \Magento\Node)){
-            throw new \Magelink\Exception\MagelinkException('Invalid node type for this gateway');
-        }
-        if($entity_type != 'order'){
+        if ($entityType != 'order') {
+            $success = FALSE;
             throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
+        }else{
+            $success = parent::init($node, $nodeEntity, $entityType);
         }
 
-        $this->_node = $node;
-        $this->_nodeEnt = $nodeEntity;
-
-        $this->_soap = $node->getApi('soap');
-        if(!$this->_soap){
-            throw new MagelinkException('SOAP is required for Magento Orders');
-        }
-        $this->_db = $node->getApi('db');
-
-        $this->_ns = $this->getServiceLocator()->get('nodeService');
-
+        return $success;
     }
 
     /**
@@ -84,16 +51,17 @@ class OrderGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = time();
+        $timestamp = time() - $this->apiOverlappingSeconds;
 
-        $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'order', 'retrieve')
-            + (intval($this->_node->getConfig('time_delta_order')) * 3600));
+        $lastRetrieve = date('Y-m-d H:i:s',
+            $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve')
+                + (intval($this->_node->getConfig('time_delta_order')) * 3600));
 
         $this->getServiceLocator()->get('logService')
             ->log(\Log\Service\LogService::LEVEL_INFO,
                 'retr_time',
-                'Retrieving orders updated since ' . $retTime,
-                array('type'=>'order', 'timestamp'=>$retTime)
+                'Retrieving orders updated since '.$lastRetrieve,
+                array('type'=>'order', 'timestamp'=>$lastRetrieve)
             );
 
         if($this->_db && FALSE){
@@ -104,7 +72,7 @@ class OrderGateway extends AbstractGateway
                     'complex_filter'=>array(
                         array(
                             'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>$retTime),
+                            'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
                         )
                     ),
                 ), // filters
@@ -299,7 +267,7 @@ class OrderGateway extends AbstractGateway
             // Nothing worked
             throw new \Magelink\Exception\NodeException('No valid API available for sync');
         }
-        $this->_ns->setTimestamp($this->_nodeEnt->getNodeId(), 'order', 'retrieve', $timestamp);
+        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $timestamp);
     }
 
     /**

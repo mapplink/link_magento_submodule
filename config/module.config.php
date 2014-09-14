@@ -62,27 +62,41 @@ return array (
                     'type'=>'Text',
                     'default'=>array()
                 ),
-                //'customer_special_att'=>array('label'=>'Extra customer attribute (stored in taxvat)', 'type'=>'Text', 'default'=>''),
-                'time_delta_product'=>array(
-                    'label'=>'Timezone delta for product fetch', 
-                    'type'=>'Text', 
+                /*'customer_special_attributes'=>array(
+                    'label'=>'Extra customer attribute (stored in taxvat)',
+                    'type'=>'Text',
+                    'default'=>''
+                ),*/
+                'time_delta_customer'=>array(
+                    'label'=>'CUSTOMER API : timezone delta in hours',
+                    'type'=>'Text',
                     'default'=>'0'
                 ),
-                'time_delta_customer'=>array(
-                    'label'=>'Timezone delta for customer fetch', 
+                'time_delta_product'=>array(
+                    'label'=>'PRODUCT API : timezone delta in hours',
                     'type'=>'Text', 
                     'default'=>'0'
                 ),
                 'time_delta_order'=>array(
-                    'label'=>'Timezone delta for order fetch', 
-                    'type'=>'Text', 
+                    'label'=>'ORDER API : timezone delta in hours',
+                    'type'=>'Text',
+                    'default'=>'0'
+                ),
+                'time_correction_order'=>array(
+                    'label'=>'ORDER : time correction in hours on import into HOPS',
+                    'type'=>'Text',
                     'default'=>'0'
                 ),
                 'time_delta_creditmemo'=>array(
-                    'label'=>'Timezone delta for creditmemo fetch', 
+                    'label'=>'CREDIT MEMO fetch : timezone delta in hours',
                     'type'=>'Text', 
                     'default'=>'0'
                 ),
+                'api_overlapping_seconds'=>array(
+                    'label'=>'API calls : overlapping seconds to avoid missing information',
+                    'type'=>'Text',
+                    'default'=>'12'
+                )
             ),
         )
     ),
