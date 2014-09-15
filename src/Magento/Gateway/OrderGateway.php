@@ -18,6 +18,7 @@ use Magelink\Exception\MagelinkException;
 use Entity\Comment;
 use Entity\Service\EntityService;
 
+
 class OrderGateway extends AbstractGateway
 {
 
@@ -52,10 +53,13 @@ class OrderGateway extends AbstractGateway
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
         $timestamp = time() - $this->apiOverlappingSeconds;
+        $deltaInHours = intval($this->_node->getConfig('time_delta_order')) * 3600;
+        $correctionHours = sprintf('%+d hours', intval($this->_node->getConfig('time_correction_order')));
 
-        $lastRetrieve = date('Y-m-d H:i:s',
-            $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve')
-                + (intval($this->_node->getConfig('time_delta_order')) * 3600));
+        $lastRetrieve = date(
+            'Y-m-d H:i:s',
+            $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve') + $deltaInHours
+        );
 
         $this->getServiceLocator()->get('logService')
             ->log(\Log\Service\LogService::LEVEL_INFO,
@@ -95,20 +99,31 @@ class OrderGateway extends AbstractGateway
                     $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
                     $uniqueId = $orderData['increment_id'];
                     $localId = $orderData['order_id'];
+                    $createdAtTimestamp = strtotime($orderData['created_at']);
+
 
                     $data = array(
-                        'customer_email'=>array_key_exists('customer_email', $orderData) ? $orderData['customer_email'] : NULL,
-                        'customer_name'=>(array_key_exists('customer_firstname', $orderData) ? $orderData['customer_firstname'].' ' : '')
-                            .(array_key_exists('customer_lastname', $orderData) ? $orderData['customer_lastname'] : ''),
+                        'customer_email'=>array_key_exists('customer_email', $orderData)
+                            ? $orderData['customer_email'] : NULL,
+                        'customer_name'=>(
+                            array_key_exists('customer_firstname', $orderData) ? $orderData['customer_firstname'].' ' : '')
+                            .(array_key_exists('customer_lastname', $orderData) ? $orderData['customer_lastname'] : ''
+                        ),
                         'status'=>$orderData['status'],
-                        'placed_at'=>$orderData['created_at'],
+                        'placed_at'=>date('Y-m-s H:i:s', strototime($correctionHours, $createdAtTimestamp)),
                         'grand_total'=>$orderData['base_grand_total'],
-                        'weight_total'=>(array_key_exists('weight', $orderData) ? $orderData['weight'] : 0),
-                        'discount_total'=>(array_key_exists('base_discount_amount', $orderData) ? $orderData['base_discount_amount'] : 0),
-                        'shipping_total'=>(array_key_exists('base_shipping_amount', $orderData) ? $orderData['base_shipping_amount'] : 0),
-                        'tax_total'=>(array_key_exists('base_tax_amount', $orderData) ? $orderData['base_tax_amount'] : 0),
-                        'shipping_method'=>(array_key_exists('shipping_method', $orderData) ? $orderData['shipping_method'] : NULL)
+                        'weight_total'=>(array_key_exists('weight', $orderData)
+                            ? $orderData['weight'] : 0),
+                        'discount_total'=>(array_key_exists('base_discount_amount', $orderData)
+                            ? $orderData['base_discount_amount'] : 0),
+                        'shipping_total'=>(array_key_exists('base_shipping_amount', $orderData)
+                            ? $orderData['base_shipping_amount'] : 0),
+                        'tax_total'=>(array_key_exists('base_tax_amount', $orderData)
+                            ? $orderData['base_tax_amount'] : 0),
+                        'shipping_method'=>(array_key_exists('shipping_method', $orderData)
+                            ? $orderData['shipping_method'] : NULL)
                     );
+
                     if (array_key_exists('base_gift_cards_amount', $orderData)) {
                         $data['giftcard_total'] = $orderData['base_gift_cards_amount'];
                     }elseif (array_key_exists('base_gift_cards_amount_invoiced', $orderData)) {
