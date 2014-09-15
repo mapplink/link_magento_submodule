@@ -51,7 +51,7 @@ abstract class AbstractGateway extends BaseAbstractGateway
                 $success = FALSE;
                 throw new MagelinkException('SOAP is required for Magento '.ucfirst($entityType));
             }else{
-                $this->apiOverlappingSeconds = $this->_node->getConfig('soap_overlapping_seconds');
+                $this->apiOverlappingSeconds = $this->_node->getConfig('api_overlapping_seconds');
             }
 
             $this->_db = $node->getApi('db');
