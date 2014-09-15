@@ -110,7 +110,7 @@ class OrderGateway extends AbstractGateway
                             .(array_key_exists('customer_lastname', $orderData) ? $orderData['customer_lastname'] : ''
                         ),
                         'status'=>$orderData['status'],
-                        'placed_at'=>date('Y-m-s H:i:s', strtotime($correctionHours, $createdAtTimestamp)),
+                        'placed_at'=>date('Y-m-d H:i:s', strtotime($correctionHours, $createdAtTimestamp)),
                         'grand_total'=>$orderData['base_grand_total'],
                         'weight_total'=>(array_key_exists('weight', $orderData)
                             ? $orderData['weight'] : 0),
