@@ -53,7 +53,7 @@ class CreditmemoGateway extends AbstractGateway
 
         $timestamp = time() - $this->apiOverlappingSeconds;
 
-        if ($this->_db) {
+        if (FALSE && $this->_db) {
             // ToDo: Implement
         }elseif ($this->_soap) {
             $lastRetrieve = $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve')

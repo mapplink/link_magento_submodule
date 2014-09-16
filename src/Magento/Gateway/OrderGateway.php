@@ -68,7 +68,7 @@ class OrderGateway extends AbstractGateway
                 array('type'=>'order', 'timestamp'=>$lastRetrieve)
             );
 
-        if($this->_db && FALSE){
+        if (FALSE && $this->_db) {
             // TODO: Implement
         }elseif ($this->_soap) {
             $results = $this->_soap->call('salesOrderList', array(

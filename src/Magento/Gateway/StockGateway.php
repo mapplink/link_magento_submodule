@@ -57,7 +57,7 @@ class StockGateway extends AbstractGateway
         );
         $products = array_unique($products);
 
-        if ($this->_db) {
+        if (FALSE && $this->_db) {
             // TODO: Implement
         }elseif($this->_soap) {
             $results = $this->_soap->call('catalogInventoryStockItemList', array(
