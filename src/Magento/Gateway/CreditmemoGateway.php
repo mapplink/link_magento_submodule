@@ -176,14 +176,20 @@ class CreditmemoGateway extends AbstractGateway
                 $needsUpdate = true;
 
                 $existingEntity = $entityService->loadEntityLocal($this->_node->getNodeId(), 'creditmemo', $store_id, $local_id);
-                if(!$existingEntity){
+                if (!$existingEntity) {
                     $existingEntity = $entityService->loadEntity($this->_node->getNodeId(), 'creditmemo', $store_id, $unique_id);
-                    if(!$existingEntity){
+                    if (!$existingEntity) {
                         $entityService->beginEntityTransaction('magento-creditmemo-'.$unique_id);
                         try{
                             $existingEntity = $entityService->createEntity($this->_node->getNodeId(), 'creditmemo', $store_id, $unique_id, $data, $parent_id);
                             $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
-                            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_new', 'New creditmemo ' . $unique_id, array('sku'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                            $this->getServiceLocator()->get('logService')
+                                ->log(\Log\Service\LogService::LEVEL_INFO,
+                                    'ent_new',
+                                    'New creditmemo '.$unique_id,
+                                    array('sku'=>$unique_id),
+                                    array('node'=>$this->_node, 'entity'=>$existingEntity)
+                                );
                             $this->createItems($creditmemo, $existingEntity->getId(), $entityService, true);
                             $entityService->commitEntityTransaction('magento-creditmemo-'.$unique_id);
                         }catch(\Exception $e){
@@ -192,12 +198,28 @@ class CreditmemoGateway extends AbstractGateway
                         }
                         $needsUpdate = false;
                     }else{
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'ent_link', 'Unlinked creditmemo ' . $unique_id, array('sku'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
-                        try{$entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);}catch(\Exception $e){} // Ignore errors.
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_WARN,
+                                'ent_link',
+                                'Unlinked creditmemo '.$unique_id,
+                                array('sku'=>$unique_id),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
+                        try{
+                            $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
+                        }catch(\Exception $e){
+                            // Ignore errors
+                        }
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }
                 }else{
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_update', 'Updated creditmemo ' . $unique_id, array('sku'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_INFO,
+                            'ent_update',
+                            'Updated creditmemo '.$unique_id,
+                            array('sku'=>$unique_id),
+                            array('node'=>$this->_node, 'entity'=>$existingEntity)
+                        );
                 }
                 if($needsUpdate){
                     $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, false);
