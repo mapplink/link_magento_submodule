@@ -17,6 +17,12 @@ abstract class AbstractGateway extends BaseAbstractGateway
     /** @var \Node\Service\NodeService */
     protected $_nodeService = NULL;
 
+    /** @var \Entity\Service\EntityService $entityService */
+    protected $_entityService = NULL;
+
+    /** @var \Entity\Service\EntityConfigService $entityConfigService */
+    protected $entityConfigService = NULL;
+
     /** @var \Magento\Api\Soap */
     protected $_soap = NULL;
 
@@ -38,6 +44,7 @@ abstract class AbstractGateway extends BaseAbstractGateway
     public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
     {
         $success = TRUE;
+
         if (!($node instanceof \Magento\Node)) {
             $success = FALSE;
             throw new \Magelink\Exception\MagelinkException('Invalid node type for this gateway');
@@ -45,16 +52,18 @@ abstract class AbstractGateway extends BaseAbstractGateway
             $this->_node = $node;
             $this->_nodeEntity = $nodeEntity;
             $this->_nodeService = $this->getServiceLocator()->get('nodeService');
+            $this->_entityService = $this->getServiceLocator()->get('entityService');
+            //$this->_entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
+            $this->_db = $node->getApi('db');
             $this->_soap = $node->getApi('soap');
+
             if (!$this->_soap) {
                 $success = FALSE;
                 throw new MagelinkException('SOAP is required for Magento '.ucfirst($entityType));
             }else{
                 $this->apiOverlappingSeconds = $this->_node->getConfig('api_overlapping_seconds');
             }
-
-            $this->_db = $node->getApi('db');
         }
 
         return $success;

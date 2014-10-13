@@ -9,192 +9,253 @@ use Magelink\Exception\MagelinkException;
 use Zend\Db\Adapter\Adapter;
 use Zend\Db\TableGateway\TableGateway;
 
+
 /**
  * Implements DB access to Magento - loading and updating
  * @package Magento\Api
  */
-class Db implements ServiceLocatorAwareInterface {
+class Db implements ServiceLocatorAwareInterface
+{
+    /** @var bool $_debug */
+    protected $_debug = TRUE;
 
-    protected $_debug = true;
-
-    protected function debugSql($sql){
-        if(!$this->_debug){
-            return;
-        }
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA, 'dbapi_sql', 'DB API SQL: ' . $sql, array('sql'=>$sql), array('node'=>$this->_node->getNodeId()));
-    }
-
-    /**
-     * @var \Zend\Db\Adapter\Adapter
-     */
+    /** @var \Zend\Db\Adapter\Adapter $_adapter */
     protected $_adapter;
 
-    protected $_enterprise = false;
+    /** @var bool $_enterprise */
+    protected $_enterprise = FALSE;
 
-    /**
-     * @var \Magento\Node
-     */
+    /** @var \Magento\Node */
     protected $_node;
+
+    /** @var array  */
+    protected $columns= array(
+        'entity_id',
+        'status',
+        'store_id',
+        'customer_id',
+        'grand_total',
+        'shipping_amount',
+        'discount_amount',
+        'discount_canceled',
+        'discount_invoiced',
+        'discount_refunded',
+        'shipping_canceled',
+        'shipping_invoiced',
+        'shipping_refunded',
+        'shipping_tax_amount',
+        'shipping_tax_refunded',
+        'subtotal',
+        'tax_amount',
+        'tax_canceled',
+        'tax_invoiced',
+        'tax_refunded',
+        'total_canceled',
+        'total_invoiced',
+        'total_offline_refunded',
+        'total_online_refunded',
+        'total_paid',
+        'total_qty_ordered',
+        'customer_is_guest',
+        'billing_address_id',
+        'customer_group_id',
+        'edit_increment',
+        'quote_address_id',
+        'quote_id',
+        'shipping_address_id',
+        'adjustment_negative',
+        'adjustment_positive',
+        'shipping_discount_amount',
+        'total_due',
+        'weight',
+        'customer_dob',
+        'increment_id',
+        'applied_rule_ids',
+        'base_currency_code',
+        'customer_email',
+        'customer_firstname',
+        'customer_lastname',
+        'customer_middlename',
+        'customer_prefix',
+        'customer_suffix',
+        'discount_description',
+        'order_currency_code',
+        'original_increment_id',
+        'shipping_method',
+        'store_name',
+        'store_currency_code',
+        'customer_note',
+        'created_at',
+        'updated_at',
+        'total_item_count',
+        'customer_gender',
+        'gift_message_id',
+    );
+
 
     /**
      * Initialize the DB API
      * @param Node $magentoNode
      * @return bool Whether we succeeded
      */
-    public function init(Node $magentoNode){
+    public function init(Node $magentoNode)
+    {
+        $success = TRUE;
+
         $this->_node = $magentoNode;
         $this->_enterprise = $magentoNode->getConfig('enterprise');
+
         $hostname = $magentoNode->getConfig('db_hostname');
         $schema = $magentoNode->getConfig('db_schema');
         $username = $magentoNode->getConfig('db_username');
         $password = $magentoNode->getConfig('db_password');
-        if(!$schema || !$hostname){
-            return false;
+
+        if (!$schema || !$hostname){
+            $success = FALSE;
+        }else {
+            try{
+                $this->_adapter = new \Zend\Db\Adapter\Adapter(
+                    array(
+                        'driver' => 'Pdo',
+                        'dsn' => 'mysql:dbname='.$schema.';host='.$hostname,
+                        'username' => $username,
+                        'password' => $password,
+                        'driver_options' => array(
+                            \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES \'UTF8\''
+                        ),
+                    )
+                );
+                $this->_adapter->getCurrentSchema();
+
+                if ($this->_enterprise) {
+                    $this->columns = array_merge(
+                        $this->columns,
+                        array(
+                            'customer_balance_amount',
+                            'customer_balance_invoiced',
+                            'customer_balance_refunded',
+                            'customer_bal_total_refunded',
+                            'gift_cards',
+                            'gift_cards_amount',
+                            'gift_cards_invoiced',
+                            'gift_cards_refunded',
+                            'gw_id',
+                            'gw_add_card',
+                            'gw_price',
+                            'gw_items_price',
+                            'gw_card_price',
+                            'gw_tax_amount',
+                            'gw_items_tax_amount',
+                            'gw_card_tax_amount',
+                            'gw_price_invoiced',
+                            'gw_items_price_invoiced',
+                            'gw_tax_amount_invoiced',
+                            'gw_items_tax_invoiced',
+                            'gw_card_tax_invoiced',
+                            'gw_price_refunded',
+                            'gw_items_price_refunded',
+                            'gw_tax_amount_refunded',
+                            'gw_items_tax_refunded',
+                            'gw_card_tax_refunded',
+                            'reward_points_balance',
+                            'reward_currency_amount',
+                            'rwrd_currency_amount_invoiced',
+                            'rwrd_crrncy_amnt_refnded',
+                            'reward_points_balance_refund',
+                            'reward_points_balance_refunded',
+                            'reward_salesrule_points',
+                        )
+                    );
+                }
+            }catch(\Exception $exception){
+                $success = FALSE;
+                $this->getServiceLocator()->get('logService')
+                    ->log(\Log\Service\LogService::LEVEL_DEBUG,
+                        'init_fail',
+                        'DB API init failed - '.$exception->getMessage(),
+                        array('hostname'=>$hostname, 'schema'=>$schema, 'message'=>$exception->getMessage()),
+                        array('node'=>$magentoNode->getNodeId(), 'exception'=>$exception)
+                    );
+            }
         }
-        try{
-            $this->_adapter = new \Zend\Db\Adapter\Adapter(array(
-                'driver' => 'Pdo',
-                'dsn' => 'mysql:dbname=' . $schema . ';host='.$hostname,
-                'username'=>$username,
-                'password'=>$password,
-                'driver_options' => array(
-                    \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES \'UTF8\''
-                ),
-            ));
-            $this->_adapter->getCurrentSchema();
-        }catch(\Exception $e){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_DEBUG, 'init_fail', 'DB API init failed - ' . $e->getMessage(), array('hostname'=>$hostname, 'schema'=>$schema, 'message'=>$e->getMessage()), array('node'=>$magentoNode->getNodeId(), 'exception'=>$e));
-            return false;
+
+        return $success;
+    }
+
+    /**
+     * @param $sql
+     */
+    protected function debugSql($sql)
+    {
+        if ($this->_debug) {
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
+                    'dbapi_sql',
+                    'DB API SQL: '.$sql,
+                    array('sql'=>$sql),
+                    array('node'=>$this->_node->getNodeId())
+                );
         }
-        return true;
+    }
+
+    protected function getOrdersFromDatabase(\Zend\Db\Sql\Select $select)
+    {
+        $select->columns($this->columns);
+        $results = $this->getTableGateway('sales_flat_order')->selectWith($select);
+
+        $data = array();
+        foreach ($results as $row) {
+            $data[$row['entity_id']] = $row;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Retrieve one magento order by increment id
+     * @param string $orderIncrementId
+     * @return array
+     */
+    public function getOrderByIncrementId($orderIncrementId)
+    {
+        $select = new \Zend\Db\Sql\Select('sales_flat_order');
+        $select->where(array('increment_id'=>array($orderIncrementId)));
+
+        $data = $this->getOrdersFromDatabase($select);
+        if (count($data)) {
+            $data = array_shift($data);
+        }else{
+            $data = NULL;
+        }
+
+        return $data;
     }
 
     /**
      * Retrieve some or all magento orders, optionally filtering by an updated at date.
      *
-     * @param int|false $store_id The store ID to look at, or false if irrelevant
-     * @param array|bool $order_ids
-     * @param bool|string $updated_since
+     * @param int|bool $storeId The store ID to look at, or false if irrelevant
+     * @param array|bool $orderIds
+     * @param bool|string $updatedSince
      * @return array
      */
-    public function getOrders($store_id, $order_ids=false, $updated_since=false){
+    public function getOrders($storeId = FALSE, $orderIds = FALSE, $updatedSince = FALSE)
+    {
         $select = new \Zend\Db\Sql\Select('sales_flat_order');
-        if($store_id !== false){
-            $select->where(array('store_id'=>$store_id));
+
+        if ($storeId !== FALSE) {
+            $select->where(array('store_id'=>$storeId));
         }
-        if(is_array($order_ids)){
-            $select->where(array('entity_id'=>$order_ids));
+        if (is_array($orderIds)) {
+            $select->where(array('entity_id'=>$orderIds));
         }
-        if($updated_since){
-            $select->where(new \Zend\Db\Sql\Expression('updated_at > ' . $updated_since));
-        }
-        $select->columns(array(
-            'entity_id',
-            'status',
-            'store_id',
-            'customer_id',
-            'grand_total',
-            'shipping_amount',
-            'discount_amount',
-            'discount_canceled',
-            'discount_invoiced',
-            'discount_refunded',
-            'shipping_canceled',
-            'shipping_invoiced',
-            'shipping_refunded',
-            'shipping_tax_amount',
-            'shipping_tax_refunded',
-            'subtotal',
-            'tax_amount',
-            'tax_canceled',
-            'tax_invoiced',
-            'tax_refunded',
-            'total_canceled',
-            'total_invoiced',
-            'total_offline_refunded',
-            'total_online_refunded',
-            'total_paid',
-            'total_qty_ordered',
-            'customer_is_guest',
-            'billing_address_id',
-            'customer_group_id',
-            'edit_increment',
-            'quote_address_id',
-            'quote_id',
-            'shipping_address_id',
-            'adjustment_negative',
-            'adjustment_positive',
-            'shipping_discount_amount',
-            'total_due',
-            'weight',
-            'customer_dob',
-            'increment_id',
-            'applied_rule_ids',
-            'base_currency_code',
-            'customer_email',
-            'customer_firstname',
-            'customer_lastname',
-            'customer_middlename',
-            'customer_prefix',
-            'customer_suffix',
-            'discount_description',
-            'order_currency_code',
-            'original_increment_id',
-            'shipping_method',
-            'store_name',
-            'store_currency_code',
-            'customer_note',
-            'created_at',
-            'updated_at',
-            'total_item_count',
-            'customer_gender',
-            'gift_message_id',
-        ));
-        if($this->_enterprise){
-            $select->columns(array(
-                'customer_balance_amount',
-                'customer_balance_invoiced',
-                'customer_balance_refunded',
-                'customer_bal_total_refunded',
-                'gift_cards',
-                'gift_cards_amount',
-                'gift_cards_invoiced',
-                'gift_cards_refunded',
-                'gw_id',
-                'gw_add_card',
-                'gw_price',
-                'gw_items_price',
-                'gw_card_price',
-                'gw_tax_amount',
-                'gw_items_tax_amount',
-                'gw_card_tax_amount',
-                'gw_price_invoiced',
-                'gw_items_price_invoiced',
-                'gw_tax_amount_invoiced',
-                'gw_items_tax_invoiced',
-                'gw_card_tax_invoiced',
-                'gw_price_refunded',
-                'gw_items_price_refunded',
-                'gw_tax_amount_refunded',
-                'gw_items_tax_refunded',
-                'gw_card_tax_refunded',
-                'reward_points_balance',
-                'reward_currency_amount',
-                'rwrd_currency_amount_invoiced',
-                'rwrd_crrncy_amnt_refnded',
-                'reward_points_balance_refund',
-                'reward_points_balance_refunded',
-                'reward_salesrule_points',
-            ));
+        if ($updatedSince) {
+            $select->where(new \Zend\Db\Sql\Where("updated_at > '".$updatedSince."'"));
         }
 
-        $ret = array();
-        $res = $this->getTableGateway('sales_flat_order')->selectWith($select);
-        foreach($res as $row){
-            $ret[$row['entity_id']] = $row;
-        }
+        $ordersDataArray = $this->getOrdersFromDatabase($select);
 
-        return $ret;
+        return $ordersDataArray;
     }
 
     /**

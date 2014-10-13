@@ -21,6 +21,9 @@ use Entity\Service\EntityService;
 
 class OrderGateway extends AbstractGateway
 {
+    /** @var array */
+    protected $notRetrievedOrderIncrementIds = NULL;
+
 
     /**
      * Initialize the gateway and perform any setup actions required.
@@ -43,18 +46,232 @@ class OrderGateway extends AbstractGateway
     }
 
     /**
+     * Check, if the order should be ignored or imported
+     * @param array $orderData
+     * @return bool
+     */
+    protected function isOrderToBeRetrieved(array $orderData)
+    {
+        // Check if order has a magento increment id
+        if (intval($orderData['increment_id']) > 100000000) {
+            $retrieve = TRUE;
+        }else{
+            $retrieve =  FALSE;
+        }
+
+        return $retrieve;
+    }
+
+    /**
+     * Store order with provided order data
+     * @param $orderData
+     * @throws MagelinkException
+     * @throws \Exception
+     * @throws \Magelink\Exception\NodeException
+     */
+    protected function storeOrderData($orderData, $forced = FALSE)
+    {
+        if ($forced) {
+            $logLevel = \Log\Service\LogService::LEVEL_WARN;
+            $logCodeSuffix = '_forced';
+            $logMessageSuffix = ' (out of sync - forced)';
+        }else{
+            $logLevel = \Log\Service\LogService::LEVEL_INFO;
+            $logMessageSuffix = $logCodeSuffix = '';
+        }
+        $correctionHours = sprintf('%+d hours', intval($this->_node->getConfig('time_correction_order')));
+
+        $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
+        $uniqueId = $orderData['increment_id'];
+        $localId = $orderData['order_id'];
+        $createdAtTimestamp = strtotime($orderData['created_at']);
+
+        $data = array(
+            'customer_email'=>array_key_exists('customer_email', $orderData)
+                ? $orderData['customer_email'] : NULL,
+            'customer_name'=>(
+                array_key_exists('customer_firstname', $orderData) ? $orderData['customer_firstname'].' ' : '')
+                .(array_key_exists('customer_lastname', $orderData) ? $orderData['customer_lastname'] : ''
+                ),
+            'status'=>$orderData['status'],
+            'placed_at'=>date('Y-m-d H:i:s', strtotime($correctionHours, $createdAtTimestamp)),
+            'grand_total'=>$orderData['base_grand_total'],
+            'weight_total'=>(array_key_exists('weight', $orderData)
+                ? $orderData['weight'] : 0),
+            'discount_total'=>(array_key_exists('base_discount_amount', $orderData)
+                ? $orderData['base_discount_amount'] : 0),
+            'shipping_total'=>(array_key_exists('base_shipping_amount', $orderData)
+                ? $orderData['base_shipping_amount'] : 0),
+            'tax_total'=>(array_key_exists('base_tax_amount', $orderData)
+                ? $orderData['base_tax_amount'] : 0),
+            'shipping_method'=>(array_key_exists('shipping_method', $orderData)
+                ? $orderData['shipping_method'] : NULL)
+        );
+
+        if (array_key_exists('base_gift_cards_amount', $orderData)) {
+            $data['giftcard_total'] = $orderData['base_gift_cards_amount'];
+        }elseif (array_key_exists('base_gift_cards_amount_invoiced', $orderData)) {
+            $data['giftcard_total'] = $orderData['base_gift_cards_amount_invoiced'];
+        }else{
+            $data['giftcard_total'] = 0;
+        }
+        if (array_key_exists('base_reward_currency_amount', $orderData)) {
+            $data['reward_total'] = $orderData['base_reward_currency_amount'];
+        }elseif (array_key_exists('base_reward_currency_amount_invoiced', $orderData)) {
+            $data['reward_total'] = $orderData['base_reward_currency_amount_invoiced'];
+        }else{
+            $data['reward_total'] = 0;
+        }
+        if (array_key_exists('base_customer_balance_amount', $orderData)) {
+            $data['storecredit_total'] = $orderData['base_customer_balance_amount'];
+        }elseif (array_key_exists('base_customer_balance_amount_invoiced', $orderData)) {
+            $data['storecredit_total'] = $orderData['base_customer_balance_amount_invoiced'];
+        }else{
+            $data['storecredit_total'] = 0;
+        }
+
+        $payments = array();
+        if (isset($orderData['payment'])) {
+            if (is_array($orderData['payment']) && !isset($orderData['payment']['payment_id'])) {
+                foreach ($orderData['payment'] as $payment) {
+                    $payments = $this->_entityService->convertPaymentData(
+                        $payment['method'], $payment['base_amount_ordered'], $payment['cc_type']);
+                }
+            }elseif (isset($orderData['payment']['payment_id'])) {
+                $payments = $this->_entityService->convertPaymentData(
+                    $orderData['payment']['method'],
+                    $orderData['payment']['base_amount_ordered'],
+                    (isset($orderData['payment']['cc_type']) ? $orderData['payment']['cc_type'] : '')
+                );
+            }else{
+                throw new MagelinkException('Invalid payment details format for order '.$uniqueId);
+            }
+        }
+        if(count($payments)){
+            $data['payment_method'] = $payments;
+        }
+
+        if (isset($orderData['customer_id']) && $orderData['customer_id'] ){
+            $customer = $this->_entityService
+                ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_id']);
+            // $customer = $this->_entityService->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_email'])
+            if ($customer && $customer->getId()) {
+                $data['customer'] = $customer;
+            }else{
+                $data['customer'] = NULL;
+            }
+        }
+
+        $needsUpdate = TRUE;
+
+        $existingEntity = $this->_entityService->loadEntityLocal(
+            $this->_node->getNodeId(),
+            'order',
+            $storeId,
+            $localId
+        );
+
+        if (!$existingEntity) {
+            $existingEntity = $this->_entityService->loadEntity(
+                $this->_node->getNodeId(),
+                'order',
+                $storeId,
+                $uniqueId
+            );
+
+            if (!$existingEntity) {
+                $this->_entityService->beginEntityTransaction('magento-order-'.$uniqueId);
+                try{
+                    $data = array_merge(
+                        $this->createAddresses($orderData, $this->_entityService),
+                        $data
+                    );
+                    $existingEntity = $this->_entityService->createEntity(
+                        $this->_node->getNodeId(),
+                        'order',
+                        $storeId,
+                        $uniqueId,
+                        $data,
+                        NULL
+                    );
+                    $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
+
+                    $this->getServiceLocator()->get('logService')
+                        ->log($logLevel,
+                            'ent_new'.$logCodeSuffix,
+                            'New order '.$uniqueId.$logMessageSuffix,
+                            array('sku'=>$uniqueId),
+                            array('node'=>$this->_node, 'entity'=>$existingEntity)
+                        );
+
+                    $this->createItems($orderData, $existingEntity->getId());
+
+                    try{
+                        $this->_soap->call('salesOrderAddComment',
+                            array(
+                                $uniqueId,
+                                $existingEntity->getData('status'),
+                                'Order retrieved by MageLink, Entity #'.$existingEntity->getId(),
+                                FALSE
+                            )
+                        );
+                    }catch (\Exception $e) {
+                        $this->getServiceLocator()->get('logService')
+                            ->log($logLevel,
+                                'ent_comment_err'.$logCodeSuffix,
+                                'Failed to write comment on order '.$uniqueId.$logMessageSuffix,
+                                array(),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
+                    }
+                    $this->_entityService->commitEntityTransaction('magento-order-'.$uniqueId);
+                }catch(\Exception $e){
+                    $this->_entityService->rollbackEntityTransaction('magento-order-'.$uniqueId);
+                    throw $e;
+                }
+                $needsUpdate = FALSE;
+            }else{
+                $this->getServiceLocator()->get('logService')
+                    ->log($logLevel,
+                        'ent_link'.$logCodeSuffix,
+                        'Unlinked order '.$uniqueId.$logMessageSuffix,
+                        array('sku'=>$uniqueId),
+                        array('node'=>$this->_node, 'entity'=>$existingEntity)
+                    );
+                $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
+            }
+        }else{
+            $attributesNotToUpdate = array('grand_total');
+            foreach ($attributesNotToUpdate as $code) {
+                if ($existingEntity->getData($code, NULL) !== NULL) {
+                    unset($data[$code]);
+                }
+            }
+            $this->getServiceLocator()->get('logService')
+                ->log($logLevel,
+                    'ent_update'.$logCodeSuffix,
+                    'Updated order '.$uniqueId.$logMessageSuffix,
+                    array('sku'=>$uniqueId),
+                    array('node'=>$this->_node, 'entity'=>$existingEntity)
+                );
+        }
+
+        if ($needsUpdate) {
+            $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
+        }
+        $this->updateStatusHistory($orderData, $existingEntity);
+    }
+
+    /**
      * Retrieve and action all updated records (either from polling, pushed data, or other sources).
+     * @throws MagelinkException
+     * @throws \Exception
+     * @throws \Magelink\Exception\NodeException
      */
     public function retrieve()
     {
-        /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator()->get('entityService');
-        /** @var \Entity\Service\EntityConfigService $entityConfigService */
-        $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
-
         $timestamp = time() - $this->apiOverlappingSeconds;
         $deltaInHours = intval($this->_node->getConfig('time_delta_order')) * 3600;
-        $correctionHours = sprintf('%+d hours', intval($this->_node->getConfig('time_correction_order')));
 
         $lastRetrieve = date(
             'Y-m-d H:i:s',
@@ -68,234 +285,190 @@ class OrderGateway extends AbstractGateway
                 array('type'=>'order', 'timestamp'=>$lastRetrieve)
             );
 
+        $success = NULL;
         if (FALSE && $this->_db) {
-            // TODO: Implement
+            // TODO (maybe): Implement
+            $storeId = $orderIds = FALSE;
+            $results = $this->_db->getOrders($storeId, $orderIds, $lastRetrieve);
+            foreach ($results as $orderData) {
+                if ($this->isOrderToBeRetrieved($orderData)) {
+                    $success = $this->storeOrderData($orderData);
+                }
+            }
         }elseif ($this->_soap) {
-            $results = $this->_soap->call('salesOrderList', array(
-                array(
-                    'complex_filter'=>array(
-                        array(
-                            'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
-                        )
-                    ),
-                ), // filters
-            ));
+            $results = $this->_soap->call(
+                'salesOrderList',
+                array(array('complex_filter'=>array(
+                    array(
+                        'key'=>'updated_at',
+                        'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
+                    )
+                )))
+            );
 
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_INFO,'salesOrderList','salesOrderList',array('results'=>$results));
             foreach ($results as $orderFromList) {
-                // Check if order has a magento increment id
-                if (intval($orderFromList['increment_id']) > 100000000) {
+                if ($this->isOrderToBeRetrieved($orderFromList)) {
                     $orderData = $this->_soap->call('salesOrderInfo', array($orderFromList['increment_id']));
                     if (isset($orderData['result'])) {
                         $orderData = $orderData['result'];
                     }
                     // Inserting missing fields from salesOrderList in the salesOrderInfo array
-                    foreach(array_diff(array_keys($orderFromList), array_keys($orderData)) as $key){
+                    foreach (array_diff(array_keys($orderFromList), array_keys($orderData)) as $key) {
                         $orderData[$key] = $orderFromList[$key];
                     }
 
-                    $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
-                    $uniqueId = $orderData['increment_id'];
-                    $localId = $orderData['order_id'];
-                    $createdAtTimestamp = strtotime($orderData['created_at']);
-
-
-                    $data = array(
-                        'customer_email'=>array_key_exists('customer_email', $orderData)
-                            ? $orderData['customer_email'] : NULL,
-                        'customer_name'=>(
-                            array_key_exists('customer_firstname', $orderData) ? $orderData['customer_firstname'].' ' : '')
-                            .(array_key_exists('customer_lastname', $orderData) ? $orderData['customer_lastname'] : ''
-                        ),
-                        'status'=>$orderData['status'],
-                        'placed_at'=>date('Y-m-d H:i:s', strtotime($correctionHours, $createdAtTimestamp)),
-                        'grand_total'=>$orderData['base_grand_total'],
-                        'weight_total'=>(array_key_exists('weight', $orderData)
-                            ? $orderData['weight'] : 0),
-                        'discount_total'=>(array_key_exists('base_discount_amount', $orderData)
-                            ? $orderData['base_discount_amount'] : 0),
-                        'shipping_total'=>(array_key_exists('base_shipping_amount', $orderData)
-                            ? $orderData['base_shipping_amount'] : 0),
-                        'tax_total'=>(array_key_exists('base_tax_amount', $orderData)
-                            ? $orderData['base_tax_amount'] : 0),
-                        'shipping_method'=>(array_key_exists('shipping_method', $orderData)
-                            ? $orderData['shipping_method'] : NULL)
-                    );
-
-                    if (array_key_exists('base_gift_cards_amount', $orderData)) {
-                        $data['giftcard_total'] = $orderData['base_gift_cards_amount'];
-                    }elseif (array_key_exists('base_gift_cards_amount_invoiced', $orderData)) {
-                        $data['giftcard_total'] = $orderData['base_gift_cards_amount_invoiced'];
-                    }else{
-                        $data['giftcard_total'] = 0;
-                    }
-                    if (array_key_exists('base_reward_currency_amount', $orderData)) {
-                        $data['reward_total'] = $orderData['base_reward_currency_amount'];
-                    }elseif (array_key_exists('base_reward_currency_amount_invoiced', $orderData)) {
-                        $data['reward_total'] = $orderData['base_reward_currency_amount_invoiced'];
-                    }else{
-                        $data['reward_total'] = 0;
-                    }
-                    if (array_key_exists('base_customer_balance_amount', $orderData)) {
-                        $data['storecredit_total'] = $orderData['base_customer_balance_amount'];
-                    }elseif (array_key_exists('base_customer_balance_amount_invoiced', $orderData)) {
-                        $data['storecredit_total'] = $orderData['base_customer_balance_amount_invoiced'];
-                    }else{
-                        $data['storecredit_total'] = 0;
-                    }
-
-                    $payments = array();
-                    if (isset($orderData['payment'])) {
-                        if (is_array($orderData['payment']) && !isset($orderData['payment']['payment_id'])) {
-                            foreach ($orderData['payment'] as $payment) {
-                                $payments = $entityService->convertPaymentData(
-                                    $payment['method'], $payment['base_amount_ordered'], $payment['cc_type']);
-                            }
-                        }elseif (isset($orderData['payment']['payment_id'])) {
-                            $payments = $entityService->convertPaymentData(
-                                $orderData['payment']['method'],
-                                $orderData['payment']['base_amount_ordered'],
-                                (isset($orderData['payment']['cc_type']) ? $orderData['payment']['cc_type'] : '')
-                            );
-                        }else{
-                            throw new MagelinkException('Invalid payment details format for order '.$uniqueId);
-                        }
-                    }
-                    if(count($payments)){
-                        $data['payment_method'] = $payments;
-                    }
-
-                    if (isset($orderData['customer_id']) && $orderData['customer_id'] ){
-                        $customer = $entityService
-                            ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_id']);
-                        // $customer = $entityService->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_email'])
-                        if ($customer && $customer->getId()) {
-                            $data['customer'] = $customer;
-                        }else{
-                            $data['customer'] = NULL;
-                        }
-                    }
-
-                    /** @var boolean $needsUpdate Whether we need to perform an entity update here */
-                    $needsUpdate = TRUE;
-
-                    $existingEntity = $entityService->loadEntityLocal(
-                        $this->_node->getNodeId(),
-                        'order',
-                        $storeId,
-                        $localId
-                    );
-
-                    if (!$existingEntity) {
-                        $existingEntity = $entityService->loadEntity(
-                            $this->_node->getNodeId(),
-                            'order',
-                            $storeId,
-                            $uniqueId
-                        );
-
-                        if (!$existingEntity) {
-                            $entityService->beginEntityTransaction('magento-order-'.$uniqueId);
-                            try{
-                                $data = array_merge(
-                                    $this->createAddresses($orderData, $entityService),
-                                    $data
-                                );
-                                $existingEntity = $entityService->createEntity(
-                                    $this->_node->getNodeId(),
-                                    'order',
-                                    $storeId,
-                                    $uniqueId,
-                                    $data,
-                                    NULL
-                                );
-                                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
-
-                                $this->getServiceLocator()->get('logService')
-                                    ->log(\Log\Service\LogService::LEVEL_INFO,
-                                        'ent_new', 'New order '.$uniqueId,
-                                        array('sku'=>$uniqueId),
-                                        array('node'=>$this->_node, 'entity'=>$existingEntity)
-                                    );
-
-                                $this->createItems($orderData, $existingEntity->getId(), $entityService);
-
-                                try{
-                                    $this->_soap->call('salesOrderAddComment',
-                                            array(
-                                                $uniqueId,
-                                                $existingEntity->getData('status'),
-                                                'Order retrieved by MageLink, Entity #'.$existingEntity->getId(),
-                                                FALSE
-                                            )
-                                        );
-                                }catch (\Exception $e) {
-                                    $this->getServiceLocator()->get('logService')
-                                        ->log(\Log\Service\LogService::LEVEL_ERROR,
-                                            'ent_comment_err',
-                                            'Failed to write comment on order '.$uniqueId,
-                                            array(),
-                                            array('node'=>$this->_node, 'entity'=>$existingEntity)
-                                        );
-                                }
-                                $entityService->commitEntityTransaction('magento-order-'.$uniqueId);
-                            }catch(\Exception $e){
-                                $entityService->rollbackEntityTransaction('magento-order-'.$uniqueId);
-                                throw $e;
-                            }
-                            $needsUpdate = FALSE;
-                        }else{
-                            $this->getServiceLocator()->get('logService')
-                                ->log(\Log\Service\LogService::LEVEL_WARN,
-                                    'ent_link',
-                                    'Unlinked order '.$uniqueId,
-                                    array('sku'=>$uniqueId),
-                                    array('node'=>$this->_node, 'entity'=>$existingEntity)
-                                );
-                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
-                        }
-                    }else{
-                        $attributesNotToUpdate = array('grand_total');
-                        foreach ($attributesNotToUpdate as $code) {
-                            if ($existingEntity->getData($code, NULL) !== NULL) {
-                                unset($data[$code]);
-                            }
-                        }
-                        $this->getServiceLocator()->get('logService')
-                            ->log(\Log\Service\LogService::LEVEL_INFO,
-                                'ent_update',
-                                'Updated order '.$uniqueId,
-                                array('sku'=>$uniqueId),
-                                array('node'=>$this->_node, 'entity'=>$existingEntity)
-                            );
-                    }
-
-                    if ($needsUpdate) {
-                        $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
-                    }
-                    $this->updateStatusHistory($orderData, $existingEntity, $entityService);
+                    $this->storeOrderData($orderData);
                 }
             }
         }else{
-            // Nothing worked
             throw new \Magelink\Exception\NodeException('No valid API available for sync');
         }
+
         $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $timestamp);
+
+        $this->forceSynchronisation();
+    }
+
+    /**
+     * Compare orders on Magento with the orders no Magelink and return increment id array of orders not retrieved
+     * @return array|bool $notRetrievedOrderIncrementIds
+     * @throws MagelinkException
+     */
+    protected function getNotRetrievedOrders()
+    {
+        if ($this->notRetrievedOrderIncrementIds === NULL) {
+            $notRetrievedOrderIncrementIds = array();
+
+            if ($this->_db) {
+                $results = $this->_db->getOrders();
+            }elseif ($this->_soap) {
+                $results = $this->_soap->call('salesOrderList', array());
+            }else {
+                throw new \Magelink\Exception\NodeException('No valid API available for synchronisation check');
+            }
+
+            foreach ($results as $magentoOrder) {
+                if ($this->isOrderToBeRetrieved($magentoOrder)) {
+                    $magelinkOrder = $this->_entityService->loadEntity(
+                        $this->_nodeEntity->getNodeId(),
+                        'order',
+                        0,
+                        $magentoOrder['increment_id']
+                    );
+
+                    if (!$magelinkOrder) {
+                        $notRetrievedOrderIncrementIds[$magentoOrder['increment_id']] = $magentoOrder['increment_id'];
+                    }
+                }
+            }
+
+            if ($notRetrievedOrderIncrementIds) {
+                $this->notRetrievedOrderIncrementIds = $notRetrievedOrderIncrementIds;
+            }else {
+                $this->notRetrievedOrderIncrementIds = FALSE;
+            }
+        }
+
+        return $this->notRetrievedOrderIncrementIds;
+    }
+
+    /**
+     * Check if all orders are retrieved from Magento into Magelink
+     * @return bool
+     */
+    protected function areOrdersInSync()
+    {
+        if ($this->notRetrievedOrderIncrementIds === NULL) {
+            $this->getNotRetrievedOrders();
+        }
+        $isInSync = (bool) $this->notRetrievedOrderIncrementIds;
+
+        return $isInSync;
+    }
+
+    /**
+     * Check for orders out of sync; load, create and check them; return success/failure
+     * @return bool
+     * @throws MagelinkException
+     * @throws \Exception
+     */
+    public function forceSynchronisation()
+    {
+        $success = TRUE;
+        if (!$this->areOrdersInSync()) {
+            $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_WARN,
+                    'forced_retrieve',
+                    'Retrieving orders: '.$orderOutOfSyncList,
+                    array(),
+                    array('order increment ids out of sync'=>$orderOutOfSyncList)
+                );
+
+            foreach ($this->notRetrievedOrderIncrementIds as $orderIncrementId) {
+                if ($this->_db) {
+                    $orderData = $this->_db->getOrderByIncrementId($orderIncrementId);
+                }elseif ($this->_soap) {
+                    $orderData = $this->_soap->call('salesOrderInfo', array($orderIncrementId));
+                    if (isset($orderData['result'])) {
+                        $orderData = $orderData['result'];
+                    }
+
+                    $results = $this->_soap->call(
+                        'salesOrderList',
+                        array(array('complex_filter'=>array(
+                            array(
+                                'key'=>'increment_id',
+                                'value'=>array('key'=>'eq', 'value'=>$orderIncrementId),
+                            )
+                        )))
+                    );
+                    $orderFromList = array_shift($results);
+
+                    foreach (array_diff(array_keys($orderFromList), array_keys($orderData)) as $key) {
+                        $orderData[$key] = $orderFromList[$key];
+                    }
+                }else{
+                    throw new \Magelink\Exception\NodeException('No valid API available for forced synchronisation');
+                }
+
+                $this->storeOrderData($orderData, TRUE);
+
+                $magelinkOrder = $this->_entityService
+                    ->loadEntity($this->_nodeEntity->getNodeId(), 'order', 0, $orderIncrementId);
+                if ($magelinkOrder) {
+                    unset($this->notRetrievedOrderIncrementIds[$magelinkOrder->getUniqueId()]);
+                }
+            }
+
+            if (count($this->notRetrievedOrderIncrementIds)) {
+                $success = FALSE;
+                $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
+                $this->getServiceLocator()->get('logService')
+                    ->log(\Log\Service\LogService::LEVEL_ERROR,
+                        'forced_retrieve_failed',
+                        'Retrieval failed for orders: '.$orderOutOfSyncList,
+                        array(),
+                        array('order increment ids still out of sync'=>$orderOutOfSyncList)
+                    );
+            }
+        }
+
+        return $success;
     }
 
     /**
      * Insert any new status history entries as entity comments
      * @param array $orderData The full order data
      * @param \Entity\Entity $orderEnt The order entity to attach to
-     * @param EntityService $entityService The EntityService
      */
-    protected function updateStatusHistory($orderData, \Entity\Entity $orderEntity, EntityService $entityService)
+    protected function updateStatusHistory($orderData, \Entity\Entity $orderEntity)
     {
         $referenceIds = array();
         $commentIds = array();
-        $comments = $entityService->loadEntityComments($orderEntity);
+        $comments = $this->_entityService->loadEntityComments($orderEntity);
 
         foreach($comments as $com){
             $referenceIds[] = $com->getReferenceId();
@@ -327,14 +500,14 @@ class OrderGateway extends AbstractGateway
             if ($addCustomerComment) {
                 $instructions = trim(substr($historyItem['comment'], strlen(Comment::CUSTOMER_COMMENT_PREFIX)));
                 if (strlen($instructions)) {
-                    $entityService->updateEntity(
+                    $this->_entityService->updateEntity(
                         $this->_node->getNodeId(),
                         $orderEntity,
                         array('delivery_instructions'=>$instructions)
                     );
                 }
             }
-            $entityService->createEntityComment(
+            $this->_entityService->createEntityComment(
                 $orderEntity,
                 'Magento',
                 'Status History Event: '.$historyItem['created_at'].' - '.$historyItem['status'],
@@ -349,16 +522,15 @@ class OrderGateway extends AbstractGateway
      * Create all the OrderItem entities for a given order
      * @param $orderData
      * @param $oid
-     * @param EntityService $es
      */
-    protected function createItems(array $orderData, $orderId, EntityService $entityService)
+    protected function createItems(array $orderData, $orderId)
     {
         $parentId = $orderId;
 
         foreach ($orderData['items'] as $item) {
             $uniqueId = $orderData['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
 
-            $entity = $entityService
+            $entity = $this->_entityService
                 ->loadEntity(
                     $this->_node->getNodeId(),
                     'orderitem',
@@ -367,7 +539,7 @@ class OrderGateway extends AbstractGateway
                 );
             if (!$entity) {
                 $localId = $item['item_id'];
-                $product = $entityService->loadEntity(
+                $product = $this->_entityService->loadEntity(
                     $this->_node->getNodeId(),
                     'product',
                     ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
@@ -404,13 +576,13 @@ class OrderGateway extends AbstractGateway
                         array('data'=>$data, 'dataQuantity'=>$data['quantity'])
                     );
 
-                $entity = $entityService->createEntity(
+                $entity = $this->_entityService->createEntity(
                     $this->_node->getNodeId(),
                     'orderitem',
                     ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
                     $uniqueId, $data, $parentId
                 );
-                $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
             }
         }
 
@@ -419,17 +591,16 @@ class OrderGateway extends AbstractGateway
     /**
      * Create the Address entities for a given order and pass them back as the appropraite attributes
      * @param $orderData
-     * @param EntityService $entityService
      * @return array
      */
-    protected function createAddresses(array $orderData, EntityService $entityService)
+    protected function createAddresses(array $orderData)
     {
         $data = array();
         if(isset($orderData['shipping_address'])){
-            $data['shipping_address'] = $this->createAddressEntity($orderData['shipping_address'], $orderData, 'shipping', $entityService);
+            $data['shipping_address'] = $this->createAddressEntity($orderData['shipping_address'], $orderData, 'shipping');
         }
         if(isset($orderData['billing_address'])){
-            $data['billing_address'] = $this->createAddressEntity($orderData['billing_address'], $orderData, 'billing', $entityService);
+            $data['billing_address'] = $this->createAddressEntity($orderData['billing_address'], $orderData, 'billing');
         }
         return $data;
     }
@@ -439,10 +610,9 @@ class OrderGateway extends AbstractGateway
      * @param array $addressData
      * @param array $orderData
      * @param string $type "billing" or "shipping"
-     * @param EntityService $entityService
      * @return \Entity\Entity|null
      */
-    protected function createAddressEntity(array $addressData, array $orderData, $type, EntityService $entityService)
+    protected function createAddressEntity(array $addressData, array $orderData, $type)
     {
         if (!array_key_exists('address_id', $addressData) || $addressData['address_id'] == NULL) {
             return NULL;
@@ -450,13 +620,13 @@ class OrderGateway extends AbstractGateway
 
         $uniqueId = 'order-'.$orderData['increment_id'].'-'.$type;
 
-        $entity = $entityService->loadEntity(
+        $entity = $this->_entityService->loadEntity(
             $this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $orderData['store_id'] : 0), $uniqueId
         );
 /*
         // DISABLED: Generally doesn't work.
         if (!$entity) {
-            $entity = $entityService->loadEntityLocal(
+            $entity = $this->_entityService->loadEntityLocal(
                 $this->_node->getNodeId(),
                 'address',
                 ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
@@ -477,14 +647,14 @@ class OrderGateway extends AbstractGateway
                 'company'=>(isset($addressData['company']) ? $addressData['company'] : null)
             );
 
-            $entity = $entityService->createEntity(
+            $entity = $this->_entityService->createEntity(
                 $this->_node->getNodeId(),
                 'address',
                 ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
                 $uniqueId,
                 $data
             );
-            $entityService->linkEntity($this->_node->getNodeId(), $entity, $addressData['address_id']);
+            $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $addressData['address_id']);
         }
 
         return $entity;
@@ -510,15 +680,10 @@ class OrderGateway extends AbstractGateway
      */
     public function writeAction(\Entity\Action $action)
     {
-        /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator()->get('entityService');
-        /** @var \Entity\Service\EntityConfigService $entityConfigService */
-        $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
-
         /** @var \Entity\Wrapper\Order $order */
         $order = $action->getEntity();
         // Reload order because entity might have changed in the meantime
-        $order = $entityService->reloadEntity($order);
+        $order = $this->_entityService->reloadEntity($order);
         $orderStatus = $order->getData('status');
 
         $success = TRUE;
@@ -573,7 +738,7 @@ class OrderGateway extends AbstractGateway
 
                         $newStatus = $changedOrder['status'];
                         $changedOrderData = array('status'=>$newStatus);
-                        $entityService->updateEntity(
+                        $this->_entityService->updateEntity(
                             $this->_node->getNodeId(),
                             $order,
                             $changedOrderData,
@@ -583,7 +748,7 @@ class OrderGateway extends AbstractGateway
                             'comment'=>'HOPS updated status from Magento after abandoning order to '.$newStatus.'.',
                             'created_at'=>date('Y/m/d H:i:s')
                         ));
-                        $this->updateStatusHistory($changedOrderData, $order, $entityService);
+                        $this->updateStatusHistory($changedOrderData, $order);
                     }
                 }
                 break;
@@ -686,12 +851,12 @@ class OrderGateway extends AbstractGateway
      */
     protected function preprocessRequestItems(\Entity\Entity $order, $rawItems=null)
     {
-        /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator()->get('entityService');
-
         $items = array();
         if($rawItems == null){
-            $orderItems = $entityService->locateEntity($this->_node->getNodeId(), 'orderitem', $order->getStoreId(),
+            $orderItems = $this->_entityService->locateEntity(
+                $this->_node->getNodeId(),
+                'orderitem',
+                $order->getStoreId(),
                 array(
                     'PARENT_ID'=>$order->getId(),
                 ),
@@ -702,12 +867,12 @@ class OrderGateway extends AbstractGateway
                 array('quantity')
             );
             foreach($orderItems as $oi){
-                $localid = $entityService->getLocalId($this->_node->getNodeId(), $oi);
+                $localid = $this->_entityService->getLocalId($this->_node->getNodeId(), $oi);
                 $items[$localid] = $oi->getData('quantity');
             }
         }else{
             foreach($rawItems as $eid=>$qty){
-                $ie = $entityService->loadEntityId($this->_node->getNodeId(), $eid);
+                $ie = $this->_entityService->loadEntityId($this->_node->getNodeId(), $eid);
                 if($ie->getTypeStr() != 'orderitem' || $ie->getParentId() != $order->getId() || $ie->getStoreId() != $order->getStoreId()){
                     throw new MagelinkException('Invalid item '.$eid.' passed to preprocessRequestItems for order '.$order->getId());
                 }
@@ -716,7 +881,7 @@ class OrderGateway extends AbstractGateway
                 }else if($qty > $ie->getData('quantity')){
                     throw new MagelinkException('Invalid item quantity '.$qty.' for item '.$eid.' in order '.$order->getId().' - max was '.$ie->getData('quantity'));
                 }
-                $localid = $entityService->getLocalId($this->_node->getNodeId(), $ie);
+                $localid = $this->_entityService->getLocalId($this->_node->getNodeId(), $ie);
                 $items[$localid] = $qty;
             }
         }
@@ -849,7 +1014,13 @@ class OrderGateway extends AbstractGateway
             throw new MagelinkException('Failed to get shipment ID from Magento for order ' . $order->getUniqueId());
         }
         if($trackingCode != null){
-            $this->_soap->call('salesOrderShipmentAddTrack', array('shipmentIncrementId'=>$soapResult, 'carrier'=>'custom', 'title'=>$order->getData('shipping_method', 'Shipping'), 'trackNumber'=>$trackingCode));
+            $this->_soap->call('salesOrderShipmentAddTrack',
+                array(
+                    'shipmentIncrementId'=>$soapResult,
+                    'carrier'=>'custom',
+                    'title'=>$order->getData('shipping_method', 'Shipping'),
+                    'trackNumber'=>$trackingCode)
+            );
         }
     }
 
