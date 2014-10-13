@@ -33,11 +33,16 @@ return array (
             ),
             'config'=>array( // Config options to be displayed to the administrator
                 'multi_store'=>array(
-                    'label'=>'Enable Multi-Store support (DO NOT CHANGE)', 
+                    'label'=>'Enable Multi-Store support? (DO NOT CHANGE)',
                     'type'=>'Checkbox', 
                     'default'=>TRUE
                 ),
                 'web_url'=>array('label'=>'Base Web URL', 'type'=>'Text', 'required'=>TRUE),
+                'enterprise'=>array(
+                    'label'=>'Enterprise Edition? (DO NOT CHANGE)',
+                    'type'=>'Checkbox',
+                    'default'=>FALSE
+                ),
                 'soap_username'=>array('label'=>'SOAP Username','type'=>'Text', 'required'=>TRUE),
                 'soap_password'=>array('label'=>'SOAP Password','type'=>'Text', 'required'=>TRUE),
                 'rest_key'=>array('label'=>'REST Consumer Key','type'=>'Text', 'required'=>FALSE),
@@ -47,10 +52,10 @@ return array (
                 'db_username'=>array('label'=>'Database Username','type'=>'Text', 'required'=>FALSE),
                 'db_password'=>array('label'=>'Database Password','type'=>'Text', 'required'=>FALSE),
 
-                'load_full_product'=>array('label'=>'Load full product data', 'type'=>'Checkbox', 'default'=>FALSE),
-                'load_stock'=>array('label'=>'Load stock data (SLOW)', 'type'=>'Checkbox', 'default'=>FALSE),
-                'load_full_customer'=>array('label'=>'Load full customer data', 'type'=>'Checkbox', 'default'=>FALSE),
-                'load_full_order'=>array('label'=>'Load full order data', 'type'=>'Checkbox', 'default'=>FALSE),
+                'load_full_product'=>array('label'=>'Load full product data?', 'type'=>'Checkbox', 'default'=>FALSE),
+                'load_stock'=>array('label'=>'Load stock data? (SLOW)', 'type'=>'Checkbox', 'default'=>FALSE),
+                'load_full_customer'=>array('label'=>'Load full customer data?', 'type'=>'Checkbox', 'default'=>FALSE),
+                'load_full_order'=>array('label'=>'Load full order data?', 'type'=>'Checkbox', 'default'=>FALSE),
 
                 'product_attributes'=>array(
                     'label'=>'Extra product attributes to load',
