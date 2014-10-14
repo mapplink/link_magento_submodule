@@ -150,7 +150,7 @@ class OrderGateway extends AbstractGateway
 
         $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
         $uniqueId = $orderData['increment_id'];
-        $localId = $orderData['entity_id'] ? $orderData['entity_id'] : $orderData['order_id'];
+        $localId = isset($orderData['entity_id']) ? $orderData['entity_id'] : $orderData['order_id'];
         $createdAtTimestamp = strtotime($orderData['created_at']);
 
         $data = array(
