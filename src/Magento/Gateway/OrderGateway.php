@@ -22,6 +22,9 @@ use Zend\Stdlib\ArrayObject;
 
 class OrderGateway extends AbstractGateway
 {
+    /** @var int $lastRetrieveTimestamp */
+    protected $lastRetrieveTimestamp = NULL;
+
     /** @var int $newRetrieveTimestamp */
     protected $newRetrieveTimestamp = NULL;
 
@@ -79,8 +82,12 @@ class OrderGateway extends AbstractGateway
      */
     protected function getLastRetrieveTimestamp()
     {
-        $retrieveTimestamp = $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve');
-        return $retrieveTimestamp;
+        if ($this->lastRetrieveTimestamp === NULL) {
+            $this->lastRetrieveTimestamp =
+                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve');
+        }
+
+        return $this->lastRetrieveTimestamp;
     }
 
     /**
@@ -97,7 +104,7 @@ class OrderGateway extends AbstractGateway
      * Get last retrieve date from the database
      * @return bool|string
      */
-    protected function getRetrieveDateForForcedSynchronisation()
+    protected function  getRetrieveDateForForcedSynchronisation()
     {
         if ($this->newRetrieveTimestamp !== NULL) {
             $intervalsBefore = 3;
