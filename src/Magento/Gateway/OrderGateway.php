@@ -22,7 +22,10 @@ use Zend\Stdlib\ArrayObject;
 
 class OrderGateway extends AbstractGateway
 {
-    /** @var array */
+    /** @var int $newRetrieveTimestamp */
+    protected $newRetrieveTimestamp = NULL;
+
+    /** @var array $notRetrievedOrderIncrementIds */
     protected $notRetrievedOrderIncrementIds = NULL;
 
 
@@ -47,8 +50,74 @@ class OrderGateway extends AbstractGateway
     }
 
     /**
+     * @param int $timestamp
+     * @return bool|string $date
+     */
+    protected function convertTimestampToMagentoDateFormat($timestamp)
+    {
+        $date = date('Y-m-d H:i:s', $timestamp);
+        return $date;
+    }
+
+    /**
+     * Get new retrieve timestamp
+     * @return int
+     */
+    protected function getNewRetrieveTimestamp()
+    {
+        if ($this->newRetrieveTimestamp === NULL) {
+            $this->newRetrieveTimestamp = time() - $this->apiOverlappingSeconds;
+        }
+
+        return $this->newRetrieveTimestamp;
+    }
+
+    /**
+     * Get last retrieve date from the database
+     * @return bool|string
+     */
+    protected function getLastRetrieveTimestamp()
+    {
+        $retrieveTimestamp = $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve');
+        return $retrieveTimestamp;
+    }
+
+    /**
+     * Get last retrieve date from the database
+     * @return bool|string
+     */
+    protected function getLastRetrieveDate()
+    {
+        $deltaInSeconds = intval($this->_node->getConfig('time_delta_order')) * 3600;
+        $retrieveTimestamp = $this->getNewRetrieveTimestamp();
+        $lastRetrieve = $this->convertTimestampToMagentoDateFormat($retrieveTimestamp + $deltaInSeconds);
+
+        return $lastRetrieve;
+    }
+
+    /**
+     * Get last retrieve date from the database
+     * @return bool|string
+     */
+    protected function getRetrieveDateForForcedSynchronisation()
+    {
+        if ($this->newRetrieveTimestamp !== NULL) {
+            $intervalsBefore = 3;
+            $retrieveInterval = $this->newRetrieveTimestamp - $this->getLastRetrieveTimestamp();
+
+            $deltaInSeconds = intval($this->_node->getConfig('time_delta_order')) * 3600;
+            $retrieveTimestamp = $this->getLastRetrieveTimestamp() - $retrieveInterval * $intervalsBefore;
+            $date = $this->convertTimestampToMagentoDateFormat($retrieveTimestamp + $deltaInSeconds);
+        }else{
+            $date = FALSE;
+        }
+
+        return $date;
+    }
+
+    /**
      * Check, if the order should be ignored or imported
-     * @param array $orderData
+     * @param \ArrayObject $orderData
      * @return bool
      */
     protected function isOrderToBeRetrieved(\ArrayObject $orderData)
@@ -184,7 +253,7 @@ class OrderGateway extends AbstractGateway
                 $this->_entityService->beginEntityTransaction('magento-order-'.$uniqueId);
                 try{
                     $data = array_merge(
-                        $this->createAddresses($orderData, $this->_entityService),
+                        $this->createAddresses($orderData),
                         $data
                     );
                     $existingEntity = $this->_entityService->createEntity(
@@ -271,13 +340,8 @@ class OrderGateway extends AbstractGateway
      */
     public function retrieve()
     {
-        $timestamp = time() - $this->apiOverlappingSeconds;
-        $deltaInHours = intval($this->_node->getConfig('time_delta_order')) * 3600;
-
-        $lastRetrieve = date(
-            'Y-m-d H:i:s',
-            $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve') + $deltaInHours
-        );
+        $timestamp = $this->getNewRetrieveTimestamp();
+        $lastRetrieve = $this->getLastRetrieveDate();
 
         $this->getServiceLocator()->get('logService')
             ->log(\Log\Service\LogService::LEVEL_INFO,
@@ -288,7 +352,7 @@ class OrderGateway extends AbstractGateway
 
         $success = NULL;
         if (FALSE && $this->_db) {
-            // TODO (maybe): Implement
+            // ToDo (maybe): Implement
             $storeId = $orderIds = FALSE;
             $results = $this->_db->getOrders($storeId, $orderIds, $lastRetrieve);
             foreach ($results as $orderData) {
@@ -343,9 +407,19 @@ class OrderGateway extends AbstractGateway
             $notRetrievedOrderIncrementIds = array();
 
             if ($this->_db) {
-                $results = $this->_db->getOrders();
+                $results = $this->_db->getOrders(FALSE, FALSE, $this->getRetrieveDateForForcedSynchronisation());
             }elseif ($this->_soap) {
-                $results = $this->_soap->call('salesOrderList', array());
+                if ($this->getRetrieveDateForForcedSynchronisation()) {
+                    $soapCallFilterData = array(array('complex_filter'=>array(
+                        array(
+                            'key'=>'updated_at',
+                            'value'=>array('key'=>'gt', 'value'=>$this->getRetrieveDateForForcedSynchronisation()),
+                        )
+                    )));
+                }else{
+                    $soapCallFilterData = array();
+                }
+                $results = $this->_soap->call('salesOrderList', $soapCallFilterData);
             }else {
                 throw new \Magelink\Exception\NodeException('No valid API available for synchronisation check');
             }
@@ -358,7 +432,6 @@ class OrderGateway extends AbstractGateway
                         0,
                         $magentoOrder['increment_id']
                     );
-
                     if (!$magelinkOrder) {
                         $notRetrievedOrderIncrementIds[$magentoOrder['increment_id']] = $magentoOrder['increment_id'];
                     }
@@ -409,7 +482,8 @@ class OrderGateway extends AbstractGateway
                 );
 
             foreach ($this->notRetrievedOrderIncrementIds as $orderIncrementId) {
-                if ($this->_db) {
+                if (FALSE && $this->_db) {
+                    // ToDo (maybe): Implemented
                     $orderData = $this->_db->getOrderByIncrementId($orderIncrementId);
                 }elseif ($this->_soap) {
                     $orderData = $this->_soap->call('salesOrderInfo', array($orderIncrementId));
@@ -462,10 +536,10 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Insert any new status history entries as entity comments
-     * @param array $orderData The full order data
+     * @param \ArrayObject $orderData The full order data
      * @param \Entity\Entity $orderEnt The order entity to attach to
      */
-    protected function updateStatusHistory($orderData, \Entity\Entity $orderEntity)
+    protected function updateStatusHistory(\ArrayObject $orderData, \Entity\Entity $orderEntity)
     {
         $referenceIds = array();
         $commentIds = array();
@@ -521,10 +595,10 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Create all the OrderItem entities for a given order
-     * @param $orderData
+     * @param \ArrayObject $orderData
      * @param $oid
      */
-    protected function createItems(array $orderData, $orderId)
+    protected function createItems(\ArrayObject $orderData, $orderId)
     {
         $parentId = $orderId;
 
@@ -594,7 +668,7 @@ class OrderGateway extends AbstractGateway
      * @param $orderData
      * @return array
      */
-    protected function createAddresses(array $orderData)
+    protected function createAddresses(\ArrayObject $orderData)
     {
         $data = array();
         if(isset($orderData['shipping_address'])){
@@ -608,12 +682,12 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Creates an individual address entity (billing or shipping)
-     * @param array $addressData
-     * @param array $orderData
+     * @param \ArrayObject $addressData
+     * @param \ArrayObject $orderData
      * @param string $type "billing" or "shipping"
      * @return \Entity\Entity|null
      */
-    protected function createAddressEntity(array $addressData, array $orderData, $type)
+    protected function createAddressEntity(\ArrayObject $addressData, \ArrayObject $orderData, $type)
     {
         if (!array_key_exists('address_id', $addressData) || $addressData['address_id'] == NULL) {
             return NULL;
@@ -846,11 +920,11 @@ class OrderGateway extends AbstractGateway
      * Preprocesses order items array (key=orderitem entity id, value=quantity) into an array suitable for Magento (local item ID=>quantity), while also auto-populating if not specified.
      *
      * @param \Entity\Entity $order
-     * @param array $rawItems
+     * @param array|NULL $rawItems
      * @return array
      * @throws \Magelink\Exception\MagelinkException
      */
-    protected function preprocessRequestItems(\Entity\Entity $order, $rawItems=null)
+    protected function preprocessRequestItems(\Entity\Entity $order, $rawItems = NULL)
     {
         $items = array();
         if($rawItems == null){
