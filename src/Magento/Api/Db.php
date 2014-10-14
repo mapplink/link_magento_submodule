@@ -252,7 +252,7 @@ class Db implements ServiceLocatorAwareInterface
             $select->where(array('entity_id'=>$orderIds));
         }
         if ($updatedSince) {
-            $select->where(new \Zend\Db\Sql\Where("updated_at > '".$updatedSince."'"));
+            $select->where(new \Zend\Db\Sql\Where(array("updated_at > '".$updatedSince."'")));
         }
 
         $ordersDataArray = $this->getOrdersFromDatabase($select);
