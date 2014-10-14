@@ -29,7 +29,7 @@ class Db implements ServiceLocatorAwareInterface
     protected $_node;
 
     /** @var array  */
-    protected $columns= array(
+    protected $columns = NULL; /*array(
         'entity_id',
         'status',
         'store_id',
@@ -90,7 +90,7 @@ class Db implements ServiceLocatorAwareInterface
         'total_item_count',
         'customer_gender',
         'gift_message_id',
-    );
+    );*/
 
 
     /**
@@ -127,7 +127,7 @@ class Db implements ServiceLocatorAwareInterface
                 );
                 $this->_adapter->getCurrentSchema();
 
-                if ($this->_enterprise) {
+                /*if ($this->_enterprise) {
                     $this->columns = array_merge(
                         $this->columns,
                         array(
@@ -166,7 +166,7 @@ class Db implements ServiceLocatorAwareInterface
                             'reward_salesrule_points',
                         )
                     );
-                }
+                }*/
             }catch(\Exception $exception){
                 $success = FALSE;
                 $this->getServiceLocator()->get('logService')
@@ -200,7 +200,9 @@ class Db implements ServiceLocatorAwareInterface
 
     protected function getOrdersFromDatabase(\Zend\Db\Sql\Select $select)
     {
-        $select->columns($this->columns);
+        if ($this->columns) {
+            $select->columns($this->columns);
+        }
         $results = $this->getTableGateway('sales_flat_order')->selectWith($select);
 
         $data = array();

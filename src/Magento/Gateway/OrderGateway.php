@@ -17,6 +17,7 @@ use Node\Entity;
 use Magelink\Exception\MagelinkException;
 use Entity\Comment;
 use Entity\Service\EntityService;
+use Zend\Stdlib\ArrayObject;
 
 
 class OrderGateway extends AbstractGateway
@@ -50,7 +51,7 @@ class OrderGateway extends AbstractGateway
      * @param array $orderData
      * @return bool
      */
-    protected function isOrderToBeRetrieved(array $orderData)
+    protected function isOrderToBeRetrieved(\ArrayObject $orderData)
     {
         // Check if order has a magento increment id
         if (intval($orderData['increment_id']) > 100000000) {
@@ -83,7 +84,7 @@ class OrderGateway extends AbstractGateway
 
         $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
         $uniqueId = $orderData['increment_id'];
-        $localId = $orderData['order_id'];
+        $localId = $orderData['entity_id'] ? $orderData['entity_id'] : $orderData['order_id'];
         $createdAtTimestamp = strtotime($orderData['created_at']);
 
         $data = array(
@@ -383,7 +384,7 @@ class OrderGateway extends AbstractGateway
         if ($this->notRetrievedOrderIncrementIds === NULL) {
             $this->getNotRetrievedOrders();
         }
-        $isInSync = (bool) $this->notRetrievedOrderIncrementIds;
+        $isInSync = !(bool) $this->notRetrievedOrderIncrementIds;
 
         return $isInSync;
     }
@@ -436,8 +437,7 @@ class OrderGateway extends AbstractGateway
 
                 $this->storeOrderData($orderData, TRUE);
 
-                $magelinkOrder = $this->_entityService
-                    ->loadEntity($this->_nodeEntity->getNodeId(), 'order', 0, $orderIncrementId);
+                $magelinkOrder = ;
                 if ($magelinkOrder) {
                     unset($this->notRetrievedOrderIncrementIds[$magelinkOrder->getUniqueId()]);
                 }
