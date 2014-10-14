@@ -55,7 +55,8 @@ class OrderGateway extends AbstractGateway
      */
     protected function convertTimestampToMagentoDateFormat($timestamp)
     {
-        $date = date('Y-m-d H:i:s', $timestamp);
+        $deltaInSeconds = intval($this->_node->getConfig('time_delta_order')) * 3600;
+        $date = date('Y-m-d H:i:s', $timestamp + $deltaInSeconds);
         return $date;
     }
 
@@ -88,10 +89,7 @@ class OrderGateway extends AbstractGateway
      */
     protected function getLastRetrieveDate()
     {
-        $deltaInSeconds = intval($this->_node->getConfig('time_delta_order')) * 3600;
-        $retrieveTimestamp = $this->getNewRetrieveTimestamp();
-        $lastRetrieve = $this->convertTimestampToMagentoDateFormat($retrieveTimestamp + $deltaInSeconds);
-
+        $lastRetrieve = $this->convertTimestampToMagentoDateFormat($this->getLastRetrieveTimestamp());
         return $lastRetrieve;
     }
 
@@ -105,9 +103,8 @@ class OrderGateway extends AbstractGateway
             $intervalsBefore = 3;
             $retrieveInterval = $this->newRetrieveTimestamp - $this->getLastRetrieveTimestamp();
 
-            $deltaInSeconds = intval($this->_node->getConfig('time_delta_order')) * 3600;
             $retrieveTimestamp = $this->getLastRetrieveTimestamp() - $retrieveInterval * $intervalsBefore;
-            $date = $this->convertTimestampToMagentoDateFormat($retrieveTimestamp + $deltaInSeconds);
+            $date = $this->convertTimestampToMagentoDateFormat($retrieveTimestamp);
         }else{
             $date = FALSE;
         }
