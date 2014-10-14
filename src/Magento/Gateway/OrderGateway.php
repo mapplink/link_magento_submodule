@@ -430,7 +430,10 @@ class OrderGateway extends AbstractGateway
             }
 
             foreach ($results as $magentoOrder) {
-                if ($this->isOrderToBeRetrieved($magentoOrder)) {
+                if ($magentoOrder instanceof \ArrayObject) {
+                    $magentoOrder = (array) $magentoOrder;
+                }
+                if ($this->isOrderToBeRetrieved((array) $magentoOrder)) {
                     $magelinkOrder = $this->_entityService->loadEntity(
                         $this->_nodeEntity->getNodeId(),
                         'order',
