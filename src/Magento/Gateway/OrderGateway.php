@@ -437,7 +437,8 @@ class OrderGateway extends AbstractGateway
 
                 $this->storeOrderData($orderData, TRUE);
 
-                $magelinkOrder = ;
+                $magelinkOrder = $this->_entityService
+                    ->loadEntity($this->_nodeEntity->getNodeId(), 'order', 0, $orderIncrementId);
                 if ($magelinkOrder) {
                     unset($this->notRetrievedOrderIncrementIds[$magelinkOrder->getUniqueId()]);
                 }
