@@ -117,10 +117,10 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Check, if the order should be ignored or imported
-     * @param \ArrayObject $orderData
+     * @param array $orderData
      * @return bool
      */
-    protected function isOrderToBeRetrieved(\ArrayObject $orderData)
+    protected function isOrderToBeRetrieved(array $orderData)
     {
         // Check if order has a magento increment id
         if (intval($orderData['increment_id']) > 100000000) {
@@ -134,12 +134,12 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Store order with provided order data
-     * @param $orderData
+     * @param array $orderData
      * @throws MagelinkException
      * @throws \Exception
      * @throws \Magelink\Exception\NodeException
      */
-    protected function storeOrderData($orderData, $forced = FALSE)
+    protected function storeOrderData(array $orderData, $forced = FALSE)
     {
         if ($forced) {
             $logLevel = \Log\Service\LogService::LEVEL_WARN;
@@ -356,6 +356,7 @@ class OrderGateway extends AbstractGateway
             $storeId = $orderIds = FALSE;
             $results = $this->_db->getOrders($storeId, $orderIds, $lastRetrieve);
             foreach ($results as $orderData) {
+                $orderData = (array) $orderData;
                 if ($this->isOrderToBeRetrieved($orderData)) {
                     $success = $this->storeOrderData($orderData);
                 }
@@ -484,7 +485,7 @@ class OrderGateway extends AbstractGateway
             foreach ($this->notRetrievedOrderIncrementIds as $orderIncrementId) {
                 if (FALSE && $this->_db) {
                     // ToDo (maybe): Implemented
-                    $orderData = $this->_db->getOrderByIncrementId($orderIncrementId);
+                    $orderData = (array) $this->_db->getOrderByIncrementId($orderIncrementId);
                 }elseif ($this->_soap) {
                     $orderData = $this->_soap->call('salesOrderInfo', array($orderIncrementId));
                     if (isset($orderData['result'])) {
@@ -536,10 +537,10 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Insert any new status history entries as entity comments
-     * @param \ArrayObject $orderData The full order data
+     * @param array $orderData The full order data
      * @param \Entity\Entity $orderEnt The order entity to attach to
      */
-    protected function updateStatusHistory(\ArrayObject $orderData, \Entity\Entity $orderEntity)
+    protected function updateStatusHistory(array $orderData, \Entity\Entity $orderEntity)
     {
         $referenceIds = array();
         $commentIds = array();
@@ -595,10 +596,10 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Create all the OrderItem entities for a given order
-     * @param \ArrayObject $orderData
-     * @param $oid
+     * @param array $orderData
+     * @param $orderId
      */
-    protected function createItems(\ArrayObject $orderData, $orderId)
+    protected function createItems(array $orderData, $orderId)
     {
         $parentId = $orderId;
 
@@ -665,10 +666,10 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Create the Address entities for a given order and pass them back as the appropraite attributes
-     * @param $orderData
+     * @param array $orderData
      * @return array
      */
-    protected function createAddresses(\ArrayObject $orderData)
+    protected function createAddresses(array $orderData)
     {
         $data = array();
         if(isset($orderData['shipping_address'])){
@@ -682,12 +683,12 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Creates an individual address entity (billing or shipping)
-     * @param \ArrayObject $addressData
-     * @param \ArrayObject $orderData
+     * @param array $addressData
+     * @param array $orderData
      * @param string $type "billing" or "shipping"
      * @return \Entity\Entity|null
      */
-    protected function createAddressEntity(\ArrayObject $addressData, \ArrayObject $orderData, $type)
+    protected function createAddressEntity(array $addressData, array $orderData, $type)
     {
         if (!array_key_exists('address_id', $addressData) || $addressData['address_id'] == NULL) {
             return NULL;
