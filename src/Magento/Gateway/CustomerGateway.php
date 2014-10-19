@@ -69,7 +69,7 @@ class CustomerGateway extends AbstractGateway
                 array('type'=>'customer', 'timestamp'=>$lastRetrieve)
             );
 
-        if($this->_soap){
+        if ($this->_soap) {
             $results = $this->_soap->call('customerCustomerList', array(
                 array(
                     'complex_filter'=>array(
@@ -124,18 +124,18 @@ class CustomerGateway extends AbstractGateway
             foreach($results as $cust){
                 $data = array();
 
-                $unique_id = $cust['email'];
+                $uniqueId = $cust['email'];
                 $local_id = $cust['customer_id'];
-                $store_id = ($this->_node->isMultiStore() ? $cust['store_id'] : 0);
-                $parent_id = null;
+                $storeId = ($this->_node->isMultiStore() ? $cust['store_id'] : 0);
+                $parentId = NULL;
 
-                $data['first_name'] = (isset($cust['firstname']) ? $cust['firstname'] : null);
-                $data['middle_name'] = (isset($cust['middlename']) ? $cust['middlename'] : null);
-                $data['last_name'] = (isset($cust['lastname']) ? $cust['lastname'] : null);
-                $data['date_of_birth'] = (isset($cust['dob']) ? $cust['dob'] : null);
+                $data['first_name'] = (isset($cust['firstname']) ? $cust['firstname'] : NULL);
+                $data['middle_name'] = (isset($cust['middlename']) ? $cust['middlename'] : NULL);
+                $data['last_name'] = (isset($cust['lastname']) ? $cust['lastname'] : NULL);
+                $data['date_of_birth'] = (isset($cust['dob']) ? $cust['dob'] : NULL);
 
                 /**if($specialAtt){
-                    $data[$specialAtt] = (isset($cust['taxvat']) ? $cust['taxvat'] : null);
+                    $data[$specialAtt] = (isset($cust['taxvat']) ? $cust['taxvat'] : NULL);
                 }**/
                 if(count($additional) && $this->_soapv1){
                     $extra = $this->_soapv1->call('customer.info', array($cust['customer_id'], $additional));
@@ -143,7 +143,7 @@ class CustomerGateway extends AbstractGateway
                         if(array_key_exists($att, $extra)){
                             $data[$att] = $extra[$att];
                         }else{
-                            $data[$att] = null;
+                            $data[$att] = NULL;
                         }
                     }
                 }
@@ -151,7 +151,12 @@ class CustomerGateway extends AbstractGateway
                 if(isset($this->_custGroups[intval($cust['group_id'])])){
                     $data['customer_type'] = $this->_custGroups[intval($cust['group_id'])]['customer_group_code'];
                 }else{
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_group', 'Unknown customer group ID ' . $cust['group_id'], array('group'=>$cust['group_id'], 'unique'=>$cust['email']));
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_WARN, 
+                            'unknown_group', 
+                            'Unknown customer group ID '.$cust['group_id'], 
+                            array('group'=>$cust['group_id'], 'unique'=>$cust['email'])
+                        );
                 }
 
                 if($this->_node->getConfig('load_full_customer')){
@@ -165,26 +170,59 @@ class CustomerGateway extends AbstractGateway
                 /** @var boolean $needsUpdate Whether we need to perform an entity update here */
                 $needsUpdate = true;
 
-                $existingEntity = $entityService->loadEntityLocal($this->_node->getNodeId(), 'customer', $store_id, $local_id);
-                if(!$existingEntity){
-                    $existingEntity = $entityService->loadEntity($this->_node->getNodeId(), 'customer', $store_id, $unique_id);
-                    if(!$existingEntity){
-                        $existingEntity = $entityService->createEntity($this->_node->getNodeId(), 'customer', $store_id, $unique_id, $data, $parent_id);
+                $existingEntity = $entityService
+                    ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $local_id);
+                if (!$existingEntity) {
+                    $existingEntity = $entityService
+                        ->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $uniqueId);
+                    if (!$existingEntity) {
+                        $existingEntity = $entityService->createEntity(
+                            $this->_node->getNodeId(), 
+                            'customer', 
+                            $storeId, 
+                            $uniqueId, 
+                            $data, 
+                            $parentId
+                        );
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_new', 'New customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_INFO,
+                                'ent_new',
+                                'New customer '.$uniqueId,
+                                array('code'=>$uniqueId),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
                         $needsUpdate = false;
-                    }else if($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != null){
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_wronglink', 'Incorrectly linked customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                    }elseif ($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_INFO,
+                                'ent_wronglink',
+                                'Incorrectly linked customer '.$uniqueId,
+                                array('code'=>$uniqueId),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
                         $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }else{
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_link', 'Unlinked customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_INFO,
+                                'ent_link',
+                                'Unlinked customer '.$uniqueId,
+                                array('code'=>$uniqueId),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }
                 }else{
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_update', 'Updated customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_INFO,
+                            'ent_update',
+                            'Updated customer '.$uniqueId,
+                            array('code'=>$uniqueId),
+                            array('node'=>$this->_node, 'entity'=>$existingEntity)
+                        );
                 }
-                if($needsUpdate){
+                if ($needsUpdate) {
                     $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, false);
                 }
             }
@@ -199,19 +237,20 @@ class CustomerGateway extends AbstractGateway
      * Create the Address entities for a given customer and pass them back as the appropriate attributes
      *
      * @param array $cust
-     * @param EntityService $es
+     * @param EntityService $entityService
      * @return array
      */
-    protected function createAddresses($cust, EntityService $es){
+    protected function createAddresses($cust, EntityService $entityService)
+    {
         $data = array();
 
         $addressRes = $this->_soap->call('customerAddressList', array($cust['customer_id']));
         foreach($addressRes as $a){
             if($a['is_default_billing']){
-                $data['billing_address'] = $this->createAddressEntity($a, $cust, 'billing', $es);
+                $data['billing_address'] = $this->createAddressEntity($a, $cust, 'billing', $entityService);
             }
             if($a['is_default_shipping']){
-                $data['shipping_address'] = $this->createAddressEntity($a, $cust, 'shipping', $es);
+                $data['shipping_address'] = $this->createAddressEntity($a, $cust, 'shipping', $entityService);
             }
             if(!$a['is_default_billing'] && !$a['is_default_shipping']){
                 // TODO: Store this maybe? For now ignore
@@ -226,36 +265,47 @@ class CustomerGateway extends AbstractGateway
      * @param array $addressData
      * @param array $cust
      * @param string $type "billing" or "shipping"
-     * @param EntityService $es
+     * @param EntityService $entityService
      * @return \Entity\Entity
      */
-    protected function createAddressEntity($addressData, $cust, $type, EntityService $es){
+    protected function createAddressEntity($addressData, $cust, $type, EntityService $entityService)
+    {
+        $uniqueId = 'cust-'.$cust['customer_id'].'-'.$type;
 
-        $unique_id = 'cust-'.$cust['customer_id'].'-'.$type;
-
-        $e = $es->loadEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $cust['store_id'] : 0), $unique_id);
+        $entity = $entityService->loadEntity(
+            $this->_node->getNodeId(), 
+            'address', 
+            ($this->_node->isMultiStore() ? $cust['store_id'] : 0), 
+            $uniqueId
+        );
 
         $data = array(
-            'first_name'=>(isset($addressData['firstname']) ? $addressData['firstname'] : null),
-            'middle_name'=>(isset($addressData['middlename']) ? $addressData['middlename'] : null),
-            'last_name'=>(isset($addressData['lastname']) ? $addressData['lastname'] : null),
-            'prefix'=>(isset($addressData['prefix']) ? $addressData['prefix'] : null),
-            'suffix'=>(isset($addressData['suffix']) ? $addressData['suffix'] : null),
-            'street'=>(isset($addressData['street']) ? $addressData['street'] : null),
-            'city'=>(isset($addressData['city']) ? $addressData['city'] : null),
-            'region'=>(isset($addressData['region']) ? $addressData['region'] : null),
-            'postcode'=>(isset($addressData['postcode']) ? $addressData['postcode'] : null),
-            'country_code'=>(isset($addressData['country_id']) ? $addressData['country_id'] : null),
-            'telephone'=>(isset($addressData['telephone']) ? $addressData['telephone'] : null),
-            'company'=>(isset($addressData['company']) ? $addressData['company'] : null)
+            'first_name'=>(isset($addressData['firstname']) ? $addressData['firstname'] : NULL),
+            'middle_name'=>(isset($addressData['middlename']) ? $addressData['middlename'] : NULL),
+            'last_name'=>(isset($addressData['lastname']) ? $addressData['lastname'] : NULL),
+            'prefix'=>(isset($addressData['prefix']) ? $addressData['prefix'] : NULL),
+            'suffix'=>(isset($addressData['suffix']) ? $addressData['suffix'] : NULL),
+            'street'=>(isset($addressData['street']) ? $addressData['street'] : NULL),
+            'city'=>(isset($addressData['city']) ? $addressData['city'] : NULL),
+            'region'=>(isset($addressData['region']) ? $addressData['region'] : NULL),
+            'postcode'=>(isset($addressData['postcode']) ? $addressData['postcode'] : NULL),
+            'country_code'=>(isset($addressData['country_id']) ? $addressData['country_id'] : NULL),
+            'telephone'=>(isset($addressData['telephone']) ? $addressData['telephone'] : NULL),
+            'company'=>(isset($addressData['company']) ? $addressData['company'] : NULL)
         );
-        if(!$e){
-            $e = $es->createEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $cust['store_id'] : 0), $unique_id, $data);
-            $es->linkEntity($this->_node->getNodeId(), $e, $addressData['customer_address_id']);
+
+        if (!$entity) {
+            $entity = $entityService->createEntity(
+                $this->_node->getNodeId(), 
+                'address', 
+                ($this->_node->isMultiStore() ? $cust['store_id'] : 0), 
+                $uniqueId, $data
+            );
+            $entityService->linkEntity($this->_node->getNodeId(), $entity, $addressData['customer_address_id']);
         }else{
-            $es->updateEntity($this->_node->getNodeId(), $e, $data, false);
+            $entityService->updateEntity($this->_node->getNodeId(), $entity, $data, false);
         }
-        return $e;
+        return $entity;
     }
 
     /**
@@ -351,7 +401,7 @@ class CustomerGateway extends AbstractGateway
             $this->_soap->call('catalogCustomerUpdate', $req);
         }else if($type == \Entity\Update::TYPE_CREATE){
 
-            $attSet = null;
+            $attSet = NULL;
             foreach($this->_attSets as $setId=>$set){
                 if($set['name'] == $entity->getData('customer_class', 'default')){
                     $attSet = $setId;
