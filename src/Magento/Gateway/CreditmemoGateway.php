@@ -370,7 +370,7 @@ class CreditmemoGateway extends AbstractGateway
             /** @var \Entity\Entity[] $items */
             $items = $entity->getItems();
             if (!count($items)) {
-                $items = $originalOrder->getOrderItems();
+                $items = $originalOrder->getOrderitems();
             }
 
             $itemData = array();

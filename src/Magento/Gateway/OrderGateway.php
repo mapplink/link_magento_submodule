@@ -994,7 +994,7 @@ class OrderGateway extends AbstractGateway
             $processItems = $itemsRefunded;
         }else{
             $processItems = array();
-            foreach ($order->getOrderItems() as $orderItem) {
+            foreach ($order->getOrderitems() as $orderItem) {
                 $processItems[$orderItem->getId()] = 0;
             }
         }
