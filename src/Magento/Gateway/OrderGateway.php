@@ -631,6 +631,7 @@ class OrderGateway extends AbstractGateway
                 $data = array(
                     'product'=>($product ? $product->getId() : null),
                     'sku'=>$item['sku'],
+                    'product_name'=>isset($item['name']) ? $item['name'] : '',
                     'is_physical'=>((isset($item['is_virtual']) && $item['is_virtual']) ? 0 : 1),
                     'product_type'=>(isset($item['product_type']) ? $item['product_type'] : null),
                     'quantity'=>$item['qty_ordered'],
