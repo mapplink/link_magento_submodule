@@ -7,6 +7,7 @@ return array (
             'magento_soapv1'=>'Magento\Api\SoapV1',
             'magento_rest'=>'Magento\Api\Rest',
             'magento_db'=>'Magento\Api\Db',
+            'magentoService'=>'Magento\Service\MagentoService',
             //'transform_order_total'=>'Magento\Transform\OrderTotalTransform'
         ),
         'shared'=>array(
@@ -14,6 +15,7 @@ return array (
             'magento_soapv1'=>FALSE,
             'magento_rest'=>FALSE,
             'magento_db'=>FALSE,
+            'magentoService'=>FALSE
             //'transform_order_total'=>FALSE
         ),
     ),
