@@ -53,9 +53,9 @@ class MagentoService implements ServiceLocatorAwareInterface
     public function isProductTypeShippable($productType)
     {
         $notShippableTypes = array(
-            self::TYPE_VIRTUAL,
-            self::TYPE_DOWNLOADABLE,
-            self::TYPE_GIFTCARD
+            self::PRODUCT_TYPE_VIRTUAL,
+            self::PRODUCT_TYPE_DOWNLOADABLE,
+            self::PRODUCT_TYPE_GIFTCARD
         );
 
         $isShippable = !in_array($productType, $notShippableTypes);
