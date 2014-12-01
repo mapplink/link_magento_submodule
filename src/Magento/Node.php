@@ -6,6 +6,7 @@ use Node\AbstractNode;
 use Node\AbstractGateway;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
+use Magelink\Exception\SyncException;
 
 class Node extends AbstractNode {
 
@@ -65,7 +66,7 @@ class Node extends AbstractNode {
 
             $soap = $this->getApi('soap');
             if (!$soap) {
-                throw new \Magelink\Exception\SyncException('Failed to initialize SOAP api for store view fetch');
+                throw new SyncException('Failed to initialize SOAP api for store view fetch');
             }else{
                 /** @var \Magento\Api|Soap $soap */
                 $result = $soap->call('storeList', array());
@@ -97,12 +98,24 @@ class Node extends AbstractNode {
         $this->getStoreViews();
         $storeCount = count($this->_storeViews);
         if($storeCount == 1 && $this->isMultiStore()){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR, 'multistore_single', 'Multi-store enabled but only one store view!', array(), array('node'=>$this));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_ERROR,
+                    'multistore_single',
+                    'Multi-store enabled but only one store view!',
+                    array(),
+                    array('node'=>$this)
+                );
         }else if($storeCount > 1 && !$this->isMultiStore()){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'multistore_missing', 'Multi-store disabled but multiple store views!', array(), array('node'=>$this));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_WARN,
+                    'multistore_missing',
+                    'Multi-store disabled but multiple store views!',
+                    array(),
+                    array('node'=>$this)
+                );
         }
 
-        if(!$this->isMultiStore()){
+        if (!$this->isMultiStore()) {
             $this->_storeViews = array(0=>array());
         }
     }
@@ -113,10 +126,7 @@ class Node extends AbstractNode {
      * This will always be the last call to the Node.
      * NOTE: This will be called even if the Node has thrown a NodeException, but NOT if a SyncException or other Exception is thrown (which represents an irrecoverable error)
      */
-    protected function _deinit()
-    {
-
-    }
+    protected function _deinit() {}
 
     /**
      * Implemented in each NodeModule
@@ -147,7 +157,6 @@ class Node extends AbstractNode {
             return null;
         }
 
-
-        throw new MagelinkException('Unknown/invalid entity type ' . $entity_type);
+        throw new SyncException('Unknown/invalid entity type '.$entity_type);
     }
 }
