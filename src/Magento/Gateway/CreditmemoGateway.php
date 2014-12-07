@@ -255,7 +255,7 @@ class CreditmemoGateway extends AbstractGateway
     }
 
     /**
-     * Create all the CreditmemoItem entities for a given creditmemo
+     * Create all the Creditmemoitem entities for a given creditmemo
      * @param array $creditmemo
      * @param string $orderId
      * @param EntityService $entityService

@@ -1,14 +1,22 @@
 <?php
-namespace Magento\Transform;
-
-use \Router\Transform\AbstractTransform;
-
 /**
  * A custom transform to initialize order data
  * Source attribute should be order grand_total, create and update
  *
+ * @category Magento
  * @package Magento\Transform
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
  */
+
+
+namespace Magento\Transform;
+
+use Router\Transform\AbstractTransform;
+use Entity\Wrapper\Order;
+
+
 class OrderTotalTransform extends AbstractTransform
 {
 
@@ -18,11 +26,7 @@ class OrderTotalTransform extends AbstractTransform
      */
     protected function _init()
     {
-        if($this->_entity->getTypeStr() != 'order'){
-            return FALSE;
-        }else{
-            return TRUE;
-        }
+        return $this->_entity->getTypeStr() == 'order';
     }
 
     /**
@@ -35,7 +39,7 @@ class OrderTotalTransform extends AbstractTransform
         $data = $order->getArrayCopy();
 
         $orderTotal = $data['grand_total'] - $data['shipping_total'];
-        foreach ($order::getNonCashPaymentCodes() as $code) {
+        foreach (Order::getNonCashPaymentCodes() as $code) {
             $orderTotal += $data[$code];
         }
 
