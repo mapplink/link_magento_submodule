@@ -502,7 +502,7 @@ class Db implements ServiceLocatorAwareInterface
                     if(isset($entityRow[$code])){
                         $resultRow[$code] = $entityRow[$code];
                     }else{
-                        throw new MagelinkException('Invalid static attribute ' . $code);
+                        throw new MagelinkException('Invalid static attribute '.$code.' on entity with id '.$entity_id);
                     }
                 }
                 continue;
