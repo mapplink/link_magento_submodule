@@ -62,7 +62,7 @@ class ProductGateway extends AbstractGateway
 
         foreach ($this->_node->getStoreViews() as $storeId=>$store_view) {
             $lastRetrieve = date('Y-m-d H:i:s',
-                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId() , 'product', 'retrieve') 
+                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve')
                     +(intval($this->_node->getConfig('time_delta_product')) * 3600) 
             );
 
@@ -115,7 +115,7 @@ class ProductGateway extends AbstractGateway
                     if (!$entityConfigService->checkAttribute('product', $k)) {
                         $entityConfigService->createAttribute(
                             $k, $k, FALSE, 'varchar', 'product', 'Magento Additional Attribute');
-                        $nodeService->subscribeAttribute($this->_node->getNodeId() , $k, 'product', TRUE);
+                        $nodeService->subscribeAttribute($this->_node->getNodeId(), $k, 'product', TRUE);
                     }
                 }
 
@@ -163,10 +163,10 @@ class ProductGateway extends AbstractGateway
                         'complex_filter'=>array(
                            array(
                                 'key'=>'updated_at',
-                                'value'=>array('key'=>'gt', 'value'=>$lastRetrieve) ,
-                            ) ,
-                        ) ,
-                    ) , // filters
+                                'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
+                            ),
+                        ),
+                    ), // filters
                     $storeId, // storeView
                 ));
 
@@ -212,7 +212,7 @@ class ProductGateway extends AbstractGateway
                 throw new \Magelink\Exception\NodeException('No valid API available for sync');
             }
         }
-        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId() , 'product', 'retrieve', $timestamp);
+        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve', $timestamp);
     }
 
     /**
@@ -230,83 +230,83 @@ class ProductGateway extends AbstractGateway
         /** @var boolean $needsUpdate Whether we need to perform an entity update here */
         $needsUpdate = TRUE;
 
-        $existingEntity = $entityService->loadEntityLocal($this->_node->getNodeId() , 'product', $storeId, $productId);
+        $existingEntity = $entityService->loadEntityLocal($this->_node->getNodeId(), 'product', $storeId, $productId);
         if (!$existingEntity) {
-            $existingEntity = $entityService->loadEntity($this->_node->getNodeId() , 'product', $storeId, $sku);
+            $existingEntity = $entityService->loadEntity($this->_node->getNodeId(), 'product', $storeId, $sku);
             if (!$existingEntity) {
                 $existingEntity = $entityService->createEntity(
-                    $this->_node->getNodeId() ,
+                    $this->_node->getNodeId(),
                     'product',
                     $storeId,
                     $sku,
                     $data,
                     $parent_id
                 );
-                $entityService->linkEntity($this->_node->getNodeId() , $existingEntity, $productId);
+                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
                 $this->getServiceLocator() ->get('logService') 
                     ->log(\Log\Service\LogService::LEVEL_INFO,
                         'ent_new',
                         'New product '.$sku,
-                       array('sku'=>$sku) ,
+                       array('sku'=>$sku),
                        array('node'=>$this->_node, 'entity'=>$existingEntity) 
                     );
                 try{
                     $stockEntity = $entityService->createEntity(
-                        $this->_node->getNodeId() ,
+                        $this->_node->getNodeId(),
                         'stockitem',
                         $storeId,
                         $sku,
-                       array() ,
+                       array(),
                         $existingEntity
                     );
-                    $entityService->linkEntity($this->_node->getNodeId() , $stockEntity, $productId);
+                    $entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
                 }catch(\Exception $e) {
                     $this->getServiceLocator() ->get('logService') 
                         ->log(\Log\Service\LogService::LEVEL_WARN,
                             'already_stockitem',
                             'Already existing stockitem for new product '.$sku,
-                           array('sku'=>$sku) ,
+                           array('sku'=>$sku),
                            array('node'=>$this->_node, 'entity'=>$existingEntity) 
                         );
                 }
                 $needsUpdate = FALSE;
-            }elseif ($entityService->getLocalId($this->_node->getNodeId() , $existingEntity) != NULL) {
+            }elseif ($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
                 $this->getServiceLocator() ->get('logService') 
                     ->log(\Log\Service\LogService::LEVEL_ERROR,
                         'ent_wronglink',
                         'Incorrectly linked product '.$sku,
-                       array('code'=>$sku) ,
+                       array('code'=>$sku),
                        array('node'=>$this->_node, 'entity'=>$existingEntity) 
                     );
-                $entityService->unlinkEntity($this->_node->getNodeId() , $existingEntity);
-                $entityService->linkEntity($this->_node->getNodeId() , $existingEntity, $productId);
+                $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
+                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
 
-                $stockEntity = $entityService->loadEntity($this->_node->getNodeId() , 'stockitem', $storeId, $sku);
-                if ($entityService->getLocalId($this->_node->getNodeId() , $stockEntity) != NULL) {
-                    $entityService->unlinkEntity($this->_node->getNodeId() , $stockEntity);
+                $stockEntity = $entityService->loadEntity($this->_node->getNodeId(), 'stockitem', $storeId, $sku);
+                if ($entityService->getLocalId($this->_node->getNodeId(), $stockEntity) != NULL) {
+                    $entityService->unlinkEntity($this->_node->getNodeId(), $stockEntity);
                 }
-                $entityService->linkEntity($this->_node->getNodeId() , $stockEntity, $productId);
+                $entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
             }else{
                 $this->getServiceLocator() ->get('logService') 
                     ->log(\Log\Service\LogService::LEVEL_INFO,
                         'ent_link',
                         'Unlinked product '.$sku,
-                       array('sku'=>$sku) ,
+                       array('sku'=>$sku),
                        array('node'=>$this->_node, 'entity'=>$existingEntity) 
                     );
-                $entityService->linkEntity($this->_node->getNodeId() , $existingEntity, $productId);
+                $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
             }
         }else{
             $this->getServiceLocator() ->get('logService') 
                 ->log(\Log\Service\LogService::LEVEL_INFO,
                     'ent_update',
                     'Updated product '.$sku,
-                   array('sku'=>$sku) ,
+                   array('sku'=>$sku),
                    array('node'=>$this->_node, 'entity'=>$existingEntity) 
                 );
         }
         if ($needsUpdate) {
-            $entityService->updateEntity($this->_node->getNodeId() , $existingEntity, $data, FALSE);
+            $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
         }
         return $existingEntity;
     }
@@ -334,7 +334,7 @@ class ProductGateway extends AbstractGateway
             $storeId,
            array(
                 'additional_attributes'=>$additional,
-            ) ,
+            ),
             'id',
         );
 
@@ -359,7 +359,7 @@ class ProductGateway extends AbstractGateway
 
             if (!$entityConfigService->checkAttribute('product', $att)) {
                 $entityConfigService->createAttribute($att, $att, 0, 'varchar', 'product', 'Custom Magento attribute');
-                $this->getServiceLocator() ->get('nodeService') ->subscribeAttribute($this->_node->getNodeId() , $att, 'product');
+                $this->getServiceLocator() ->get('nodeService') ->subscribeAttribute($this->_node->getNodeId(), $att, 'product');
             }
         }
 
@@ -473,7 +473,7 @@ class ProductGateway extends AbstractGateway
         // Restructure data for soap call
         $soapData = array(
             'additional_attributes'=>array(
-                'single_data'=>array() ,
+                'single_data'=>array(),
                 'multi_data'=>array() 
             ) 
         );
@@ -520,7 +520,7 @@ class ProductGateway extends AbstractGateway
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE) 
     {
         /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator() ->get('entityService');
+        $entityService = $this->getServiceLocator()->get('entityService');
 
         $customAttributes = $this->_node->getConfig('product_attributes');
         if (is_string($customAttributes)) {
@@ -533,14 +533,14 @@ class ProductGateway extends AbstractGateway
         $this->getServiceLocator() ->get('logService') 
             ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
                 'mag_prod_write_update',
-                'Attributes for update of product '.$entity->getUniqueId() .': '.var_export($attributes, TRUE) ,
-               array('attributes'=>$attributes, 'custom'=>$customAttributes) ,
+                'Attributes for update of product '.$entity->getUniqueId() .': '.var_export($attributes, TRUE),
+               array('attributes'=>$attributes, 'custom'=>$customAttributes),
                array('entity'=>$entity) 
             );
 
         $data = array();
         $attributeCodes = array_unique(array_merge(
-            //array('special_price', 'special_from_date', 'special_to_date') , // force update off these attributes
+            //array('special_price', 'special_from_date', 'special_to_date'), // force update off these attributes
             //$customAttributes,
             $attributes
         ));
@@ -600,7 +600,7 @@ class ProductGateway extends AbstractGateway
                         ->log(\Log\Service\LogService::LEVEL_WARN,
                             'mag_prod_inv_data',
                             'Unsupported attribute for update of '.$entity->getUniqueId() .': '.$attributeCode,
-                           array('attribute'=>$attributeCode) ,
+                           array('attribute'=>$attributeCode),
                            array('entity'=>$entity) 
                         );
                     // Warn unsupported attribute
@@ -612,13 +612,13 @@ class ProductGateway extends AbstractGateway
             $this->getServiceLocator() ->get('logService') 
                 ->log(\Log\Service\LogService::LEVEL_WARN,
                     'mag_prod_noupd',
-                    'No update required for '.$entity->getUniqueId() .' but requested was '.implode(', ', $attributes) ,
-                   array('attributes'=>$attributes) ,
+                    'No update required for '.$entity->getUniqueId() .' but requested was '.implode(', ', $attributes),
+                   array('attributes'=>$attributes),
                    array('entity'=>$entity) 
                 );
         }
 
-        $localId = $entityService->getLocalId($this->_node->getNodeId() , $entity);
+        $localId = $entityService->getLocalId($this->_node->getNodeId(), $entity);
 
         $data['website_ids'] = array($entity->getStoreId());
         if (count($this->_node->getStoreViews()) && $type != \Entity\Update::TYPE_DELETE) {
@@ -629,32 +629,32 @@ class ProductGateway extends AbstractGateway
                 }
 
                 $loadedEntity = $entityService->loadEntity(
-                    $this->_node->getNodeId() , $entity->getType() , $storeId, $entity->getUniqueId());
+                    $this->_node->getNodeId(), $entity->getType(), $storeId, $entity->getUniqueId());
                 if ($loadedEntity) {
-                    if (!in_array($loadedEntity->getStoreId() , $data['website_ids'])) {
+                    if (!in_array($loadedEntity->getStoreId(), $data['website_ids'])) {
                         $data['website_ids'][] = $loadedEntity->getStoreId();
                     }
 
                     if ($type == \Entity\Update::TYPE_CREATE && !$localId) {
                         $message = 'Product exists in other store, ';
-                        $localId = $entityService->getLocalId($this->_node->getNodeId() , $loadedEntity);
+                        $localId = $entityService->getLocalId($this->_node->getNodeId(), $loadedEntity);
                         if ($localId) {
                             $this->getServiceLocator() ->get('logService') 
                                 ->log(\Log\Service\LogService::LEVEL_INFO,
                                     'prod_storedup',
                                     $message.'forcing local ID for '.$entity->getUniqueId() .' to '.$localId,
-                                   array('local_id'=>$localId, 'loadedEntityId'=>$loadedEntity->getId()) ,
+                                   array('local_id'=>$localId, 'loadedEntityId'=>$loadedEntity->getId()),
                                    array('entity'=>$entity) 
                                 );
-                            $entityService->linkEntity($this->_node->getNodeId() , $entity, $localId);
+                            $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
                             $type = \Entity\Update::TYPE_UPDATE;
                             break;
                         }else{
                             $this->getServiceLocator() ->get('logService') 
                                 ->log(\Log\Service\LogService::LEVEL_INFO,
                                     'prod_storenew',
-                                    'Product exists in other store, but no local ID: '.$entity->getUniqueId() ,
-                                   array('loadedEntityId'=>$loadedEntity->getId()) ,
+                                    'Product exists in other store, but no local ID: '.$entity->getUniqueId(),
+                                   array('loadedEntityId'=>$loadedEntity->getId()),
                                    array('entity'=>$entity) 
                                 );
                         }
@@ -667,9 +667,9 @@ class ProductGateway extends AbstractGateway
         if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
 
             $logData = array(
-                'type'=>$entity->getData('type') ,
+                'type'=>$entity->getData('type'),
                 'websites'=>$data['website_ids'],
-                'data keys'=>array_keys($data) ,
+                'data keys'=>array_keys($data),
                 'data'=>$data
             );
 
@@ -693,14 +693,14 @@ class ProductGateway extends AbstractGateway
                 $this->_db->updateEntityEav(
                     $tablePrefix,
                     $localId,
-                    $entity->getStoreId() ,
+                    $entity->getStoreId(),
                     $data
                 );
             }else{
                 $request = array(
-                    $entity->getUniqueId() ,
+                    $entity->getUniqueId(),
                     $soapData,
-                    $entity->getStoreId() ,
+                    $entity->getStoreId(),
                     'sku'
                 );
                 $this->_soap->call('catalogProductUpdate', $request);
@@ -725,20 +725,20 @@ class ProductGateway extends AbstractGateway
                     'mag_prod_create',
                     $message,
                    array(
-                        'type'=>$entity->getData('type') ,
+                        'type'=>$entity->getData('type'),
                         'websites'=>$data['website_ids'],
                         'set'=>$attributeSet,
-                        'data keys'=>array_keys($data) ,
+                        'data keys'=>array_keys($data),
                         'data'=>$data,
-                        'soap data keys'=>array_keys($soapData) ,
+                        'soap data keys'=>array_keys($soapData),
                         'soap data'=>$soapData
                     ) 
                 );
 
             $request = array(
-                $entity->getData('type') ,
+                $entity->getData('type'),
                 $attributeSet,
-                $entity->getUniqueId() ,
+                $entity->getUniqueId(),
                 $soapData,
                 $entity->getStoreId() 
             );
@@ -753,14 +753,14 @@ class ProductGateway extends AbstractGateway
                         ->log(\Log\Service\LogService::LEVEL_WARN,
                             'prod_dupfault',
                             'Creating product '.$entity->getUniqueId() .' hit SKU duplicate fault',
-                           array() ,
+                           array(),
                            array('entity'=>$entity) 
                         );
 
                     $check = $this->_soap->call('catalogProductInfo',array(
-                        $entity->getUniqueId() ,
+                        $entity->getUniqueId(),
                         0, // store ID
-                       array() ,
+                       array(),
                         'sku'
                     ));
 
@@ -773,12 +773,12 @@ class ProductGateway extends AbstractGateway
                             if ($row['sku'] == $entity->getUniqueId()) {
                                 $found = TRUE;
 
-                                $entityService->linkEntity($this->_node->getNodeId() , $entity, $row['product_id']);
+                                $entityService->linkEntity($this->_node->getNodeId(), $entity, $row['product_id']);
                                 $this->getServiceLocator() ->get('logService') 
                                     ->log(\Log\Service\LogService::LEVEL_WARN,
                                         'prod_dupres',
                                         'Creating product '.$entity->getUniqueId() .' resolved SKU duplicate fault',
-                                       array('local_id'=>$row['product_id']) ,
+                                       array('local_id'=>$row['product_id']),
                                        array('entity'=>$entity) 
                                     );
                             }
@@ -798,7 +798,7 @@ class ProductGateway extends AbstractGateway
                 throw new MagelinkException($message, 0, $soapFault);
             }
 
-            $entityService->linkEntity($this->_node->getNodeId() , $entity, $soapResult);
+            $entityService->linkEntity($this->_node->getNodeId(), $entity, $soapResult);
         }
     }
 
@@ -818,7 +818,7 @@ class ProductGateway extends AbstractGateway
 
         switch($action->getType()) {
             case 'delete':
-                $this->_soap->call('catalogProductDelete',array($entity->getUniqueId() , 'sku'));
+                $this->_soap->call('catalogProductDelete',array($entity->getUniqueId(), 'sku'));
                 return TRUE;
                 break;
             default:
