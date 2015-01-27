@@ -13,7 +13,6 @@
 namespace Magento\Gateway;
 
 use Entity\Service\EntityService;
-use Magelink\Exception\MagelinkException;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
 use Node\AbstractNode;
@@ -28,7 +27,7 @@ class CreditmemoGateway extends AbstractGateway
      * @param AbstractNode $node
      * @param Entity\Node $nodeEntity
      * @param string $entity_type
-     * @throws \Magelink\Exception\MagelinkException
+     * @throws GatewayException
      * @return boolean
      */
     public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
@@ -374,7 +373,7 @@ class CreditmemoGateway extends AbstractGateway
      * @param \Entity\Entity $entity
      * @param string[] $attributes
      * @param int $type
-     * @throws MagelinkException
+     * @throws GatewayException
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE)
     {
@@ -423,7 +422,8 @@ class CreditmemoGateway extends AbstractGateway
                                 break;
                             default:
                                 $message = 'Wrong type of the children of creditmemo '.$entity->getUniqueId().'.';
-                                throw new MagelinkException($message);
+                                // store as sync issue
+                                throw new GatewayException($message);
                         }
 
                         $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $orderItemId);
@@ -542,7 +542,7 @@ class CreditmemoGateway extends AbstractGateway
     /**
      * Write out the given action.
      * @param \Entity\Action $action
-     * @throws MagelinkException
+     * @throws GatewayException
      */
     public function writeAction(\Entity\Action $action)
     {
