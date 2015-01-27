@@ -218,7 +218,7 @@ class OrderGateway extends AbstractGateway
                     (isset($orderData['payment']['cc_type']) ? $orderData['payment']['cc_type'] : '')
                 );
             }else{
-                // store as a sync issue
+                // store as sync issue
                 throw new GatewayException('Invalid payment details format for order '.$uniqueId);
             }
         }
@@ -834,12 +834,17 @@ class OrderGateway extends AbstractGateway
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                 }
 
-                $this->_soap->call('salesOrderAddComment', array(
-                        $order->getOriginalOrder()->getUniqueId(),
-                        $status,
-                        $comment,
-                        $notify
-                    ));
+                try {
+                    $this->_soap->call('salesOrderAddComment', array(
+                            $order->getOriginalOrder()->getUniqueId(),
+                            $status,
+                            $comment,
+                            $notify
+                        ));
+                }catch (\Exception $exception) {
+                    // store as sync issue
+                    throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                }
                 break;
             case 'cancel':
                 $isCancelable = (strpos($orderStatus, 'pending') === 0)
