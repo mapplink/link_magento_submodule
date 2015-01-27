@@ -2,6 +2,8 @@
 
 namespace Magento\Gateway;
 
+use Magelink\Exception\MagelinkException;
+use Magelink\Exception\GatewayException;
 use Node\AbstractGateway as BaseAbstractGateway;
 use Node\AbstractNode;
 use Node\Entity;
@@ -47,7 +49,7 @@ abstract class AbstractGateway extends BaseAbstractGateway
 
         if (!($node instanceof \Magento\Node)) {
             $success = FALSE;
-            throw new \Magelink\Exception\MagelinkException('Invalid node type for this gateway');
+            throw new MagelinkException('Invalid node type for this gateway');
         }else{
             $this->_node = $node;
             $this->_nodeEntity = $nodeEntity;
@@ -60,7 +62,7 @@ abstract class AbstractGateway extends BaseAbstractGateway
 
             if (!$this->_soap) {
                 $success = FALSE;
-                throw new MagelinkException('SOAP is required for Magento '.ucfirst($entityType));
+                throw new GatewayException('SOAP is required for Magento '.ucfirst($entityType));
             }else{
                 $this->apiOverlappingSeconds += $this->_node->getConfig('api_overlapping_seconds');
             }
