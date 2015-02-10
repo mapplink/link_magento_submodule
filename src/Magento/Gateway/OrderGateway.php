@@ -167,7 +167,9 @@ class OrderGateway extends AbstractGateway
      */
     protected function updateQtyPreTransit(Order $order, Orderitem $orderitem)
     {
+        $qtyPreTransit = NULL;
         $orderStatus = $order->getData('status');
+
         if (self::isOrderStateProcessing($orderStatus)) {
             $storeId = ($this->_node->isMultiStore() ? $order->getData('store_id') : 0);
 
