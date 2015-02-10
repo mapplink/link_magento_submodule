@@ -138,23 +138,23 @@ class Node extends AbstractNode {
      */
     protected function _createGateway($entity_type)
     {
-        if($entity_type == 'product'){
+        if ($entity_type == 'product') {
             return new Gateway\ProductGateway;
         }
-        if($entity_type == 'stockitem'){
+        if ($entity_type == 'stockitem') {
             return new Gateway\StockGateway;
         }
-        if($entity_type == 'order'){
+        if ($entity_type == 'order') {
             return new Gateway\OrderGateway;
         }
-        if($entity_type == 'creditmemo'){
+        if ($entity_type == 'creditmemo') {
             return new Gateway\CreditmemoGateway;
         }
-        if($entity_type == 'customer'){
+        if ($entity_type == 'customer') {
             return new Gateway\CustomerGateway;
         }
-        if($entity_type == 'address' || $entity_type == 'orderitem'){
-            return null;
+        if ($entity_type == 'address' || $entity_type == 'orderitem') {
+            return NULL;
         }
 
         throw new SyncException('Unknown/invalid entity type '.$entity_type);

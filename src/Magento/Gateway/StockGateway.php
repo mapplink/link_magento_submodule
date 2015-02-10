@@ -35,7 +35,7 @@ class StockGateway extends AbstractGateway
      */
     public function retrieve()
     {
-        if(!$this->_node->getConfig('load_stock')){
+        if (!$this->_node->getConfig('load_stock')) {
             // No need to retrieve Stock from magento
             return;
         }
@@ -71,10 +71,10 @@ class StockGateway extends AbstractGateway
 
                 $data = array('available'=>$item['qty']);
 
-                foreach($this->_node->getStoreViews() as $store_id=>$store_view){
+                foreach ($this->_node->getStoreViews() as $store_id=>$store_view) {
                     $product = $entityService->loadEntity($this->_node->getNodeId(), 'product', $store_id, $item['sku']);
 
-                    if(!$product){
+                    if (!$product) {
                         // No product exists, leave for now. May not be in this store.
                         continue;
                     }

@@ -12,6 +12,9 @@
 
 namespace Magento\Gateway;
 
+use Entity\Wrapper\Order;
+use Entity\Wrapper\Orderitem;
+use Log\Service\LogService;
 use Node\AbstractNode;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
@@ -22,6 +25,20 @@ use Zend\Stdlib\ArrayObject;
 
 class OrderGateway extends AbstractGateway
 {
+    const MAGENTO_STATUS_COMPLETE = 'complete';
+    const MAGENTO_STATUS_CANCELED = 'canceled';
+    const MAGENTO_STATUS_PROCESSING = 'processing';
+    const MAGENTO_STATUS_PROCESSING_DPS_PAID = 'processing_dps_paid';
+    const MAGENTO_STATUS_PROCESSING_OGONE = 'processed_ogone';
+    const MAGENTO_STATUS_PROCESSING_DPS_AUTH = 'processing_dps_auth';
+
+    protected static $magentoProcessingStatusses = array(
+        self::MAGENTO_STATUS_PROCESSING,
+        self::MAGENTO_STATUS_PROCESSING_DPS_PAID,
+        self::MAGENTO_STATUS_PROCESSING_OGONE,
+        self::MAGENTO_STATUS_PROCESSING_DPS_AUTH
+    );
+
     /** @var int $lastRetrieveTimestamp */
     protected $lastRetrieveTimestamp = NULL;
 
@@ -104,7 +121,7 @@ class OrderGateway extends AbstractGateway
      * Get last retrieve date from the database
      * @return bool|string
      */
-    protected function  getRetrieveDateForForcedSynchronisation()
+    protected function getRetrieveDateForForcedSynchronisation()
     {
         if ($this->newRetrieveTimestamp !== NULL) {
             $intervalsBefore = 3;
@@ -134,6 +151,70 @@ class OrderGateway extends AbstractGateway
         }
 
         return $retrieve;
+    }
+
+    protected static function isOrderStateProcessing($orderStatus)
+    {
+        $isOrderStateProcessing = in_array($orderStatus, self::$magentoProcessingStatusses);
+        return $isOrderStateProcessing;
+    }
+
+    /**
+     * @param Order $order
+     * @param Orderitem $orderitem
+     * @return bool|NULL
+     * @throws MagelinkException
+     */
+    protected function updateQtyPreTransit(Order $order, Orderitem $orderitem)
+    {
+        $orderStatus = $order->getData('status');
+        if (self::isOrderStateProcessing($orderStatus)) {
+            $storeId = ($this->_node->isMultiStore() ? $order->getData('store_id') : 0);
+
+            $stockitem = $this->_entityService->loadEntity(
+                $this->_node->getNodeId(),
+                'stockitem',
+                $storeId,
+                $orderitem->getData('sku')
+            );
+
+            $success = FALSE;
+            if ($stockitem) {
+                try{
+                    $qtyPreTransit = $stockitem->getData('qty_pre_transit') + $orderitem->getData('quantity');
+                    $updateData = array('qty_pre_transit'=>$qtyPreTransit);
+                    $this->_entityService->updateEntity($this->_node->getNodeId(), $stockitem, $updateData, FALSE);
+                    $success = TRUE;
+                }catch (\Exception $exception) {
+                    $this->getServiceLocator()->get('logService')
+                        ->log(LogService::LEVEL_ERROR,
+                            'pre_trans_upd_failed',
+                            'Update of qty_pre_transit failed on stockitem '.$stockitem->getEntityId(),
+                            array('sku'=>$stockitem->getUniqueId(), 'qty_pre_transit'=>$qtyPreTransit),
+                            array('node'=>$this->_node, 'stockitem'=>$stockitem, 'orderitem'=>$orderitem)
+                        );
+                }
+            }else {
+                $this->getServiceLocator()->get('logService')
+                    ->log(LogService::LEVEL_ERROR,
+                        'stocki_noxis',
+                        'Stockitem '.$orderitem->getData('sku').' does not exist.',
+                        array('sku'=>$orderitem->getData('sku')),
+                        array('node'=>$this->_node, 'orderitem'=>$orderitem)
+                    );
+            }
+        }else{
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_DEBUGEXTRA,
+                    'upd_pre_trans_fail',
+                    'No update of qty_pre_transit. Order '.$order->getUniqueId().' has wrong status: '.$orderStatus,
+                    array('order id'=>$order->getId()),
+                    array('node'=>$this->_node, 'order'=>$order)
+                );
+            $success = NULL;
+        }
+
+        return $success;
     }
 
     /**
@@ -221,7 +302,7 @@ class OrderGateway extends AbstractGateway
                 throw new MagelinkException('Invalid payment details format for order '.$uniqueId);
             }
         }
-        if(count($payments)){
+        if (count($payments)) {
             $data['payment_method'] = $payments;
         }
 
@@ -278,7 +359,7 @@ class OrderGateway extends AbstractGateway
                             array('node'=>$this->_node, 'entity'=>$existingEntity)
                         );
 
-                    $this->createItems($orderData, $existingEntity->getId());
+                    $this->createItems($orderData, $existingEntity);
 
                     try{
                         $this->_soap->call('salesOrderAddComment',
@@ -289,7 +370,7 @@ class OrderGateway extends AbstractGateway
                                 FALSE
                             )
                         );
-                    }catch (\Exception $e) {
+                    }catch (\Exception $exception) {
                         $this->getServiceLocator()->get('logService')
                             ->log($logLevel,
                                 'ent_comment_err'.$logCodeSuffix,
@@ -299,9 +380,9 @@ class OrderGateway extends AbstractGateway
                             );
                     }
                     $this->_entityService->commitEntityTransaction('magento-order-'.$uniqueId);
-                }catch(\Exception $e){
+                }catch(\Exception $exception){
                     $this->_entityService->rollbackEntityTransaction('magento-order-'.$uniqueId);
-                    throw $e;
+                    throw $exception;
                 }
                 $needsUpdate = FALSE;
             }else{
@@ -331,7 +412,16 @@ class OrderGateway extends AbstractGateway
         }
 
         if ($needsUpdate) {
+            $movedToProcessing = self::isOrderStateProcessing($data['status'])
+                && !self::isOrderStateProcessing($existingEntity->getData('status'));
             $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
+
+            if ($movedToProcessing) {
+                /** @var Order $existingEntity */
+                foreach ($existingEntity->getOrderitems() as $orderitem) {
+                    $this->updateQtyPreTransit($existingEntity, $orderitem);
+                }
+            }
         }
         $this->updateStatusHistory($orderData, $existingEntity);
     }
@@ -606,9 +696,11 @@ class OrderGateway extends AbstractGateway
      * @param array $orderData
      * @param $orderId
      */
-    protected function createItems(array $orderData, $orderId)
+    protected function createItems(array $orderData, Order $order)
     {
-        $parentId = $orderId;
+        $nodeId = $this->_node->getNodeId();
+        $parentId = $order->getId();
+        $orderStatus = $order->getData('status');
 
         foreach ($orderData['items'] as $item) {
             $uniqueId = $orderData['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
@@ -660,13 +752,19 @@ class OrderGateway extends AbstractGateway
                         array('data'=>$data, 'dataQuantity'=>$data['quantity'])
                     );
 
+                $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
+
                 $entity = $this->_entityService->createEntity(
-                    $this->_node->getNodeId(),
+                    $nodeId,
                     'orderitem',
-                    ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
-                    $uniqueId, $data, $parentId
+                    $storeId,
+                    $uniqueId,
+                    $data,
+                    $parentId
                 );
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+
+                $this->updateQtyPreTransit($order, $entity);
             }
         }
 
@@ -803,7 +901,7 @@ class OrderGateway extends AbstractGateway
             case 'cancel':
                 $isCancelable = (strpos($orderStatus, 'pending') === 0)
                     || in_array($orderStatus, array('payment_review', 'fraud', 'fraud_dps'));
-                if ($orderStatus !== 'canceled') {
+                if ($orderStatus !== self::MAGENTO_STATUS_CANCELED) {
                     if (!$isCancelable){
                         $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
                         throw new MagelinkException($message);
@@ -853,7 +951,7 @@ class OrderGateway extends AbstractGateway
                 }
                 break;
             case 'ship':
-                if (strpos($orderStatus, 'processing') === 0) {
+                if (self::isOrderStateProcessing($orderStatus)) {
                     $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                     $sendComment = ($action->hasData('send_comment') ?
@@ -870,7 +968,7 @@ class OrderGateway extends AbstractGateway
                 }
                 break;
             case 'creditmemo':
-                if (strpos($orderStatus, 'processing') === 0 || $orderStatus == 'complete') {
+                if (self::isOrderStateProcessing($orderStatus) || $orderStatus == self::MAGENTO_STATUS_COMPLETE) {
                     $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                     $sendComment = ($action->hasData('send_comment') ?
@@ -893,20 +991,20 @@ class OrderGateway extends AbstractGateway
                             'mag_cr_cmemo',
                             $message,
                             array(
-                                'entity (order)' => $order,
-                                'action' => $action,
-                                'action data' => $action->getData(),
-                                'orderIncrementId' => $order->getUniqueId(),
-                                'creditmemoData' => array(
-                                    'qtys' => $itemsRefunded,
-                                    'shipping_amount' => $shippingRefund,
-                                    'adjustment_positive' => $adjustmentPositive,
-                                    'adjustment_negative' => $adjustmentNegative
+                                'entity (order)'=>$order,
+                                'action'=>$action,
+                                'action data'=>$action->getData(),
+                                'orderIncrementId'=>$order->getUniqueId(),
+                                'creditmemoData'=>array(
+                                    'qtys'=>$itemsRefunded,
+                                    'shipping_amount'=>$shippingRefund,
+                                    'adjustment_positive'=>$adjustmentPositive,
+                                    'adjustment_negative'=>$adjustmentNegative
                                 ),
-                                'comment' => $comment,
-                                'notifyCustomer' => $notify,
-                                'includeComment' => $sendComment,
-                                'refundToStoreCreditAmount' => $creditRefund
+                                'comment'=>$comment,
+                                'notifyCustomer'=>$notify,
+                                'includeComment'=>$sendComment,
+                                'refundToStoreCreditAmount'=>$creditRefund
                             )
                         );
                     $this->actionCreditmemo($order, $comment, $notify, $sendComment,
