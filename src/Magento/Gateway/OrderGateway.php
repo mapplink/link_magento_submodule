@@ -414,7 +414,7 @@ class OrderGateway extends AbstractGateway
         }
 
         if ($needsUpdate) {
-            $movedToProcessing = self::isOrderStateProcessing($data['status'])
+            $movedToProcessing = self::isOrderStateProcessing($orderData['status'])
                 && !self::isOrderStateProcessing($existingEntity->getData('status'));
             $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
 
@@ -702,7 +702,6 @@ class OrderGateway extends AbstractGateway
     {
         $nodeId = $this->_node->getNodeId();
         $parentId = $order->getId();
-        $orderStatus = $order->getData('status');
 
         foreach ($orderData['items'] as $item) {
             $uniqueId = $orderData['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
