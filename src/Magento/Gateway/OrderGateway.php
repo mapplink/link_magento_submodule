@@ -418,10 +418,11 @@ class OrderGateway extends AbstractGateway
                 && !self::isOrderStateProcessing($existingEntity->getData('status'));
             $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
 
+            $order = $this->_entityService->loadEntityId($this->_node->getNodeId(), $existingEntity->getId());
             if ($movedToProcessing) {
-                /** @var Order $existingEntity */
-                foreach ($existingEntity->getOrderitems() as $orderitem) {
-                    $this->updateQtyPreTransit($existingEntity, $orderitem);
+                /** @var Order $order */
+                foreach ($order->getOrderitems() as $orderitem) {
+                    $this->updateQtyPreTransit($order, $orderitem);
                 }
             }
         }
