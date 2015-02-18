@@ -31,14 +31,15 @@ class OrderGateway extends AbstractGateway
     const MAGENTO_STATUS_PROCESSING_DPS_PAID = 'processing_dps_paid';
     const MAGENTO_STATUS_PROCESSING_OGONE = 'processed_ogone';
     const MAGENTO_STATUS_PROCESSING_DPS_AUTH = 'processing_dps_auth';
+    const MAGENTO_STATUS_PAYPAL_REVERSAL = 'paypal_canceled_reversal';
 
     protected static $magentoProcessingStatusses = array(
         self::MAGENTO_STATUS_PROCESSING,
         self::MAGENTO_STATUS_PROCESSING_DPS_PAID,
         self::MAGENTO_STATUS_PROCESSING_OGONE,
-        self::MAGENTO_STATUS_PROCESSING_DPS_AUTH
+        self::MAGENTO_STATUS_PROCESSING_DPS_AUTH,
+        self::MAGENTO_STATUS_PAYPAL_REVERSAL
     );
-
     /** @var int $lastRetrieveTimestamp */
     protected $lastRetrieveTimestamp = NULL;
 
