@@ -12,14 +12,14 @@
 
 namespace Magento\Gateway;
 
+use Entity\Comment;
+use Entity\Service\EntityService;
 use Entity\Wrapper\Order;
 use Entity\Wrapper\Orderitem;
 use Log\Service\LogService;
+use Magelink\Exception\MagelinkException;
 use Node\AbstractNode;
 use Node\Entity;
-use Magelink\Exception\MagelinkException;
-use Entity\Comment;
-use Entity\Service\EntityService;
 use Zend\Stdlib\ArrayObject;
 
 
@@ -184,14 +184,14 @@ class OrderGateway extends AbstractGateway
             $success = FALSE;
             if ($stockitem) {
                 try{
-                    $qtyPreTransit = $stockitem->getData('qty_pre_transit') + $orderitem->getData('quantity');
+                    $qtyPreTransit = $stockitem->getData('qty_pre_transit', 0) + $orderitem->getData('quantity', 0);
                     $updateData = array('qty_pre_transit'=>$qtyPreTransit);
                     $this->_entityService->updateEntity($this->_node->getNodeId(), $stockitem, $updateData, FALSE);
                     $success = TRUE;
                 }catch (\Exception $exception) {
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_ERROR,
-                            'pre_trans_upd_failed',
+                            'upd_pre_trans_fail',
                             'Update of qty_pre_transit failed on stockitem '.$stockitem->getEntityId(),
                             array('sku'=>$stockitem->getUniqueId(), 'qty_pre_transit'=>$qtyPreTransit),
                             array('node'=>$this->_node, 'stockitem'=>$stockitem, 'orderitem'=>$orderitem)
