@@ -227,7 +227,7 @@ class StockGateway extends AbstractGateway
                         $logMessage = 'Stock update for '.$entity->getUniqueId().' failed!'
                             .' Product had wrong local id '.$localId.' ('.$nodeId.') which is removed now.';
                         $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_ERROR, 'stock_prodloc_fail', $logMessage, $logMessage, $logEntities);
+                            ->log(LogService::LEVEL_ERROR, 'stock_prodloc_fail', $logMessage, $logData, $logEntities);
                     }elseif ($parentLocal) {
                         $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
                         $this->getServiceLocator()->get('logService')
