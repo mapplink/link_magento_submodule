@@ -12,9 +12,9 @@ namespace Magento\Service;
 
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\NodeException;
-use \Zend\ServiceManager\ServiceLocatorAwareInterface;
-use \Zend\ServiceManager\ServiceLocatorInterface;
-use \Zend\Db\TableGateway\TableGateway;
+use Zend\Db\TableGateway\TableGateway;
+use Zend\ServiceManager\ServiceLocatorAwareInterface;
+use Zend\ServiceManager\ServiceLocatorInterface;
 
 
 class MagentoService implements ServiceLocatorAwareInterface
