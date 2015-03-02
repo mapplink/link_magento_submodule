@@ -1,12 +1,19 @@
 <?php
+/**
+ * @category Magento
+ * @package Magento\Gateway
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Gateway;
 
 use Entity\Service\EntityService;
 use Log\Service\LogService;
+use Magelink\Exception\MagelinkException;
 use Node\AbstractNode;
 use Node\Entity;
-use Magelink\Exception\MagelinkException;
 
 
 class StockGateway extends AbstractGateway
@@ -140,6 +147,37 @@ class StockGateway extends AbstractGateway
     }
 
     /**
+     * @param \Entity\Entity $entity
+     * @param bool $log
+     * @param bool $error
+     * @return int|NULL
+     */
+    protected function getParentLocal(\Entity\Entity $entity, $error = FALSE)
+    {
+        $logLevel = ($error ? LogService::LEVEL_ERROR : LogService::LEVEL_WARN);
+        $this->getServiceLocator()->get('logService')
+            ->log($logLevel, 'stock_prodloc', 'Stock update for '.$entity->getUniqueId().' had to use parent local!',
+                array('parent'=>$entity->getParentId()),
+                array('node'=>$this->_node, 'entity' => $entity)
+            );
+
+        $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
+
+
+        if (!$localId) {
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_ERROR,
+                    'stock_noloc',
+                    'Stock update for '.$entity->getUniqueId().' had no local id!',
+                    array('data'=>$entity->getAllSetData()),
+                    array('node'=>$this->_node, 'entity'=>$entity)
+                );
+        }
+
+        return $localId;
+    }
+
+    /**
      * Write out all the updates to the given entity.
      * @param \Entity\Entity $entity
      * @param string[] $attributes
@@ -153,48 +191,70 @@ class StockGateway extends AbstractGateway
         $logEntities = array('node' => $this->_node, 'entity' => $entity);
 
         if (in_array('available', $attributes)) {
+            $parentLocal = FALSE;
+            $nodeId = $this->_node->getNodeId();
+            $localId = $this->_entityService->getLocalId($nodeId, $entity);
 
-            $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
-            if ($localId) {
-                $logLevel = LogService::LEVEL_INFO;
-                $logCode .= '_upd';
-                $logMessage = 'Update stock '.$entity->getUniqueId().'.';
-            }else{
-                $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
-                if ($localId) {
-                    $logLevel = LogService::LEVEL_WARN;
-                    $logCode .= '_prnt_loc';
-                    $logMessage = 'Stock update for '.$entity->getUniqueId().' had to use parent local!';
-                    $logData['parent'] = $entity->getParentId();
-                }else{
-                    $logLevel = LogService::LEVEL_ERROR;
-                    $logCode .= '_nolocal';
-                    $logMessage = 'Stock update for '.$entity->getUniqueId().' had no local ID!';
-                }
+            if (!$localId) {
+                $localId = $this->getParentLocal($entity);
+                $parentLocal = TRUE;
             }
 
-            $this->getServiceLocator()->get('logService')
-                ->log($logLevel, $logCode, $logMessage, $logData, $logEntities);
+            $qty = $entity->getData('available');
+            $isInStock = (int) ($qty > 0);
 
-            if ($localId) {
-                $qty = $entity->getData('available');
-                $is_in_stock = ($qty > 0);
+            if ($this->_db) {
+                $success = FALSE;
+                while ($localId && !$success) {
+                    $success = $this->_db->updateStock($localId, $qty, $isInStock);
+                    if (!$success && !$parentLocal) {
+                        $localId = $this->getParentLocal($entity, TRUE);
+                        $parentLocal = TRUE;
 
-                if ($this->_db) {
-                    $this->_db->updateStock($localId, $qty, $is_in_stock ? 1 : 0);
-                }else{
-                    $this->_soap->call('catalogInventoryStockItemUpdate',
-                        // ToDo : Check if product can be removed
-                        array('product'=>$localId, 'productId'=>$localId, 'data'=>array(
-                            'qty' => $qty,
-                            'is_in_stock' => ($is_in_stock ? 1 : 0)
-                        ))
-                    );
-                }
+                        $this->_entityService->unlinkEntity($this->_node->getNodeId(), $entity);
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_ERROR,
+                                'stock_loc_rm',
+                                'Removed local id from stockitem '.$entity->getUniqueId().'('.$nodeId.'!',
+                                array('parent'=>$entity->getParentId()),
+                                array('node'=>$this->_node, 'entity' => $entity)
+                            );
+                    }elseif (!$success) {
+                        $localId = NULL;
+                        $product = $this->_entityService
+                            ->loadEntityId($this->_node->getNodeId(), $entity->getParentId());
+                        $this->_entityService->unlinkEntity($this->_node->getNodeId(), $product);
+
+                        $message = 'Stock update for '.$entity->getUniqueId().' failed!'
+                            .' Product had wrong local id ('.$localId.') which is removed now.';
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_ERROR,
+                                'stock_prodloc_fail',
+                                $message,
+                                array('data'=>$entity->getAllSetData()),
+                                array('node'=>$this->_node, 'entity'=>$entity)
+                            );
+                    }elseif ($success && $parentLocal) {
+                        $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                    }
+                };
+            }else{
+                // ToDo: This is actually returning an object
+                $success = $this->_soap->call('catalogInventoryStockItemUpdate', array(
+                    'product'=>$localId,
+                    'productId'=>$localId,
+                    'data'=>array(
+                        'qty'=>$qty,
+                        'is_in_stock'=>($isInStock)
+                    )
+                ));
             }
         }else{
             // We don't care about any other attributes
+            $success = TRUE;
         }
+
+        return $success;
     }
 
     /**

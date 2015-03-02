@@ -1,4 +1,13 @@
 <?php
+/**
+ * Implements DB access to Magento - loading and updating
+ * @category Entity
+ * @package Magento\Api
+ * @author Matt Johnston
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Api;
 
@@ -12,10 +21,6 @@ use Zend\ServiceManager\ServiceLocatorAwareInterface;
 use Zend\ServiceManager\ServiceLocatorInterface;
 
 
-/**
- * Implements DB access to Magento - loading and updating
- * @package Magento\Api
- */
 class Db implements ServiceLocatorAwareInterface
 {
     /** @var bool $_debug */
@@ -145,7 +150,7 @@ class Db implements ServiceLocatorAwareInterface
             $success = FALSE;
         }else {
             try{
-                $this->_adapter = new \Zend\Db\Adapter\Adapter(
+                $this->_adapter = new Adapter(
                     array(
                         'driver'=>'Pdo',
                         'dsn'=>'mysql:host='.$hostname.';dbname='.$schema,
@@ -317,30 +322,38 @@ class Db implements ServiceLocatorAwareInterface
 
     /**
      * Update stock level for a single product
-     * @param int $product_id Product Entity ID
+     * @param int $productId Product Entity ID
      * @param float $qty Quantity available
-     * @param bool $is_in_stock Whether the product should be in stock
+     * @param bool $isInStock Whether the product should be in stock
      */
-    public function updateStock($product_id, $qty, $is_in_stock)
+    public function updateStock($productId, $qty, $isInStock)
     {
-        $this->getTableGateway('cataloginventory_stock_item')
-            ->update(array('qty'=>$qty, 'is_in_stock'=>$is_in_stock), array('product_id'=>$product_id, 'stock_id'=>1));
+        $affectedRows = $this->getTableGateway('cataloginventory_stock_item')
+            ->update(array('qty'=>$qty, 'is_in_stock'=>$isInStock), array('product_id'=>$productId, 'stock_id'=>1));
+        if ($affectedRows !== 1) {
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_ERROR,
+                'upd_stock_err',
+                'Update error on stock with product id '.$productId,
+                array('product_id'=>$productId, 'qty'=>$qty, 'is_in_stock'=>$isInStock, 'affected rows'=>$affectedRows)
+            );
+        }
+
+        return ($affectedRows > 0);
     }
 
     /**
      * Returns whether or not the given customer is subscribed to the newsletter in Magento (unconfirmed or confirmed)
-     *
-     * @param int $customer_id The Magento customer ID to look up the status for
+     * @param int $customerId The Magento customer ID to look up the status for
      * @return bool
      */
-    public function getNewsletterStatus($customer_id)
+    public function getNewsletterStatus($customerId)
     {
-        $sql = 'SELECT subscriber_id FROM newsletter_subscriber WHERE customer_id = '.$customer_id
-            .' AND subscriber_status IN (1,4)';
+        $sql = "SELECT subscriber_id FROM newsletter_subscriber WHERE customer_id = ".$customerId
+            ." AND subscriber_status IN (1,4)";
         $this->debugSql($sql);
 
-        $newsletterSubscribers = $this->_adapter->query($sql, \Zend\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
-
+        $newsletterSubscribers = $this->_adapter->query($sql, Adapter::QUERY_MODE_EXECUTE);
         foreach ($newsletterSubscribers as $row) {
             if ($row['subscriber_id']) {
                 break;
@@ -364,7 +377,7 @@ class Db implements ServiceLocatorAwareInterface
         $this->debugSql($sql);
         $localEntityIds = array();
 
-        $result = $this->_adapter->query($sql, \Zend\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+        $result = $this->_adapter->query($sql, Adapter::QUERY_MODE_EXECUTE);
         foreach ($result as $tableRow) {
             $localEntityIds[] = intval($tableRow['entity_id']);
         }
