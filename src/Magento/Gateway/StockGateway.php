@@ -154,21 +154,20 @@ class StockGateway extends AbstractGateway
      */
     protected function getParentLocal(\Entity\Entity $entity, $error = FALSE)
     {
+        $nodeId = $this->_node->getNodeId();
+
         $logLevel = ($error ? LogService::LEVEL_ERROR : LogService::LEVEL_WARN);
-        $this->getServiceLocator()->get('logService')
-            ->log($logLevel, 'stock_prodloc', 'Stock update for '.$entity->getUniqueId().' had to use parent local!',
-                array('parent'=>$entity->getParentId()),
-                array('node'=>$this->_node, 'entity' => $entity)
-            );
+        $logMessage = 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had to use parent local!';
+        $this->getServiceLocator()->get('logService')->log($logLevel, 'stock_prodloc', $logMessage,
+                array('parent'=>$entity->getParentId()), array('node'=>$this->_node, 'entity' => $entity));
 
         $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
-
 
         if (!$localId) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
                     'stock_noloc',
-                    'Stock update for '.$entity->getUniqueId().' had no local id!',
+                    'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had no local id!',
                     array('data'=>$entity->getAllSetData()),
                     array('node'=>$this->_node, 'entity'=>$entity)
                 );
@@ -215,8 +214,8 @@ class StockGateway extends AbstractGateway
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_ERROR,
                                 'stock_loc_rm',
-                                'Removed local id from stockitem '.$entity->getUniqueId().'('.$nodeId.'!',
-                                array('parent'=>$entity->getParentId()),
+                                'Removed stockitem local id from '.$entity->getUniqueId().' ('.$nodeId.')',
+                                array('node id'=>$nodeId, 'parent'=>$entity->getParentId()),
                                 array('node'=>$this->_node, 'entity' => $entity)
                             );
                     }elseif (!$success) {
@@ -226,12 +225,12 @@ class StockGateway extends AbstractGateway
                         $this->_entityService->unlinkEntity($this->_node->getNodeId(), $product);
 
                         $message = 'Stock update for '.$entity->getUniqueId().' failed!'
-                            .' Product had wrong local id ('.$localId.') which is removed now.';
+                            .' Product had wrong local id '.$localId.' ('.$nodeId.') which is removed now.';
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_ERROR,
                                 'stock_prodloc_fail',
                                 $message,
-                                array('data'=>$entity->getAllSetData()),
+                                array('node id'=>$nodeId, 'data'=>$entity->getAllSetData()),
                                 array('node'=>$this->_node, 'entity'=>$entity)
                             );
                     }elseif ($success && $parentLocal) {
