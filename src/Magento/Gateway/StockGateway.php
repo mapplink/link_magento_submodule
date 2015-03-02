@@ -166,10 +166,8 @@ class StockGateway extends AbstractGateway
         if (!$localId) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
-                    'stock_noloc',
-                    'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had no local id!',
-                    array('data'=>$entity->getAllSetData()),
-                    array('node'=>$this->_node, 'entity'=>$entity)
+                    'stock_noloc', 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had no local id!',
+                    array('data'=>$entity->getFullArrayCopy()), array('node'=>$this->_node, 'entity'=>$entity)
                 );
         }
 
@@ -192,6 +190,7 @@ class StockGateway extends AbstractGateway
         if (in_array('available', $attributes)) {
             $parentLocal = FALSE;
             $nodeId = $this->_node->getNodeId();
+            $logEntities = array('node'=>$this->_node, 'entity' => $entity);
             $localId = $this->_entityService->getLocalId($nodeId, $entity);
 
             if (!$localId) {
@@ -206,17 +205,18 @@ class StockGateway extends AbstractGateway
                 $success = FALSE;
                 while ($localId && !$success) {
                     $success = $this->_db->updateStock($localId, $qty, $isInStock);
+                    $logData = array('node id'=>$nodeId, 'local id'=>$localId, 'data'=>$entity->getFullArrayCopy());
+
                     if (!$success && !$parentLocal) {
                         $localId = $this->getParentLocal($entity, TRUE);
                         $parentLocal = TRUE;
 
                         $this->_entityService->unlinkEntity($this->_node->getNodeId(), $entity);
                         $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_ERROR,
+                            ->log(LogService::LEVEL_WARN,
                                 'stock_loc_rm',
                                 'Removed stockitem local id from '.$entity->getUniqueId().' ('.$nodeId.')',
-                                array('node id'=>$nodeId, 'parent'=>$entity->getParentId()),
-                                array('node'=>$this->_node, 'entity' => $entity)
+                                $logData, $logEntities
                             );
                     }elseif (!$success) {
                         $localId = NULL;
@@ -224,17 +224,18 @@ class StockGateway extends AbstractGateway
                             ->loadEntityId($this->_node->getNodeId(), $entity->getParentId());
                         $this->_entityService->unlinkEntity($this->_node->getNodeId(), $product);
 
-                        $message = 'Stock update for '.$entity->getUniqueId().' failed!'
+                        $logMessage = 'Stock update for '.$entity->getUniqueId().' failed!'
                             .' Product had wrong local id '.$localId.' ('.$nodeId.') which is removed now.';
                         $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_ERROR,
-                                'stock_prodloc_fail',
-                                $message,
-                                array('node id'=>$nodeId, 'data'=>$entity->getAllSetData()),
-                                array('node'=>$this->_node, 'entity'=>$entity)
-                            );
-                    }elseif ($success && $parentLocal) {
+                            ->log(LogService::LEVEL_ERROR, 'stock_prodloc_fail', $logMessage, $logMessage, $logEntities);
+                    }elseif ($parentLocal) {
                         $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::INFO,
+                                'stock_loc_add',
+                                'Added stockitem local id for '.$entity->getUniqueId().' ('.$nodeId.')',
+                                $logData, $logEntities
+                            );
                     }
                 };
             }else{
