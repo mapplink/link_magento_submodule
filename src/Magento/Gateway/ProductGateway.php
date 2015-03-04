@@ -729,17 +729,16 @@ class ProductGateway extends AbstractGateway
         }
 
         $soapData = $this->getUpdateDataForSoapCall($productData, $customAttributes);
+        $logData = array(
+            'type'=>$entity->getData('type'),
+            'websites'=>$productData['website_ids'],
+            'data keys'=>array_keys($productData),
+            'data'=>$productData,
+            'soap data keys'=>array_keys($soapData),
+            'soap data'=>$soapData
+        );
+
         if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
-
-            $logData = array(
-                'type'=>$entity->getData('type'),
-                'websites'=>$productData['website_ids'],
-                'data keys'=>array_keys($productData),
-                'data'=>$productData,
-                'soap data keys'=>array_keys($soapData),
-                'soap data'=>$soapData
-            );
-
             $updateViaDbApi =  $this->_db && $localId;
             if ($updateViaDbApi) {
                 $message = 'DB';
@@ -785,75 +784,63 @@ class ProductGateway extends AbstractGateway
             }
         }elseif ($type == \Entity\Update::TYPE_CREATE) {
 
-            $attributeSet = NULL;
-            foreach ($this->_attributeSets as $setId=>$set) {
+            $attributeSet = null;
+            foreach ($this->_attributeSets as $setId => $set) {
                 if ($set['name'] == $entity->getData('product_class', 'default')) {
                     $attributeSet = $setId;
                     break;
                 }
             }
-            if ($attributeSet === NULL) {
+            if ($attributeSet === null) {
                 $message = 'Invalid product class '.$entity->getData('product_class', 'default');
                 throw new \Magelink\Exception\SyncException($message);
             }
 
-<<<<<<< HEAD
-            $message = 'Creating product(SOAP) : '.$entity->getUniqueId() .' with '.implode(', ', array_keys($productData));
-=======
-            $message = 'Creating product(SOAP) : '.$sku.' with '.implode(', ', array_keys($data));
->>>>>>> Implemented local id handling on product as well
+            $message = 'Creating product(SOAP) : '.$sku.' with '.implode(', ', array_keys($productData));
+            $logData['set'] = $attributeSet;
             $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_INFO,
-                    'mag_p_wr_cr',
-                    $message,
-                   array(
-                        'type'=>$entity->getData('type'),
-                        'websites'=>$productData['website_ids'],
-                        'set'=>$attributeSet,
-                        'data keys'=>array_keys($productData),
-                        'data'=>$productData,
-                        'soap data keys'=>array_keys($soapData),
-                        'soap data'=>$soapData
-                    ) 
-                );
+                ->log(LogService::LEVEL_INFO, 'mag_p_wr_cr', $message, $logData);
 
             $request = array(
                 $entity->getData('type'),
                 $attributeSet,
                 $sku,
                 $soapData,
-                $entity->getStoreId() 
+                $entity->getStoreId()
             );
 
             try{
                 $soapResult = $this->_soap->call('catalogProductCreate', $request);
-                $soapFault = NULL;
-            }catch(\SoapFault $soapFault) {
-                $soapResult = FALSE;
+                $soapFault = null;
+            }catch( \SoapFault $soapFault ){
+                $soapResult = false;
                 if ($soapFault->getMessage() == 'The value of attribute "SKU" must be unique') {
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_WARN,
                             'mag_p_wr_duperr',
-                            'Creating product '.$entity->getUniqueId() .' hit SKU duplicate fault',
-                           array(),
-                           array('entity'=>$entity) 
+                            'Creating product '.$sku.' hit SKU duplicate fault',
+                            array(),
+                            array('entity'=>$entity)
                         );
 
-                    $check = $this->_soap->call('catalogProductInfo',array(
-                        $sku,
-                        0, // store ID
-                       array(),
-                        'sku'
-                    ));
+                    $check = $this->_soap->call(
+                        'catalogProductInfo',
+                        array(
+                            $sku,
+                            0, // store ID
+                            array(),
+                            'sku'
+                        )
+                    );
 
                     if (!$check || !count($check)) {
                         throw new MagelinkException('Magento complained duplicate SKU but we cannot find a duplicate!');
 
-                    }else{
-                        $found = FALSE;
+                    }else {
+                        $found = false;
                         foreach ($check as $row) {
                             if ($row['sku'] == $sku) {
-                                $found = TRUE;
+                                $found = true;
 
                                 $this->_entityService->linkEntity($nodeId, $entity, $row['product_id']);
                                 $this->getServiceLocator()->get('logService')
@@ -878,9 +865,17 @@ class ProductGateway extends AbstractGateway
                 $message = 'Error creating product '.$sku.' in Magento!';
                 throw new MagelinkException($message, 0, $soapFault);
             }
-
-            $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
         }
+
+        if ($soapResult) {
+            $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO,
+                'mag_prod_loc_add',
+                'Added product local id for '.$sku.' ('.$nodeId.')',
+                $logData
+            );
+        }
+
     }
 
     /**
