@@ -777,13 +777,8 @@ class ProductGateway extends AbstractGateway
             }
 
             if (!$updateViaDbApi) {
-                $request = array(
-                    $sku,
-                    $soapData,
-                    $entity->getStoreId(),
-                    'sku'
-                );
-                $this->_soap->call('catalogProductUpdate', $request);
+                $request = array($sku, $soapData, $entity->getStoreId(), 'sku');
+                $soapResult = $this->_soap->call('catalogProductUpdate', $request);
             }
         }elseif ($type == \Entity\Update::TYPE_CREATE) {
 
@@ -878,7 +873,6 @@ class ProductGateway extends AbstractGateway
                 $logData
             );
         }
-
     }
 
     /**
