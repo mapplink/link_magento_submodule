@@ -325,7 +325,7 @@ class ProductGateway extends AbstractGateway
 
                 $this->getServiceLocator() ->get('logService')
                     ->log(LogService::LEVEL_ERROR,
-                        'mag_p_wronglink',
+                        'mag_p_relink',
                         'Incorrectly linked product '.$sku.' ('.$noneOrWrongLocalId.'). Re-linked now.',
                        array('code'=>$sku, 'wrong local id'=>$noneOrWrongLocalId),
                        array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -676,8 +676,8 @@ class ProductGateway extends AbstractGateway
 
         if (!count($productData)) {
             $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_WARN,
-                    'mag_p_wr_noupd',
+                ->log(LogService::LEVEL_INFO,
+                    'mag_p_wr_upd_non',
                     'No update required for '.$sku.' but requested was '.implode(', ', $attributes),
                    array('attributes'=>$attributes),
                    array('entity'=>$entity) 
@@ -774,7 +774,7 @@ class ProductGateway extends AbstractGateway
                     $logMessage = 'Product update on '.$sku.' via API failed! Removed local id '.$localId
                         .' ('.$nodeId.'). Retry update via SOAP API. '.$exception->getMessage();
                     $this->getServiceLocator()->get('logService')
-                        ->log(LogService::LEVEL_ERROR, 'mag_p_upd_fail', $logMessage, $logData);
+                        ->log(LogService::LEVEL_ERROR, 'mag_p_wr_updfail', $logMessage, $logData);
                 }
             }
 

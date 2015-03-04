@@ -45,7 +45,7 @@ class Node extends AbstractNode
         $this->_api[$type] = $this->getServiceLocator()->get('magento_' . $type);
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
-                'init_api',
+                'mag_init_api',
                 'Creating API instance '.$type,
                 array('type'=>$type),
                 array('node'=>$this)
@@ -68,7 +68,7 @@ class Node extends AbstractNode
         if ($this->_storeViews === NULL) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
-                    'storeviews',
+                    'mag_storevws',
                     'Loading store views',
                     array(),
                     array('node'=>$this)
@@ -108,7 +108,7 @@ class Node extends AbstractNode
         if ($storeCount == 1 && $this->isMultiStore()) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
-                    'multistore_single',
+                    'mag_mstore_sng',
                     'Multi-store enabled but only one store view!',
                     array(),
                     array('node'=>$this)
@@ -116,7 +116,7 @@ class Node extends AbstractNode
         }elseif ($storeCount > 1 && !$this->isMultiStore()) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_WARN,
-                    'multistore_missing',
+                    'mag_mstore_miss',
                     'Multi-store disabled but multiple store views!',
                     array(),
                     array('node'=>$this)

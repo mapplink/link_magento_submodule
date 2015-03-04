@@ -342,7 +342,7 @@ class Db implements ServiceLocatorAwareInterface
         if ($affectedRows !== 1) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
-                'mag_db_upd_err_stck',
+                'mag_db_upd_err_si',
                 'Update error on stock with product id '.$productId,
                 array('product_id'=>$productId, 'qty'=>$qty, 'is_in_stock'=>$isInStock, 'affected rows'=>$affectedRows)
             );

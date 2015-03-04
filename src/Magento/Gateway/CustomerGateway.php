@@ -92,7 +92,7 @@ class CustomerGateway extends AbstractGateway
 
             if (!is_array($results)) {
                 $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
-                    'mag_cu_soap',
+                    'mag_cu_rtr_soap',
                     'SOAP (customerCustomerList) did not return an array but '.gettype($results).' instead.',
                     array('type'=>gettype($results), 'class'=>(is_object($results) ? get_class($results) : 'no object')),
                     array('soap result'=>$results)
@@ -221,7 +221,7 @@ class CustomerGateway extends AbstractGateway
                     }elseif ($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_INFO,
-                                'mag_cu_wronglink',
+                                'mag_cu_rerelink',
                                 'Incorrectly linked customer '.$uniqueId,
                                 array('code'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)

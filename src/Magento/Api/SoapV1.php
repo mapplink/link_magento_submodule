@@ -48,10 +48,17 @@ class SoapV1 extends Soap {
         try{
             $res = $this->_soapClient->call('call', $data);
         }catch(\SoapFault $sf){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR, 'soap_fault', 'SOAP v1 Fault with call ' . $call . ': ' . $sf->getMessage(), array('keys'=>array_keys($data), 'code'=>$sf->getCode(), 'trace'=>$sf->getTraceAsString(), 'req'=>$this->_soapClient->getLastRequest(), 'resp'=>$this->_soapClient->getLastResponse()));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_ERROR,
+                    'mag_soap1_fault',
+                    'SOAP v1 Fault with call '.$call.': '.$sf->getMessage(),
+                    array('keys'=>array_keys($data), 'code'=>$sf->getCode(), 'trace'=>$sf->getTraceAsString(),
+                        'req'=>$this->_soapClient->getLastRequest(), 'resp'=>$this->_soapClient->getLastResponse())
+                );
             throw new \Magelink\Exception\MagelinkException('Soap Fault - ' . $sf->getMessage(), 0, $sf);//throw $sf;
         }
         //echo PHP_EOL . $this->_soapClient->getLastRequest() . PHP_EOL . $this->_soapClient->getLastResponse() . PHP_EOL;
         return $this->_processResponse($res);
     }
+
 }

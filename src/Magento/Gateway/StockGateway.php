@@ -158,7 +158,8 @@ class StockGateway extends AbstractGateway
 
         $logLevel = ($error ? LogService::LEVEL_ERROR : LogService::LEVEL_WARN);
         $logMessage = 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had to use parent local!';
-        $this->getServiceLocator()->get('logService')->log($logLevel, 'stock_prodloc', $logMessage,
+        $this->getServiceLocator()->get('logService')
+            ->log($logLevel, 'mag_si_par', $logMessage,
                 array('parent'=>$entity->getParentId()), array('node'=>$this->_node, 'entity' => $entity));
 
         $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
@@ -166,7 +167,7 @@ class StockGateway extends AbstractGateway
         if (!$localId) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
-                    'stock_noloc', 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had no local id!',
+                    'mag_si_nolink', 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had no local id!',
                     array('data'=>$entity->getFullArrayCopy()), array('node'=>$this->_node, 'entity'=>$entity)
                 );
         }
@@ -190,7 +191,6 @@ class StockGateway extends AbstractGateway
         if (in_array('available', $attributes)) {
             $parentLocal = FALSE;
             $nodeId = $this->_node->getNodeId();
-            $logCode = 'mag_stck_';
             $logEntities = array('node'=>$this->_node, 'entity' => $entity);
 
             $localId = $this->_entityService->getLocalId($nodeId, $entity);
@@ -214,24 +214,25 @@ class StockGateway extends AbstractGateway
                             $parentLocal = TRUE;
 
                             $this->_entityService->unlinkEntity($this->_node->getNodeId(), $entity);
-                            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
-                                    $logCode.'db_locrm',
+                            $this->getServiceLocator()->get('logService')
+                                ->log(LogService::LEVEL_WARN,
+                                    'mag_si_unlink',
                                     'Removed stockitem local id from '.$entity->getUniqueId().' ('.$nodeId.')',
                                     $logData, $logEntities
                                 );
                         }else{
-                            $localId = NULL;
                             $product = $this->_entityService
                                 ->loadEntityId($this->_node->getNodeId(), $entity->getParentId());
-                            $this->_entityService->unlinkEntity($this->_node->getNodeId(), $product);
 
-                            $logMessage = 'Stock update for '.$entity->getUniqueId().' failed!'
-                                .' Product had wrong local id '.$localId.' ('.$nodeId.') which is removed now.';
-                            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
-                                $logCode.'db_prodloc_fail',
-                                $logMessage,
-                                $logData, $logEntities
-                            );
+                            if ($localId) {
+                                $localId = NULL;
+                                $this->_entityService->unlinkEntity($this->_node->getNodeId(), $product);
+
+                                $logMessage = 'Stock update for '.$entity->getUniqueId().' failed!'
+                                    .' Product had wrong local id '.$localId.' ('.$nodeId.') which is removed now.';
+                                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
+                                    'mag_si_par_unlink', $logMessage, $logData, $logEntities);
+                            }
                         }
                     }
                 }while (!$quit);
@@ -256,8 +257,8 @@ class StockGateway extends AbstractGateway
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::INFO,
-                        $logCode.'loc_add',
-                        'Added stockitem local id for '.$entity->getUniqueId().' ('.$nodeId.')',
+                        'mag_si_link',
+                        'Linked stockitem '.$entity->getUniqueId().' on node '.$nodeId,
                         $logData, $logEntities
                     );
             }

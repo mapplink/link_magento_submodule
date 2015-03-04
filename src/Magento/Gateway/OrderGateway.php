@@ -1,7 +1,6 @@
 <?php
 /**
  * Magento\Gateway\OrderGateway
- *
  * @category Magento
  * @package Magento\Gateway
  * @author Matt Johnston
@@ -218,7 +217,7 @@ class OrderGateway extends AbstractGateway
                 }catch (\Exception $exception) {
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_ERROR,
-                            'mag_o_pre_upderr',
+                            'mag_o_si_upd_err',
                             'Update of '.$attributeCode.' failed on stockitem '.$stockitem->getEntityId(),
                             $logData, $logEntities
                         );
@@ -226,7 +225,7 @@ class OrderGateway extends AbstractGateway
             }else{
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_ERROR,
-                        'mag_o_pre_sinoex',
+                        'mag_o_si_no_ex',
                         'Stockitem '.$orderitem->getData('sku').' does not exist.',
                         $logData, $logEntities
                     );
@@ -234,7 +233,7 @@ class OrderGateway extends AbstractGateway
         }else{
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_DEBUGEXTRA,
-                    'mag_o_pre_err',
+                    'mag_o_upd_pre_f',
                     'No update of qty_pre_transit. Order '.$order->getUniqueId().' has wrong status: '.$orderStatus,
                     array('order id'=>$order->getId()),
                     $logData, $logEntities
@@ -406,7 +405,7 @@ class OrderGateway extends AbstractGateway
                     }catch (\Exception $exception) {
                         $this->getServiceLocator()->get('logService')
                             ->log($logLevel,
-                                'mag_o_comm_err'.$logCodeSuffix,
+                                'mag_o_comt_err'.$logCodeSuffix,
                                 'Failed to write comment on order '.$uniqueId.$logMessageSuffix,
                                 array('exception message'=>$exception->getMessage()),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity, 'exception'=>$exception)
@@ -496,7 +495,7 @@ class OrderGateway extends AbstractGateway
 
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
-                'mag_o_rtr_time',
+                'mag_o_re_time',
                 'Retrieving orders updated since '.$lastRetrieve,
                 array('type'=>'order', 'timestamp'=>$lastRetrieve)
             );
@@ -527,7 +526,7 @@ class OrderGateway extends AbstractGateway
                 ));
 
                 $this->getServiceLocator()->get('logService')
-                    ->log(LogService::LEVEL_DEBUGEXTRA,
+                    ->log(LogService::LEVEL_INFO,
                         'mag_o_soap_list',
                         'Retrieved salesOrderList updated from '.$lastRetrieve,
                         array('updated_at'=>$lastRetrieve, 'results'=>$results)
@@ -831,7 +830,8 @@ class OrderGateway extends AbstractGateway
 
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_INFO,
-                        'mag_o_cr_oi', 'Create item data',
+                        'mag_o_re_cr_oi',
+                        'Create item data',
                         array('orderitem uniqued id'=>$uniqueId, 'quantity'=>$data['quantity'],'data'=>$data)
                     );
 
@@ -1094,7 +1094,7 @@ class OrderGateway extends AbstractGateway
                         .', refundToStoreCreditAmount '.$creditRefund.'.';
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_DEBUGEXTRA,
-                            'mag_o_cr_cm',
+                            'mag_o_wr_cr_cm',
                             $message,
                             array(
                                 'entity (order)'=>$order,
