@@ -147,9 +147,9 @@ class ProductGateway extends AbstractGateway
                     }
 
                     try {
-                        $productsData = $this->_db->loadEntitiesEav('catalog_product',
-                            $updatedProducts, $storeId, $attributes);
-                    }catch (\Exception $exception) {
+                        $productsData = $this->_db
+                            ->loadEntitiesEav('catalog_product', $updatedProducts, $storeId, $attributes);
+                    }catch (\Exception $exception){
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                     }
 
@@ -278,15 +278,15 @@ class ProductGateway extends AbstractGateway
      * @param array $data
      * @return \Entity\Entity|NULL
      */
-    protected function processUpdate($productId, $sku, $storeId,
-        $parentId, $data) 
+    protected function processUpdate($productId, $sku, $storeId, $parentId, $data)
     {
         /** @var boolean $needsUpdate Whether we need to perform an entity update here */
         $needsUpdate = TRUE;
 
         $existingEntity = $this->_entityService->loadEntityLocal($this->_node->getNodeId(), 'product', 0, $productId);
         if (!$existingEntity) {
-            $existingEntity = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', 0, $sku);
+            $noneOrWrongLocalId = $this->_entityService->getLocalId($this->_node->getNodeId(), $existingEntity);
+            $existingEntity = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', $storeId, $sku);
             if (!$existingEntity) {
                 $existingEntity = $this->_entityService
                     ->createEntity($this->_node->getNodeId(), 'product', 0, $sku, $data, $parentId);
@@ -312,14 +312,7 @@ class ProductGateway extends AbstractGateway
                         );
                 }
                 $needsUpdate = FALSE;
-            }elseif ($this->_entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
-                $this->getServiceLocator()->get('logService')
-                    ->log(LogService::LEVEL_ERROR,
-                        'mag_p_wronglink',
-                        'Incorrectly linked product '.$sku,
-                       array('code'=>$sku, 'correct product id'=>$productId),
-                       array('node'=>$this->_node, 'entity'=>$existingEntity) 
-                    );
+            }elseif ($noneOrWrongLocalId != NULL) {
                 $this->_entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
 
@@ -328,6 +321,14 @@ class ProductGateway extends AbstractGateway
                     $this->_entityService->unlinkEntity($this->_node->getNodeId(), $stockEntity);
                 }
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
+
+                $this->getServiceLocator() ->get('logService')
+                    ->log(LogService::LEVEL_ERROR,
+                        'mag_p_wronglink',
+                        'Incorrectly linked product '.$sku.' ('.$noneOrWrongLocalId.'). Re-linked now.',
+                       array('code'=>$sku, 'wrong local id'=>$noneOrWrongLocalId),
+                       array('node'=>$this->_node, 'entity'=>$existingEntity)
+                    );
             }else{
                 $this->getServiceLocator() ->get('logService')
                     ->log(LogService::LEVEL_INFO,
@@ -772,7 +773,7 @@ class ProductGateway extends AbstractGateway
                     $logMessage = 'Product update on '.$sku.' via API failed! Removed local id '.$localId
                         .' ('.$nodeId.'). Retry update via SOAP API. '.$exception->getMessage();
                     $this->getServiceLocator()->get('logService')
-                        ->log(LogService::LEVEL_ERROR, 'mag_prod_upd_fail', $logMessage, $logData);
+                        ->log(LogService::LEVEL_ERROR, 'mag_p_upd_fail', $logMessage, $logData);
                 }
             }
 
@@ -883,7 +884,6 @@ class ProductGateway extends AbstractGateway
     public function writeAction(\Entity\Action $action) 
     {
         $entity = $action->getEntity();
-
         switch($action->getType()) {
             case 'delete':
                 $this->_soap->call('catalogProductDelete',array($entity->getUniqueId(), 'sku'));
