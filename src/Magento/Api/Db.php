@@ -424,6 +424,7 @@ class Db implements ServiceLocatorAwareInterface
                 $attributesById[$attr['attribute_id']] = $attr;
             }
 
+            $affectedRows = 0;
             foreach ($attributesByType as $type=>$singleTypeAttributes) {
 
                 $doSourceTranslation = FALSE;
@@ -467,7 +468,7 @@ class Db implements ServiceLocatorAwareInterface
                             ));
 
                         if (!$resultsDefault || !count($resultsDefault)) {
-                            $this->getTableGateway($type)
+                            $affectedRows = $this->getTableGateway($type)
                                 ->insert(array(
                                     'entity_id'=>$entityId,
                                     'entity_type_id'=>$entityTypeData['entity_type_id'],
@@ -486,7 +487,7 @@ class Db implements ServiceLocatorAwareInterface
                     ));
 
                     if (!$resultsStore || !count($resultsStore)) {
-                        $this->getTableGateway($type)->insert(array(
+                        $affectedRows += $this->getTableGateway($type)->insert(array(
                             'entity_id'=>$entityId,
                             'entity_type_id'=>$entityTypeData['entity_type_id'],
                             'store_id'=>$storeId,
@@ -494,7 +495,7 @@ class Db implements ServiceLocatorAwareInterface
                             'value'=>$value)
                         );
                     }else{
-                        $this->getTableGateway($type)->update(
+                        $affectedRows += $this->getTableGateway($type)->update(
                             array('value'=>$value),
                             array(
                                 'entity_id'=>$entityId,
@@ -512,7 +513,10 @@ class Db implements ServiceLocatorAwareInterface
         }catch(\Exception $exception) {
             $this->_adapter->getDriver()->getConnection()->rollback();
             throw $exception;
+            $affectedRows = 0;
         }
+
+        return $affectedRows;
     }
 
     /**

@@ -2,38 +2,56 @@
 
 namespace Magento\Api;
 
+use Magelink\Exception\MagelinkException;
+use Magento\Node;
 use Zend\ServiceManager\ServiceLocatorAwareInterface;
 use Zend\ServiceManager\ServiceLocatorInterface;
-use Magento\Node;
 use Zend\Soap\Client;
 
 /**
  * Implements SOAP access to Magento
  * @package Magento\Api
  */
-class Soap implements ServiceLocatorAwareInterface {
+class Soap implements ServiceLocatorAwareInterface
+{
 
-    /**
-     * @var string The Session ID provided by Magento after logging in
-     */
+    /** @var string The Session ID provided by Magento after logging in */
     protected $_sessionId;
 
+    /** @var Client $_soapClient */
+    protected $_soapClient = NULL;
+
+    /** @var ServiceLocatorInterface $_serviceLocator */
+    protected $_serviceLocator;
+
     /**
-     * @var Client $_soapClient
+     * Get service locator
+     * @return ServiceLocatorInterface
      */
-    protected $_soapClient = null;
+    public function getServiceLocator()
+    {
+        return $this->_serviceLocator;
+    }
+
+    /**
+     * Set service locator
+     * @param ServiceLocatorInterface $serviceLocator
+     */
+    public function setServiceLocator(ServiceLocatorInterface $serviceLocator)
+    {
+        $this->_serviceLocator = $serviceLocator;
+    }
 
     /**
      * Sets up the SOAP API, connects to Magento, and performs a login.
-     *
      * @param Node $magentoNode The Magento node we are representing communications for
      * @return bool Whether we successfully connected
-     * @throws \Magelink\Exception\MagelinkException If this API has already been initialized
+     * @throws MagelinkException If this API has already been initialized
      */
     public function init(Node $magentoNode)
     {
         if($this->_soapClient !== NULL){
-            throw new \Magelink\Exception\MagelinkException('Tried to initialize Soap API twice!');
+            throw new MagelinkException('Tried to initialize Soap API twice!');
             $success = FALSE;
         }else{
             $username = $magentoNode->getConfig('soap_username');
@@ -102,7 +120,7 @@ class Soap implements ServiceLocatorAwareInterface {
                         'response'=>$this->_soapClient->getLastResponse())
                 );
             $this->forceStdoutDebug();
-            throw new \Magelink\Exception\MagelinkException('Soap Fault - '.$soapFault->getMessage(), 0, $soapFault);
+            throw new MagelinkException('Soap Fault - '.$soapFault->getMessage(), 0, $soapFault);
         }
         // $this->forceStdoutDebug(); // Uncomment for debugging
 
@@ -146,25 +164,4 @@ class Soap implements ServiceLocatorAwareInterface {
         return $result;
     }
 
-    protected $_serviceLocator;
-
-    /**
-     * Set service locator
-     *
-     * @param ServiceLocatorInterface $serviceLocator
-     */
-    public function setServiceLocator(ServiceLocatorInterface $serviceLocator)
-    {
-        $this->_serviceLocator = $serviceLocator;
-    }
-
-    /**
-     * Get service locator
-     *
-     * @return ServiceLocatorInterface
-     */
-    public function getServiceLocator()
-    {
-        return $this->_serviceLocator;
-    }
 }

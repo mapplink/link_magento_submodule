@@ -579,6 +579,9 @@ class ProductGateway extends AbstractGateway
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE) 
     {
+        $nodeId = $this->_node->getNodeId();
+        $sku = $entity->getUniqueId();
+
         $customAttributes = $this->_node->getConfig('product_attributes');
         if (is_string($customAttributes)) {
             $customAttributes = explode(',', $customAttributes);
@@ -590,7 +593,7 @@ class ProductGateway extends AbstractGateway
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_DEBUGEXTRA,
                 'mag_p_wr_upd',
-                'Attributes for update of product '.$entity->getUniqueId() .': '.var_export($attributes, TRUE),
+                'Attributes for update of product '.$sku.': '.var_export($attributes, TRUE),
                array('attributes'=>$attributes, 'custom'=>$customAttributes),
                array('entity'=>$entity) 
             );
@@ -660,9 +663,9 @@ class ProductGateway extends AbstractGateway
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_WARN,
                             'mag_p_wr_invdata',
-                            'Unsupported attribute for update of '.$entity->getUniqueId() .': '.$code,
-                           array('attribute'=>$code),
-                           array('entity'=>$entity) 
+                            'Unsupported attribute for update of '.$sku.': '.$attributeCode,
+                           array('attribute'=>$attributeCode),
+                           array('entity'=>$entity)
                         );
                     // Warn unsupported attribute
                     break;
@@ -673,9 +676,9 @@ class ProductGateway extends AbstractGateway
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_WARN,
                     'mag_p_wr_noupd',
-                    'No update required for '.$entity->getUniqueId() .' but requested was '.implode(', ', $attributes),
-                    array('attributes'=>$attributes),
-                    array('entity'=>$entity)
+                    'No update required for '.$sku.' but requested was '.implode(', ', $attributes),
+                   array('attributes'=>$attributes),
+                   array('entity'=>$entity) 
                 );
         }
 
@@ -698,12 +701,13 @@ class ProductGateway extends AbstractGateway
 
                     if ($type == \Entity\Update::TYPE_CREATE && !$localId) {
                         $message = 'Product exists in other store, ';
-                        $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $loadedEntity);
+
+                        $localId = $this->_entityService->getLocalId($nodeId, $loadedEntity);
                         if ($localId) {
                             $this->getServiceLocator()->get('logService')
                                 ->log(LogService::LEVEL_INFO,
                                     'mag_p_wr_sto_upd',
-                                    $message.'forcing local ID for '.$entity->getUniqueId() .' to '.$localId,
+                                    $message.'forcing local ID for '.$sku.' to '.$localId,
                                    array('local_id'=>$localId, 'loadedEntityId'=>$loadedEntity->getId()),
                                    array('entity'=>$entity) 
                                 );
@@ -714,7 +718,7 @@ class ProductGateway extends AbstractGateway
                             $this->getServiceLocator()->get('logService')
                                 ->log(LogService::LEVEL_INFO,
                                     'mag_p_wr_sto_new',
-                                    'Product exists in other store, but no local ID: '.$entity->getUniqueId(),
+                                    'Product exists in other store, but no local ID: '.$sku,
                                    array('loadedEntityId'=>$loadedEntity->getId()),
                                    array('entity'=>$entity) 
                                 );
@@ -731,7 +735,9 @@ class ProductGateway extends AbstractGateway
                 'type'=>$entity->getData('type'),
                 'websites'=>$productData['website_ids'],
                 'data keys'=>array_keys($productData),
-                'data'=>$productData
+                'data'=>$productData,
+                'soap data keys'=>array_keys($soapData),
+                'soap data'=>$soapData
             );
 
             $updateViaDbApi =  $this->_db && $localId;
@@ -739,10 +745,8 @@ class ProductGateway extends AbstractGateway
                 $message = 'DB';
             }else{
                 $message = 'SOAP';
-                $logData['soap data keys'] = array_keys($soapData);
-                $logData['soap data'] = $soapData;
-
             }
+            $message = 'Updating product('.$message.') : '.$sku.' with '.implode(', ', array_keys($data));
 
             $message = 'Updating product('.$message.') : '
                 .$entity->getUniqueId() .' with '.implode(', ', array_keys($productData));
@@ -751,22 +755,35 @@ class ProductGateway extends AbstractGateway
 
             if ($updateViaDbApi) {
                 $tablePrefix = 'catalog_product';
-                $this->_db->updateEntityEav(
+                $success = $this->_db->updateEntityEav(
                     $tablePrefix,
                     $localId,
                     $entity->getStoreId(),
                     $productData
                 );
-            }else{
+
+                if (!$success) {
+                    $this->_entityService->unlinkEntity($nodeId, $entity);
+                    $localId = NULL;
+                    $updateViaDbApi = FALSE;
+
+                    $logMessage = 'Product update on '.$sku.' via API failed! Removed local id '.$localId
+                        .' ('.$nodeId.'). Retry update via SOAP API.';
+                    $this->getServiceLocator()->get('logService')
+                        ->log(LogService::LEVEL_ERROR, 'mag_prod_upd_fail', $logMessage, $logData);
+                }
+            }
+
+            if (!$updateViaDbApi) {
                 $request = array(
-                    $entity->getUniqueId(),
+                    $sku,
                     $soapData,
                     $entity->getStoreId(),
                     'sku'
                 );
                 $this->_soap->call('catalogProductUpdate', $request);
             }
-        }elseif ($type == \Entity\Update::TYPE_CREATE ) {
+        }elseif ($type == \Entity\Update::TYPE_CREATE) {
 
             $attributeSet = NULL;
             foreach ($this->_attributeSets as $setId=>$set) {
@@ -780,7 +797,11 @@ class ProductGateway extends AbstractGateway
                 throw new \Magelink\Exception\SyncException($message);
             }
 
+<<<<<<< HEAD
             $message = 'Creating product(SOAP) : '.$entity->getUniqueId() .' with '.implode(', ', array_keys($productData));
+=======
+            $message = 'Creating product(SOAP) : '.$sku.' with '.implode(', ', array_keys($data));
+>>>>>>> Implemented local id handling on product as well
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
                     'mag_p_wr_cr',
@@ -799,7 +820,7 @@ class ProductGateway extends AbstractGateway
             $request = array(
                 $entity->getData('type'),
                 $attributeSet,
-                $entity->getUniqueId(),
+                $sku,
                 $soapData,
                 $entity->getStoreId() 
             );
@@ -819,7 +840,7 @@ class ProductGateway extends AbstractGateway
                         );
 
                     $check = $this->_soap->call('catalogProductInfo',array(
-                        $entity->getUniqueId(),
+                        $sku,
                         0, // store ID
                        array(),
                         'sku'
@@ -831,23 +852,22 @@ class ProductGateway extends AbstractGateway
                     }else{
                         $found = FALSE;
                         foreach ($check as $row) {
-                            if ($row['sku'] == $entity->getUniqueId()) {
+                            if ($row['sku'] == $sku) {
                                 $found = TRUE;
 
-                                $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $row['product_id']);
+                                $this->_entityService->linkEntity($nodeId, $entity, $row['product_id']);
                                 $this->getServiceLocator()->get('logService')
                                     ->log(LogService::LEVEL_INFO,
                                         'mag_p_wr_dupres',
-                                        'Creating product '.$entity->getUniqueId() .' resolved SKU duplicate fault',
-                                       array('local_id'=>$row['product_id']),
-                                       array('entity'=>$entity) 
+                                        'Creating product '.$sku.' resolved SKU duplicate fault',
+                                        array('local_id'=>$row['product_id']),
+                                        array('entity'=>$entity)
                                     );
                             }
                         }
 
                         if (!$found) {
-                            $message = 'Magento found duplicate SKU '.$entity->getUniqueId() 
-                                .' but we could not replicate. Database fault?';
+                            $message = 'Magento found duplicate SKU '.$sku.' but we could not replicate. Database fault?';
                             throw new MagelinkException($message);
                         }
                     }
@@ -855,11 +875,11 @@ class ProductGateway extends AbstractGateway
             }
 
             if (!$soapResult) {
-                $message = 'Error creating product in Magento('.$entity->getUniqueId() .'!';
+                $message = 'Error creating product '.$sku.' in Magento!';
                 throw new MagelinkException($message, 0, $soapFault);
             }
 
-            $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $soapResult);
+            $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
         }
     }
 
@@ -878,7 +898,7 @@ class ProductGateway extends AbstractGateway
                 $success = TRUE;
                 break;
             default:
-                throw new MagelinkException('Unsupported action type '.$action->getType() .' for Magento Orders.');
+                throw new MagelinkException('Unsupported action type '.$action->getType().' for Magento Orders.');
                 $success = FALSE;
         }
 
