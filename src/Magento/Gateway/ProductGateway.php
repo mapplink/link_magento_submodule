@@ -740,34 +740,37 @@ class ProductGateway extends AbstractGateway
 
         if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
             $updateViaDbApi =  $this->_db && $localId;
+
             if ($updateViaDbApi) {
                 $message = 'DB';
             }else{
                 $message = 'SOAP';
             }
-            $message = 'Updating product('.$message.') : '.$sku.' with '.implode(', ', array_keys($data));
 
-            $message = 'Updating product('.$message.') : '
-                .$entity->getUniqueId() .' with '.implode(', ', array_keys($productData));
+            $message = 'Updating product('.$message.') : '.$sku.' with '.implode(', ', array_keys($data));
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO, 'mag_p_wr_upd', $message, $logData);
 
             if ($updateViaDbApi) {
-                $tablePrefix = 'catalog_product';
-                $success = $this->_db->updateEntityEav(
-                    $tablePrefix,
-                    $localId,
-                    $entity->getStoreId(),
-                    $productData
-                );
+                try{
+                    $tablePrefix = 'catalog_product';
+                    $rowsAffected = $this->_db->updateEntityEav(
+                        $tablePrefix,
+                        $localId,
+                        $entity->getStoreId(),
+                        $productData
+                    );
 
-                if (!$success) {
+                    if ($rowsAffected =! 1) {
+                        throw new MagelinkException($rowsAffected.' rows affected.');
+                    }
+                }catch (\Exception $exception) {
                     $this->_entityService->unlinkEntity($nodeId, $entity);
                     $localId = NULL;
                     $updateViaDbApi = FALSE;
 
                     $logMessage = 'Product update on '.$sku.' via API failed! Removed local id '.$localId
-                        .' ('.$nodeId.'). Retry update via SOAP API.';
+                        .' ('.$nodeId.'). Retry update via SOAP API. '.$exception->getMessage();
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_ERROR, 'mag_prod_upd_fail', $logMessage, $logData);
                 }
@@ -870,7 +873,7 @@ class ProductGateway extends AbstractGateway
         if ($soapResult) {
             $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO,
-                'mag_prod_loc_add',
+                'mag_p_wr_loc_id',
                 'Added product local id for '.$sku.' ('.$nodeId.')',
                 $logData
             );
