@@ -250,7 +250,7 @@ class StockGateway extends AbstractGateway
             if ($success && $isUnlinked) {
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
                 $this->getServiceLocator()->get('logService')
-                    ->log(LogService::INFO,
+                    ->log(LogService::LEVEL_INFO,
                         'mag_si_link',
                         'Linked stockitem '.$entity->getUniqueId().' on node '.$nodeId,
                         $logData, $logEntities
