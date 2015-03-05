@@ -701,14 +701,9 @@ class Db implements ServiceLocatorAwareInterface
                 continue;
             }
 
-<<<<<<< HEAD
-            $attr = $this->getAttribute($entityType, $code);
-            if ($attr == NULL) {
-                // ToDo (maybe): throw new MagelinkException('Invalid Magento attribute code '.$code.' for '.$entityType);
-=======
+            $attribute = $this->getAttribute($entityType, $code);
             if ($attribute == NULL) {
                 // ToDo : throw new MagelinkException('Invalid Magento attribute code ' . $code . ' for ' . $entityType);
->>>>>>> Tweaked error codes, cleanup
             }else{
                 $table = $this->getAttributeTable($prefix, $attribute);
 

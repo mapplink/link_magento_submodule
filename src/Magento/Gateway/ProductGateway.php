@@ -1,7 +1,6 @@
 <?php
 /**
  * Magento\Gateway\OrderGateway
- *
  * @category Magento
  * @package Magento\Gateway
  * @author Matt Johnston
@@ -186,6 +185,11 @@ class ProductGateway extends AbstractGateway
                             throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         }
                     }
+
+                    $parentId = NULL; // TODO: Calculate
+                    $sku = $rawData['sku'];
+
+                    $this->processUpdate($entityService, $productId, $sku, $storeId, $parentId, $data);
                 }
 
             }elseif ($this->_soap) {
@@ -250,11 +254,10 @@ class ProductGateway extends AbstractGateway
                     unset($productData['website_ids']); // Not used
 
                     $productId = $productData['product_id'];
+                    $parentId = NULL; // TODO: Calculate
                     $sku = $productData['sku'];
                     unset($productData['product_id']);
                     unset($productData['sku']);
-
-                    $parentId = NULL; // TODO: Calculate
 
                     try {
                         $this->processUpdate($productId, $sku, $storeId, $parentId, $productData);
@@ -278,7 +281,7 @@ class ProductGateway extends AbstractGateway
      * @param array $data
      * @return \Entity\Entity|NULL
      */
-    protected function processUpdate($productId, $sku, $storeId, $parentId, $data)
+    protected function processUpdate($productId, $sku, $storeId, $parentId, array $data)
     {
         /** @var boolean $needsUpdate Whether we need to perform an entity update here */
         $needsUpdate = TRUE;
@@ -426,7 +429,6 @@ class ProductGateway extends AbstractGateway
         }
 
         return $data;
-
     }
 
     /**
