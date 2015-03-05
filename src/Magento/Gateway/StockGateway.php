@@ -247,7 +247,6 @@ class StockGateway extends AbstractGateway
                 }
             }while (!$quit);
 
-
             if ($success && $isUnlinked) {
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
                 $this->getServiceLocator()->get('logService')
