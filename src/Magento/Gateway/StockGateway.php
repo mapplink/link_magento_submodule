@@ -244,13 +244,18 @@ class StockGateway extends AbstractGateway
 
                 // ToDo: This is actually returning an object
                 $success = $this->_soap->call('catalogInventoryStockItemUpdate', array(
-                    'product'=>$localId,
-                    'productId'=>$localId,
+                    $localId,
                     'data'=>array(
                         'qty'=>$qty,
                         'is_in_stock'=>($isInStock)
                     )
                 ));
+                $this->getServiceLocator()->get('logService')
+                    ->log(LogService::ERROR,
+                        'killme',
+                        'soap response',
+                        array('response'=>var_export($success, TRUE))
+                    );
             }
 
             if ($success && $parentLocal) {
