@@ -25,21 +25,56 @@ use Zend\Stdlib\ArrayObject;
 
 class OrderGateway extends AbstractGateway
 {
-    const MAGENTO_STATUS_COMPLETE = 'complete';
-    const MAGENTO_STATUS_CANCELED = 'canceled';
+    const MAGENTO_STATUS_PENDING = 'pending';
+    const MAGENTO_STATUS_PENDING_ALIPAY = 'pending_alipay';
+    const MAGENTO_STATUS_PENDING_DPS = 'pending_dps';
+    const MAGENTO_STATUS_PENDING_OGONE = 'pending_ogone';
+    const MAGENTO_STATUS_PENDING_PAYMENT = 'pending_payment';
+    const MAGENTO_STATUS_PENDING_PAYPAL = 'pending_paypal';
+    const MAGENTO_STATUS_PAYMENT_REVIEW = 'payment_review';
+    const MAGENTO_STATUS_FRAUD = 'fraud';
+    const MAGENTO_STATUS_FRAUD_DPS = 'fraud_dps';
+
+    private static $magentoPendingStatusses = array(
+        self::MAGENTO_STATUS_PENDING,
+        self::MAGENTO_STATUS_PENDING_ALIPAY,
+        self::MAGENTO_STATUS_PENDING_DPS,
+        self::MAGENTO_STATUS_PENDING_OGONE,
+        self::MAGENTO_STATUS_PENDING_PAYMENT,
+        self::MAGENTO_STATUS_PENDING_PAYPAL,
+        self::MAGENTO_STATUS_PAYMENT_REVIEW,
+        self::MAGENTO_STATUS_FRAUD,
+        self::MAGENTO_STATUS_FRAUD_DPS
+    );
+
+    const MAGENTO_STATUS_ONHOLD = 'holded';
+
     const MAGENTO_STATUS_PROCESSING = 'processing';
     const MAGENTO_STATUS_PROCESSING_DPS_PAID = 'processing_dps_paid';
     const MAGENTO_STATUS_PROCESSING_OGONE = 'processed_ogone';
     const MAGENTO_STATUS_PROCESSING_DPS_AUTH = 'processing_dps_auth';
-    const MAGENTO_STATUS_PAYPAL_REVERSAL = 'paypal_canceled_reversal';
+    const MAGENTO_STATUS_PAYPAL_CANCELED_REVERSAL = 'paypal_canceled_reversal';
 
-    protected static $magentoProcessingStatusses = array(
+    private static $magentoProcessingStatusses = array(
         self::MAGENTO_STATUS_PROCESSING,
         self::MAGENTO_STATUS_PROCESSING_DPS_PAID,
         self::MAGENTO_STATUS_PROCESSING_OGONE,
         self::MAGENTO_STATUS_PROCESSING_DPS_AUTH,
-        self::MAGENTO_STATUS_PAYPAL_REVERSAL
+        self::MAGENTO_STATUS_PAYPAL_CANCELED_REVERSAL
     );
+
+    const MAGENTO_STATUS_PAYPAL_REVERSED = 'paypal_reversed';
+
+    const MAGENTO_STATUS_COMPLETE = 'complete';
+    const MAGENTO_STATUS_CLOSED = 'closed';
+    const MAGENTO_STATUS_CANCELED = 'canceled';
+
+    private static $magentoFinalStatusses = array(
+        self::MAGENTO_STATUS_COMPLETE,
+        self::MAGENTO_STATUS_CLOSED,
+        self::MAGENTO_STATUS_CANCELED
+    );
+
     /** @var int $lastRetrieveTimestamp */
     protected $lastRetrieveTimestamp = NULL;
 
@@ -154,10 +189,24 @@ class OrderGateway extends AbstractGateway
         return $retrieve;
     }
 
-    protected static function isOrderStateProcessing($orderStatus)
+    /**
+     * @param $orderStatus
+     * @return bool
+     */
+    public static function hasOrderStatePending($orderStatus)
     {
-        $isOrderStateProcessing = in_array($orderStatus, self::$magentoProcessingStatusses);
-        return $isOrderStateProcessing;
+        $hasOrderStatePending = in_array($orderStatus, self::$magentoPendingStatusses);
+        return $hasOrderStatePending;
+    }
+
+    /**
+     * @param $orderStatus
+     * @return bool
+     */
+    public static function hasOrderStateProcessing($orderStatus)
+    {
+        $hasOrderStateProcessing = in_array($orderStatus, self::$magentoProcessingStatusses);
+        return $hasOrderStateProcessing;
     }
 
     /**
@@ -171,7 +220,7 @@ class OrderGateway extends AbstractGateway
         $qtyPreTransit = NULL;
         $orderStatus = $order->getData('status');
 
-        if (self::isOrderStateProcessing($orderStatus)) {
+        if (self::hasOrderStateProcessing($orderStatus)) {
             $storeId = ($this->_node->isMultiStore() ? $order->getData('store_id') : 0);
 
             $stockitem = $this->_entityService->loadEntity(
@@ -415,8 +464,8 @@ class OrderGateway extends AbstractGateway
         }
 
         if ($needsUpdate) {
-            $movedToProcessing = self::isOrderStateProcessing($orderData['status'])
-                && !self::isOrderStateProcessing($existingEntity->getData('status'));
+            $movedToProcessing = self::hasOrderStateProcessing($orderData['status'])
+                && !self::hasOrderStateProcessing($existingEntity->getData('status'));
             $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
 
             $order = $this->_entityService->loadEntityId($this->_node->getNodeId(), $existingEntity->getId());
@@ -954,7 +1003,7 @@ class OrderGateway extends AbstractGateway
                 }
                 break;
             case 'ship':
-                if (self::isOrderStateProcessing($orderStatus)) {
+                if (self::hasOrderStateProcessing($orderStatus)) {
                     $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                     $sendComment = ($action->hasData('send_comment') ?
@@ -971,7 +1020,7 @@ class OrderGateway extends AbstractGateway
                 }
                 break;
             case 'creditmemo':
-                if (self::isOrderStateProcessing($orderStatus) || $orderStatus == self::MAGENTO_STATUS_COMPLETE) {
+                if (self::hasOrderStateProcessing($orderStatus) || $orderStatus == self::MAGENTO_STATUS_COMPLETE) {
                     $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
                     $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                     $sendComment = ($action->hasData('send_comment') ?
