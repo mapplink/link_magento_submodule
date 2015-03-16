@@ -12,10 +12,11 @@
 
 namespace Magento\Gateway;
 
+use Entity\Service\EntityService;
+use Magelink\Exception\NodeException;
+use Magelink\Exception\GatewayException;
 use Node\AbstractNode;
 use Node\Entity;
-use Magelink\Exception\MagelinkException;
-use Entity\Service\EntityService;
 
 
 class CreditmemoGateway extends AbstractGateway
@@ -26,14 +27,14 @@ class CreditmemoGateway extends AbstractGateway
      * @param AbstractNode $node
      * @param Entity\Node $nodeEntity
      * @param string $entity_type
-     * @throws \Magelink\Exception\MagelinkException
+     * @throws GatewayException
      * @return boolean
      */
     public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
     {
         if ($entityType != 'creditmemo') {
             $success = FALSE;
-            throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
+            throw new GatewayException('Invalid entity type for this gateway');
         }else{
             $success = parent::init($node, $nodeEntity, $entityType);
         }
@@ -58,32 +59,40 @@ class CreditmemoGateway extends AbstractGateway
         }elseif ($this->_soap) {
             $lastRetrieve = $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve')
                 + (intval($this->_node->getConfig('time_delta_creditmemo')) * 3600);
-            $results = $this->_soap->call('salesOrderCreditmemoList', array(
-                array(
-                    'complex_filter'=>array(
+            try {
+                $results = $this->_soap->call('salesOrderCreditmemoList', array(
+                    array('complex_filter'=>array(
                         array(
                             'key'=>'updated_at',
                             'value'=>array(
                                 'key'=>'gt',
                                 'value'=>date('Y-m-d H:i:s', $lastRetrieve)
-                            ),
-                        ),
-                    ),
-                ), // filters
-            ));
+                            )
+                        )))
+                ));
+            }catch (\Exception $exception) {
+                // store as sync issue
+                throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+            }
 
             foreach ($results as $creditmemo) {
                 $data = array();
 
-                $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($creditmemo['increment_id']));
+                try {
+                    $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($creditmemo['increment_id']));
+                }catch (\Exception $exception) {
+                    // store as sync issue
+                    throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                }
+
                 if(isset($creditmemo['result'])){
                     $creditmemo = $creditmemo['result'];
                 }
 
-                $store_id = ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0);
-                $unique_id = $creditmemo['increment_id'];
-                $local_id = $creditmemo['creditmemo_id'];
-                $parent_id = null;
+                $storeId = ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0);
+                $uniqueId = $creditmemo['increment_id'];
+                $localId = $creditmemo['creditmemo_id'];
+                $parentId = null;
 
                 $map = array(
                     'order_currency'=>'order_currency_code',
@@ -117,16 +126,16 @@ class CreditmemoGateway extends AbstractGateway
                     ));
                 }
 
-                foreach ($map as $att=>$key) {
+                foreach ($map as $attributeCode=>$key) {
                     if(isset($creditmemo[$key])){
-                        $data[$att] = $creditmemo[$key];
+                        $data[$attributeCode] = $creditmemo[$key];
                     }else{
-                        $data[$att] = null;
+                        $data[$attributeCode] = NULL;
                     }
                 }
 /*
                 if(isset($creditmemo['invoice_id']) && $creditmemo['invoice_id']){
-                    $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'invoice', $store_id, $creditmemo['invoice_id']);
+                    $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'invoice', $storeId, $creditmemo['invoice_id']);
                     if($ent && $ent->getId()){
                         $data['invoice'] = $ent;
                     }else{
@@ -134,123 +143,144 @@ class CreditmemoGateway extends AbstractGateway
                     }
                 }
 */
-                if(isset($creditmemo['billing_address_id']) && $creditmemo['billing_address_id']){
-                    $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'address', $store_id, $creditmemo['billing_address_id']);
-                    if($ent && $ent->getId()){
-                        $data['billing_address'] = $ent;
+                if (isset($creditmemo['billing_address_id']) && $creditmemo['billing_address_id']) {
+                    $billingAddress = $entityService->loadEntityLocal(
+                        $this->_node->getNodeId(), 'address', $storeId, $creditmemo['billing_address_id']);
+                    if($billingAddress && $billingAddress->getId()){
+                        $data['billing_address'] = $billingAddress;
                     }else{
-                        $data['billing_address'] = null;
+                        $data['billing_address'] = NULL;
                     }
                 }
 
-                if(isset($creditmemo['shipping_address_id']) && $creditmemo['shipping_address_id']){
-                    $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'address', $store_id, $creditmemo['shipping_address_id']);
-                    if($ent && $ent->getId()){
-                        $data['shipping_address'] = $ent;
+                if (isset($creditmemo['shipping_address_id']) && $creditmemo['shipping_address_id']) {
+                    $shippingAddress = $entityService->loadEntityLocal(
+                        $this->_node->getNodeId(), 'address', $storeId, $creditmemo['shipping_address_id']);
+                    if($shippingAddress && $shippingAddress->getId()){
+                        $data['shipping_address'] = $shippingAddress;
                     }else{
-                        $data['shipping_address'] = null;
+                        $data['shipping_address'] = NULL;
                     }
                 }
 
                 if (isset($creditmemo['order_id']) && $creditmemo['order_id']) {
-                    $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'order', $store_id, $creditmemo['order_id']);
-                    if($ent){
-                        $parent_id = $ent->getId();
+                    $order = $entityService->loadEntityLocal(
+                        $this->_node->getNodeId(), 'order', $storeId, $creditmemo['order_id']);
+                    if ($order) {
+                        $parentId = $order->getId();
                     }
                 }
 
                 if (isset($creditmemo['comments'])) {
-                    foreach($creditmemo['comments'] as $com){
-                        if (isset($com['comment']) && preg_match('#FOR ORDER: ([0-9]+[a-zA-Z]*)#', $com['comment'], $matches)) {
-                            $ent = $entityService->loadEntity($this->_node->getNodeId(), 'order', $store_id, $matches[1]);
-                            if(!$ent){
-                                throw new MagelinkException('Comment referenced order '.$matches[1].' on cm '.$unique_id.' but could not locate order!');
+                    foreach ($creditmemo['comments'] as $commentData){
+                        $isOrderComment = isset($commentData['comment'])
+                            && preg_match('#FOR ORDER: ([0-9]+[a-zA-Z]*)#', $commentData['comment'], $matches);
+                        if ($isOrderComment) {
+                            $originalOrderUniqueId = $matches[1];
+                            $originalOrder = $entityService->loadEntity(
+                                $this->_node->getNodeId(), 'order', $storeId, $originalOrderUniqueId);
+                            if (!$order){
+                                $message = 'Comment referenced order '.$originalOrderUniqueId
+                                    .' on creditmemo '.$uniqueId.' but could not locate order!';
+                                throw new GatewayException($message);
                             }else{
-                                $parent_id = $ent->getId();
+                                $parentId = $originalOrder->getId();
                             }
                         }
                     }
                 }
 
                 /** @var boolean $needsUpdate Whether we need to perform an entity update here */
-                $needsUpdate = true;
+                $needsUpdate = TRUE;
 
-                $existingEntity = $entityService->loadEntityLocal($this->_node->getNodeId(), 'creditmemo', $store_id, $local_id);
+                $existingEntity = $entityService->loadEntityLocal(
+                    $this->_node->getNodeId(), 'creditmemo', $storeId, $localId);
                 if (!$existingEntity) {
-                    $existingEntity = $entityService->loadEntity($this->_node->getNodeId(), 'creditmemo', $store_id, $unique_id);
+                    $existingEntity = $entityService->loadEntity(
+                        $this->_node->getNodeId(), 'creditmemo', $storeId, $uniqueId);
                     if (!$existingEntity) {
-                        $entityService->beginEntityTransaction('magento-creditmemo-'.$unique_id);
+                        $entityService->beginEntityTransaction('magento-creditmemo-'.$uniqueId);
                         try{
-                            $existingEntity = $entityService->createEntity($this->_node->getNodeId(), 'creditmemo', $store_id, $unique_id, $data, $parent_id);
-                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                            $existingEntity = $entityService->createEntity(
+                                $this->_node->getNodeId(), 'creditmemo', $storeId, $uniqueId, $data, $parentId);
+                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                             $this->getServiceLocator()->get('logService')
                                 ->log(\Log\Service\LogService::LEVEL_INFO,
                                     'ent_new',
-                                    'New creditmemo '.$unique_id,
-                                    array('sku'=>$unique_id),
+                                    'New creditmemo '.$uniqueId,
+                                    array('sku'=>$uniqueId),
                                     array('node'=>$this->_node, 'entity'=>$existingEntity)
                                 );
-                            $this->createItems($creditmemo, $existingEntity->getId(), $entityService, true);
-                            $entityService->commitEntityTransaction('magento-creditmemo-'.$unique_id);
-                        }catch(\Exception $e){
-                            $entityService->rollbackEntityTransaction('magento-creditmemo-'.$unique_id);
-                            throw $e;
+                            $this->createItems($creditmemo, $existingEntity->getId(), $entityService, TRUE);
+                            $entityService->commitEntityTransaction('magento-creditmemo-'.$uniqueId);
+                        }catch (\Exception $exception){
+                            $entityService->rollbackEntityTransaction('magento-creditmemo-'.$uniqueId);
+                            // store as sync issue
+                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         }
-                        $needsUpdate = false;
+                        $needsUpdate = FALSE;
                     }else{
                         $this->getServiceLocator()->get('logService')
                             ->log(\Log\Service\LogService::LEVEL_WARN,
                                 'ent_link',
-                                'Unlinked creditmemo '.$unique_id,
-                                array('sku'=>$unique_id),
+                                'Unlinked creditmemo '.$uniqueId,
+                                array('sku'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
                             );
                         try{
                             $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
-                        }catch(\Exception $e){
+                        }catch(\Exception $exception){
                             // Ignore errors
                         }
-                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                     }
                 }else{
                     $this->getServiceLocator()->get('logService')
                         ->log(\Log\Service\LogService::LEVEL_INFO,
                             'ent_update',
-                            'Updated creditmemo '.$unique_id,
-                            array('sku'=>$unique_id),
+                            'Updated creditmemo '.$uniqueId,
+                            array('sku'=>$uniqueId),
                             array('node'=>$this->_node, 'entity'=>$existingEntity)
                         );
                 }
-                if($needsUpdate){
-                    $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, false);
-                    $this->createItems($creditmemo, $existingEntity->getId(), $entityService, false);
+                if ($needsUpdate) {
+                    $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
+                    $this->createItems($creditmemo, $existingEntity->getId(), $entityService, FALSE);
                 }
                 $this->updateComments($creditmemo, $existingEntity, $entityService);
             }
         }else{
             // Nothing worked
-            throw new \Magelink\Exception\NodeException('No valid API available for sync');
+            throw new NodeException('No valid API available for sync');
         }
         $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $timestamp);
     }
 
     /**
      * Insert any new comment entries as entity comments
-     * @param array $order The full order data
-     * @param \Entity\Entity $orderEnt The order entity to attach to
-     * @param EntityService $es The EntityService
+     * @param array $creditmemoData The full creditmemo data
+     * @param \Entity\Entity $creditmemo The order entity to attach to
+     * @param EntityService $entityService The EntityService
      */
-    protected function updateComments($creditmemo, \Entity\Entity $cmEnt, EntityService $es){
-        $comments = $es->loadEntityComments($cmEnt);
+    protected function updateComments(array $creditmemoData, \Entity\Entity $creditmemo, EntityService $entityService)
+    {
+        $comments = $entityService->loadEntityComments($creditmemo);
         $referenceIds = array();
-        foreach($comments as $com){
-            $referenceIds[] = $com->getReferenceId();
+        foreach ($comments as $comment) {
+            $referenceIds[] = $comment->getReferenceId();
         }
-        foreach($creditmemo['comments'] as $histEntry){
-            if(in_array($histEntry['comment_id'], $referenceIds)){
-                continue; // Comment already loaded
+
+        foreach ($creditmemoData['comments'] as $historyEntry) {
+            if (!in_array($historyEntry['comment_id'], $referenceIds)) {
+                $entityService->createEntityComment(
+                    $creditmemo,
+                    'Magento',
+                    'Comment: '.$historyEntry['created_at'],
+                    (isset($histEntry['comment']) ? $histEntry['comment'] : ''),
+                    $histEntry['comment_id'],
+                    $histEntry['is_visible_on_front']
+                );
             }
-            $es->createEntityComment($cmEnt, 'Magento', 'Comment: ' . $histEntry['created_at'], (isset($histEntry['comment']) ? $histEntry['comment'] : ''), $histEntry['comment_id'], $histEntry['is_visible_on_front']);
         }
     }
 
@@ -261,7 +291,7 @@ class CreditmemoGateway extends AbstractGateway
      * @param EntityService $entityService
      * @param bool $creationMode Whether this is for a newly created credit memo in magelink
      */
-    protected function createItems($creditmemo, $orderId, EntityService $entityService, $creationMode){
+    protected function createItems(array $creditmemo, $orderId, EntityService $entityService, $creationMode){
 
         $parentId = $orderId;
 
@@ -343,136 +373,168 @@ class CreditmemoGateway extends AbstractGateway
      * @param \Entity\Entity $entity
      * @param string[] $attributes
      * @param int $type
-     * @throws MagelinkException
+     * @throws GatewayException
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE)
     {
-        if ($type == \Entity\Update::TYPE_UPDATE) {
-            return; // We don't update, ever.
-
-        }elseif ($type == \Entity\Update::TYPE_DELETE) {
-            $this->_soap->call('salesOrderCreditmemoCancel', array($entity->getUniqueId()));
-            return;
-
-        }elseif ($type == \Entity\Update::TYPE_CREATE) {
-            /** @var \Entity\Service\EntityService $entityService */
-            $entityService = $this->getServiceLocator()->get('entityService');
-
-            $order = $entity->getParent();
-            if (!$order || $order->getTypeStr() != 'order') {
-                throw new MagelinkException('Creditmemo parent not correctly set for Creditmemo '.$entity->getId());
-            }
-            $originalOrder = $entity->getOriginalParent();
-            if (!$originalOrder || $originalOrder->getTypeStr() != 'order') {
-                throw new MagelinkException('Creditmemo root parent not correctly set for Creditmemo '.$entity->getId());
-            }
-
-            /** @var \Entity\Entity[] $items */
-            $items = $entity->getItems();
-            if (!count($items)) {
-                $items = $originalOrder->getOrderitems();
-            }
-
-            $itemData = array();
-            foreach ($items as $item) {
-                switch ($item->getTypeStr()) {
-                    case 'creditmemoitem':
-                        $orderItemId = $item->getData('order_item');
-                        $qty = $item->getData('qty', 0);
-                        break;
-                    case 'orderitem':
-                        $orderItemId = $item->getId();
-                        $qty = 0;
-                        break;
-                    default:
-                        $message = 'Wrong type of the children of creditmemo '.$entity->getUniqueId().'.';
-                        throw new \Magelink\Exception\NodeException($message);
+        switch ($type) {
+            case \Entity\Update::TYPE_UPDATE:
+                // We don't update, ever
+                break;
+            case \Entity\Update::TYPE_DELETE:
+                try {
+                    $this->_soap->call('salesOrderCreditmemoCancel', array($entity->getUniqueId()));
+                }catch (\Exception $exception) {
+                    // store as sync issue
+                    throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                 }
+                break;
+            case \Entity\Update::TYPE_CREATE:
+                /** @var \Entity\Service\EntityService $entityService */
+                $entityService = $this->getServiceLocator()->get('entityService');
 
-                $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $orderItemId);
-                if (!$itemLocalId) {
-                    $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
-                        .' and creditmemo '.$entity->getUniqueId().' (orderitem '.$item->getData('order_item').')';
-                    throw new \Magelink\Exception\NodeException($message);
-                }
-                $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$qty);
-            }
-
-
-            $creditmemoData = array(
-                'qtys'=>$itemData,
-                'shipping_amount'=>$entity->getData('shipping_amount', 0),
-                'adjustment_positive'=>$entity->getData('adjustment_positive', 0),
-                'adjustment_negative'=>$entity->getData('adjustment_negative', 0)
-            );
-
-            $soapResult = $this->_soap->call('salesOrderCreditmemoCreate',
-                array($originalOrder->getUniqueId(),
-                    $creditmemoData,
-                    '',
-                    FALSE,
-                    FALSE,
-                    $entity->getData('customer_balance', 0)
-                )
-            );
-
-            if (is_object($soapResult)) {
-                $soapResult = $soapResult->result;
-            }elseif (is_array($soapResult)) {
-                if(isset($soapResult['result'])){
-                    $soapResult = $soapResult['result'];
+                $order = $entity->getParent();
+                $originalOrder = $entity->getOriginalParent();
+                if (!$order || $order->getTypeStr() != 'order') {
+                    // store as sync issue
+                    throw new GatewayException('Creditmemo parent not correctly set for creditmemo '.$entity->getId());
+                }elseif (!$originalOrder || $originalOrder->getTypeStr() != 'order') {
+                    $message = 'Creditmemo root parent not correctly set for creditmemo '.$entity->getId();
+                    // store as sync issue
+                    throw new GatewayException($message);
                 }else{
-                    $soapResult = array_shift($soapResult);
-                }
-            }
-            if (!$soapResult) {
-                $message = 'Failed to get creditmemo ID from Magento for order '.$originalOrder->getUniqueId()
-                    .' (Hops order '.$order->getUniqueId().').';
-                throw new MagelinkException($message);
-            }
-            $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $soapResult);
+                    /** @var \Entity\Entity[] $items */
+                    $items = $entity->getItems();
+                    if (!count($items)) {
+                        $items = $originalOrder->getOrderitems();
+                    }
 
-            $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($soapResult));
-            if(isset($creditmemo['result'])){
-                $creditmemo = $creditmemo['result'];
-            }
-            $local_id = $creditmemo['creditmemo_id'];
+                    $itemData = array();
+                    foreach ($items as $item) {
+                        switch ($item->getTypeStr()) {
+                            case 'creditmemoitem':
+                                $orderItemId = $item->getData('order_item');
+                                $qty = $item->getData('qty', 0);
+                                break;
+                            case 'orderitem':
+                                $orderItemId = $item->getId();
+                                $qty = 0;
+                                break;
+                            default:
+                                $message = 'Wrong type of the children of creditmemo '.$entity->getUniqueId().'.';
+                                // store as sync issue
+                                throw new GatewayException($message);
+                        }
 
-            try{
-                $entityService->unlinkEntity($this->_node->getNodeId(), $entity);
-            }catch (\Exception $e) {} // Ignore errors
+                        $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $orderItemId);
+                        if (!$itemLocalId) {
+                            $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
+                                .' and creditmemo '.$entity->getUniqueId().' (orderitem '.$item->getData(
+                                    'order_item'
+                                ).')';
+                            // store as sync issue
+                            throw new GatewayException($message);
+                        }
+                        $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$qty);
+                    }
 
-            $entityService->linkEntity($this->_node->getNodeId(), $entity, $local_id);
 
-            // Update credit memo item local and unique IDs
-            foreach ($creditmemo['items'] as $item) {
-                foreach ($items as $itemEntity) {
+                    $creditmemoData = array(
+                        'qtys' => $itemData,
+                        'shipping_amount' => $entity->getData('shipping_amount', 0),
+                        'adjustment_positive' => $entity->getData('adjustment_positive', 0),
+                        'adjustment_negative' => $entity->getData('adjustment_negative', 0)
+                    );
 
-                    if ($itemEntity->getData('sku') == $item['sku'] && $itemEntity->getData('qty') == $item['qty']) {
-                        $entityService->updateEntityUnique(
-                            $this->_node->getNodeId(),
-                            $itemEntity, $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id']
+                    try {
+                        $soapResult = $this->_soap->call(
+                            'salesOrderCreditmemoCreate',
+                            array(
+                                $originalOrder->getUniqueId(),
+                                $creditmemoData,
+                                '',
+                                false,
+                                false,
+                                $entity->getData('customer_balance', 0)
+                            )
                         );
+                    }catch (\Exception $exception) {
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    }
 
-                        try{
-                            $entityService->unlinkEntity($this->_node->getNodeId(), $itemEntity);
-                        }catch (\Exception $e) {} // Ignore errors
+                    if (is_object($soapResult)) {
+                        $soapResult = $soapResult->result;
+                    }elseif (is_array($soapResult)) {
+                        if (isset($soapResult['result'])) {
+                            $soapResult = $soapResult['result'];
+                        }else {
+                            $soapResult = array_shift($soapResult);
+                        }
+                    }
 
-                        $entityService->linkEntity($this->_node->getNodeId(), $itemEntity, $item['item_id']);
-                        break;
+                    if (!$soapResult) {
+                        $message = 'Failed to get creditmemo ID from Magento for order '.$originalOrder->getUniqueId()
+                            .' (Hops order '.$order->getUniqueId().').';
+                        // store as sync issue
+                        throw new GatewayException($message);
+                    }
+                    $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $soapResult);
+
+                    try {
+                        $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($soapResult));
+                    }catch (\Exception $exception) {
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    }
+
+                    if (isset($creditmemo['result'])) {
+                        $creditmemo = $creditmemo['result'];
+                    }
+                    $localId = $creditmemo['creditmemo_id'];
+
+                    try{
+                        $entityService->unlinkEntity($this->_node->getNodeId(), $entity);
+                    }catch (\Exception $exception) {} // Ignore errors
+
+                    $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+
+                    // Update credit memo item local and unique IDs
+                    foreach ($creditmemo['items'] as $item) {
+                        foreach ($items as $itemEntity) {
+                            $isItemSkuAndQtyTheSame = $itemEntity->getData('sku') == $item['sku']
+                                && $itemEntity->getData('qty') == $item['qty'];
+                            if ($isItemSkuAndQtyTheSame) {
+                                $entityService->updateEntityUnique(
+                                    $this->_node->getNodeId(),
+                                    $itemEntity,
+                                    $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id']
+                                );
+
+                                try{
+                                    $entityService->unlinkEntity($this->_node->getNodeId(), $itemEntity);
+                                }catch (\Exception $exception) {} // Ignore errors
+
+                                $entityService->linkEntity($this->_node->getNodeId(), $itemEntity, $item['item_id']);
+                                break;
+                            }
+                        }
+                    }
+
+                    try {
+                        $this->_soap->call(
+                            'salesOrderCreditmemoAddComment',
+                            array($soapResult, 'FOR ORDER: '.$order->getUniqueId(), FALSE, FALSE)
+                        );
+                    }catch (\Exception $exception) {
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                     }
                 }
-            }
 
-            $this->_soap->call('salesOrderCreditmemoAddComment', array(
-                $soapResult,
-                'FOR ORDER: '.$order->getUniqueId(),
-                false,
-                false
-            ));
-
-        }else{
-            throw new MagelinkException('Invalid update type ' . $type);
+                break;
+            default:
+                throw new GatewayException('Invalid update type '.$type);
         }
         return;
     }
@@ -480,7 +542,7 @@ class CreditmemoGateway extends AbstractGateway
     /**
      * Write out the given action.
      * @param \Entity\Action $action
-     * @throws MagelinkException
+     * @throws GatewayException
      */
     public function writeAction(\Entity\Action $action)
     {
@@ -491,28 +553,49 @@ class CreditmemoGateway extends AbstractGateway
 
         $entity = $action->getEntity();
 
+        $success = FALSE;
         if (stripos($entity->getUniqueId(), 'TMP-') === 0) {
-            return false; // Hold off for now.
+            // Hold off for now
+        }else {
+            switch ($action->getType()) {
+                case 'comment':
+                    $comment = $action->getData('comment');
+                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false') : NULL);
+                    $includeComment = ($action->hasData('includeComment')
+                        ? ($action->getData('includeComment') ? 'true' : 'false') : NULL);
+
+                    try{
+                        $this->_soap->call(
+                            'salesOrderCreditmemoAddComment',
+                            array(
+                                $entity->getUniqueId(),
+                                $comment,
+                                $notify,
+                                $includeComment
+                            )
+                        );
+                        $success = TRUE;
+                    }catch( \Exception $exception ){
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    }
+                    break;
+                case 'cancel':
+                    try {
+                        $this->_soap->call('salesOrderCreditmemoCancel', $entity->getUniqueId());
+                        $success = TRUE;
+                    }catch (\Exception $exception) {
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    }
+                    break;
+                default:
+                    $message = 'Unsupported action type '.$action->getType().' for Magento Credit Memos.';
+                    throw new GatewayException($message);
+            }
         }
 
-        switch ($action->getType()) {
-            case 'comment':
-                $comment = $action->getData('comment');
-                $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
-                $includeComment = ($action->hasData('includeComment')
-                    ? ($action->getData('includeComment') ? 'true' : 'false' ) : NULL);
-                $this->_soap->call('salesOrderCreditmemoAddComment', array(
-                    $entity->getUniqueId(), $comment, $notify, $includeComment
-                ));
-
-                return TRUE;
-                break;
-            case 'cancel':
-                $this->_soap->call('salesOrderCreditmemoCancel', $entity->getUniqueId());
-                return TRUE;
-                break;
-            default:
-                throw new MagelinkException('Unsupported action type '.$action->getType().' for Magento Credit Memos.');
-        }
+        return $success;
     }
+
 }
