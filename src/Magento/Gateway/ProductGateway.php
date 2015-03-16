@@ -53,11 +53,11 @@ class ProductGateway extends AbstractGateway
     public function retrieve() 
     {
         /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator() ->get('entityService');
+        $entityService = $this->getServiceLocator()->get('entityService');
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
-        $entityConfigService = $this->getServiceLocator() ->get('entityConfigService');
+        $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
         /** @var \Node\Service\NodeService $nodeService */
-        $nodeService = $this->getServiceLocator() ->get('nodeService');
+        $nodeService = $this->getServiceLocator()->get('nodeService');
 
         $timestamp = time() - $this->apiOverlappingSeconds;
 
@@ -67,7 +67,7 @@ class ProductGateway extends AbstractGateway
                     + (intval($this->_node->getConfig('time_delta_product')) * 3600)
             );
 
-            $this->getServiceLocator() ->get('logService') 
+            $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
                     'retr_time',
                     'Retrieving products updated since '.$lastRetrieve,
@@ -146,7 +146,7 @@ class ProductGateway extends AbstractGateway
                     if (isset($this->_attributeSets[intval($rawData['attribute_set_id']) ])) {
                         $data['product_class'] = $this->_attributeSets[intval($rawData['attribute_set_id']) ]['name'];
                     }else{
-                        $this->getServiceLocator() ->get('logService') ->log(LogService::LEVEL_WARN,
+                        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
                             'unknown_set',
                             'Unknown attribute set ID '.$rawData['attribute_set_id'],
                            array('set'=>$rawData['attribute_set_id'], 'sku'=>$rawData['sku']) 
@@ -184,7 +184,7 @@ class ProductGateway extends AbstractGateway
                         $data['product_class'] = $this->_attributeSets[intval($data['set']) ]['name'];
                         unset($data['set']);
                     }else{
-                        $this->getServiceLocator() ->get('logService') 
+                        $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_WARN,
                                 'unknown_set', 
                                 'Unknown attribute set ID '.$data['set'], 
@@ -244,7 +244,7 @@ class ProductGateway extends AbstractGateway
                     $parent_id
                 );
                 $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
-                $this->getServiceLocator() ->get('logService') 
+                $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_INFO,
                         'ent_new',
                         'New product '.$sku,
@@ -262,7 +262,7 @@ class ProductGateway extends AbstractGateway
                     );
                     $entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
                 }catch(\Exception $e) {
-                    $this->getServiceLocator() ->get('logService') 
+                    $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_WARN,
                             'already_stockitem',
                             'Already existing stockitem for new product '.$sku,
@@ -272,7 +272,7 @@ class ProductGateway extends AbstractGateway
                 }
                 $needsUpdate = FALSE;
             }elseif ($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
-                $this->getServiceLocator() ->get('logService') 
+                $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_ERROR,
                         'ent_wronglink',
                         'Incorrectly linked product '.$sku,
@@ -288,7 +288,7 @@ class ProductGateway extends AbstractGateway
                 }
                 $entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
             }else{
-                $this->getServiceLocator() ->get('logService') 
+                $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_INFO,
                         'ent_link',
                         'Unlinked product '.$sku,
@@ -298,7 +298,7 @@ class ProductGateway extends AbstractGateway
                 $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
             }
         }else{
-            $this->getServiceLocator() ->get('logService') 
+            $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
                     'ent_update',
                     'Updated product '.$sku,
@@ -360,7 +360,7 @@ class ProductGateway extends AbstractGateway
 
             if (!$entityConfigService->checkAttribute('product', $att)) {
                 $entityConfigService->createAttribute($att, $att, 0, 'varchar', 'product', 'Custom Magento attribute');
-                $this->getServiceLocator() ->get('nodeService') ->subscribeAttribute($this->_node->getNodeId(), $att, 'product');
+                $this->getServiceLocator()->get('nodeService')->subscribeAttribute($this->_node->getNodeId(), $att, 'product');
             }
         }
 
@@ -531,7 +531,7 @@ class ProductGateway extends AbstractGateway
             $customAttributes = array();
         }
 
-        $this->getServiceLocator() ->get('logService') 
+        $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_DEBUGEXTRA,
                 'mag_prod_write_update',
                 'Attributes for update of product '.$entity->getUniqueId() .': '.var_export($attributes, TRUE),
@@ -597,7 +597,7 @@ class ProductGateway extends AbstractGateway
                     }
                     break;
                 default:
-                    $this->getServiceLocator() ->get('logService') 
+                    $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_WARN,
                             'mag_prod_inv_data',
                             'Unsupported attribute for update of '.$entity->getUniqueId() .': '.$attributeCode,
@@ -610,7 +610,7 @@ class ProductGateway extends AbstractGateway
         }
 
         if (!count($data)) {
-            $this->getServiceLocator() ->get('logService') 
+            $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_WARN,
                     'mag_prod_noupd',
                     'No update required for '.$entity->getUniqueId() .' but requested was '.implode(', ', $attributes),
@@ -640,7 +640,7 @@ class ProductGateway extends AbstractGateway
                         $message = 'Product exists in other store, ';
                         $localId = $entityService->getLocalId($this->_node->getNodeId(), $loadedEntity);
                         if ($localId) {
-                            $this->getServiceLocator() ->get('logService') 
+                            $this->getServiceLocator()->get('logService')
                                 ->log(LogService::LEVEL_INFO,
                                     'prod_storedup',
                                     $message.'forcing local ID for '.$entity->getUniqueId() .' to '.$localId,
@@ -651,7 +651,7 @@ class ProductGateway extends AbstractGateway
                             $type = \Entity\Update::TYPE_UPDATE;
                             break;
                         }else{
-                            $this->getServiceLocator() ->get('logService') 
+                            $this->getServiceLocator()->get('logService')
                                 ->log(LogService::LEVEL_INFO,
                                     'prod_storenew',
                                     'Product exists in other store, but no local ID: '.$entity->getUniqueId(),
@@ -686,7 +686,7 @@ class ProductGateway extends AbstractGateway
 
             $message = 'Updating product('.$message.') : '
                 .$entity->getUniqueId() .' with '.implode(', ', array_keys($data));
-            $this->getServiceLocator() ->get('logService') 
+            $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO, 'mag_prod_update', $message, $logData);
 
             if ($updateViaDbApi) {
@@ -721,7 +721,7 @@ class ProductGateway extends AbstractGateway
             }
 
             $message = 'Creating product(SOAP) : '.$entity->getUniqueId() .' with '.implode(', ', array_keys($data));
-            $this->getServiceLocator() ->get('logService') 
+            $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
                     'mag_prod_create',
                     $message,
@@ -750,7 +750,7 @@ class ProductGateway extends AbstractGateway
             }catch(\SoapFault $soapFault) {
                 $soapResult = FALSE;
                 if ($soapFault->getMessage() == 'The value of attribute "SKU" must be unique') {
-                    $this->getServiceLocator() ->get('logService') 
+                    $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_WARN,
                             'prod_dupfault',
                             'Creating product '.$entity->getUniqueId() .' hit SKU duplicate fault',
@@ -775,7 +775,7 @@ class ProductGateway extends AbstractGateway
                                 $found = TRUE;
 
                                 $entityService->linkEntity($this->_node->getNodeId(), $entity, $row['product_id']);
-                                $this->getServiceLocator() ->get('logService') 
+                                $this->getServiceLocator()->get('logService')
                                     ->log(LogService::LEVEL_WARN,
                                         'prod_dupres',
                                         'Creating product '.$entity->getUniqueId() .' resolved SKU duplicate fault',
@@ -811,9 +811,9 @@ class ProductGateway extends AbstractGateway
     public function writeAction(\Entity\Action $action) 
     {
         /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator() ->get('entityService');
+        $entityService = $this->getServiceLocator()->get('entityService');
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
-        $entityConfigService = $this->getServiceLocator() ->get('entityConfigService');
+        $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
         $entity = $action->getEntity();
 
