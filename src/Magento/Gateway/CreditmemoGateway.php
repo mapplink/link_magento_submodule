@@ -277,8 +277,8 @@ class CreditmemoGateway extends AbstractGateway
                     'Magento',
                     'Comment: '.$historyEntry['created_at'],
                     (isset($histEntry['comment']) ? $histEntry['comment'] : ''),
-                    $histEntry['comment_id'],
-                    $histEntry['is_visible_on_front']
+                    $historyEntry['comment_id'],
+                    $historyEntry['is_visible_on_front']
                 );
             }
         }
