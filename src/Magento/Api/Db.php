@@ -127,7 +127,7 @@ class Db implements ServiceLocatorAwareInterface
                 );
                 $this->_adapter->getCurrentSchema();
 
-                /*if ($this->_enterprise) {
+                if ($this->_enterprise) {
                     $this->columns = array_merge(
                         $this->columns,
                         array(
@@ -160,13 +160,13 @@ class Db implements ServiceLocatorAwareInterface
                             'reward_points_balance',
                             'reward_currency_amount',
                             'rwrd_currency_amount_invoiced',
-                            'rwrd_crrncy_amnt_refnded',
+                            'rwrd_crrncy_amnt_refunded',
                             'reward_points_balance_refund',
                             'reward_points_balance_refunded',
                             'reward_salesrule_points',
                         )
                     );
-                }*/
+                }
             }catch(\Exception $exception){
                 $success = FALSE;
                 $this->getServiceLocator()->get('logService')
