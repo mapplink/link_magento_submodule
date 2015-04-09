@@ -28,6 +28,7 @@ class OrderGateway extends AbstractGateway
 {
     const MAGENTO_STATUS_PENDING = 'pending';
     const MAGENTO_STATUS_PENDING_ALIPAY = 'pending_alipay';
+    const MAGENTO_STATUS_PENDING_ALIPAY_NEW = 'new';
     const MAGENTO_STATUS_PENDING_DPS = 'pending_dps';
     const MAGENTO_STATUS_PENDING_OGONE = 'pending_ogone';
     const MAGENTO_STATUS_PENDING_PAYMENT = 'pending_payment';
@@ -39,6 +40,7 @@ class OrderGateway extends AbstractGateway
     private static $magentoPendingStatusses = array(
         self::MAGENTO_STATUS_PENDING,
         self::MAGENTO_STATUS_PENDING_ALIPAY,
+        self::MAGENTO_STATUS_PENDING_ALIPAY_NEW,
         self::MAGENTO_STATUS_PENDING_DPS,
         self::MAGENTO_STATUS_PENDING_OGONE,
         self::MAGENTO_STATUS_PENDING_PAYMENT,
