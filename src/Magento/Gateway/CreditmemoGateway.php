@@ -85,7 +85,7 @@ class CreditmemoGateway extends AbstractGateway
                     throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                 }
 
-                if(isset($creditmemo['result'])){
+                if (isset($creditmemo['result'])) {
                     $creditmemo = $creditmemo['result'];
                 }
 
