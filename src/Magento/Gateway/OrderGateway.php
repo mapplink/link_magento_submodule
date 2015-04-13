@@ -371,6 +371,7 @@ class OrderGateway extends AbstractGateway
                 $data['customer'] = $customer;
             }else{
                 $data['customer'] = NULL;
+                // ToDo : Should never be the case, exception handling neccessary
             }
         }
 
