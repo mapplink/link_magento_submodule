@@ -365,14 +365,10 @@ class OrderGateway extends AbstractGateway
                     $this->createItems($orderData, $existingEntity);
 
                     try{
-                        $this->_soap->call('salesOrderAddComment',
-                            array(
-                                $uniqueId,
-                                $existingEntity->getData('status'),
-                                'Order retrieved by MageLink, Entity #'.$existingEntity->getId(),
-                                FALSE
-                            )
-                        );
+                        // ToDo: Get new status from Magento to prevent overwrites (via db api?)
+                        $status = $existingEntity->getData('status');
+                        $comment = 'Order retrieved by MageLink, Entity #'.$existingEntity->getId();
+                        $this->_soap->call('salesOrderAddComment', array($uniqueId, $status, $comment, FALSE));
                     }catch (\Exception $exception) {
                         $this->getServiceLocator()->get('logService')
                             ->log($logLevel,
@@ -478,8 +474,11 @@ class OrderGateway extends AbstractGateway
                     if (isset($orderData['result'])) {
                         $orderData = $orderData['result'];
                     }
-                    // Inserting missing fields from salesOrderList in the salesOrderInfo array
-                    foreach (array_diff(array_keys($orderFromList), array_keys($orderData)) as $key) {
+
+                    unset ($orderFromList['status']); // Reduces risk overwriting an updated status when adding a comment
+                    $missingFieldsInSalesOrderList = array_diff(array_keys($orderFromList), array_keys($orderData));
+
+                    foreach ($missingFieldsInSalesOrderList as $key) {
                         $orderData[$key] = $orderFromList[$key];
                     }
 
