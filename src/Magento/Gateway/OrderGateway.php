@@ -273,7 +273,7 @@ class OrderGateway extends AbstractGateway
             }else{
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_ERROR,
-                        'mag_o_sti_noxis',
+                        'mag_o_si_noxis',
                         'Stockitem '.$orderitem->getData('sku').' does not exist.',
                         $logData, $logEntities
                     );
@@ -516,7 +516,7 @@ class OrderGateway extends AbstractGateway
 
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
-                'mag_rtr_time',
+                'mag_o_rtr_time',
                 'Retrieving orders updated since '.$lastRetrieve,
                 array('type'=>'order', 'timestamp'=>$lastRetrieve)
             );
@@ -1331,7 +1331,7 @@ class OrderGateway extends AbstractGateway
             $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId());
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_DEBUGEXTRA,
-                'mag_ship_send',
+                'mag_o_act_ship',
                 'Sending shipment for '.$orderId,
                 array(
                     'ord'=>$order->getId(),
