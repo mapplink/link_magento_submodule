@@ -218,16 +218,18 @@ class OrderGateway extends AbstractGateway
      * @return bool|NULL
      * @throws MagelinkException
      */
-    protected function updateQtyPreTransit(Order $order, Orderitem $orderitem)
+    protected function updateStockQuantities(Order $order, Orderitem $orderitem)
     {
         $qtyPreTransit = NULL;
         $orderStatus = $order->getData('status');
+        $isOrderPending = self::hasOrderStatePending($orderStatus);
         $isOrderProcessing = self::hasOrderStateProcessing($orderStatus);
+        $isOrderCancelled = $orderStatus == self::MAGENTO_STATUS_CANCELED;
 
         $logData = array('order id'=>$order->getId(), 'orderitem'=>$orderitem->getId(), 'sku'=>$orderitem->getData('sku'));
         $logEntities = array('node'=>$this->_node, 'order'=>$order, 'orderitem'=>$orderitem);
 
-        if ($isOrderProcessing || $orderStatus == self::MAGENTO_STATUS_CANCELED) {
+        if ($isOrderPending || $isOrderProcessing || $isOrderCancelled) {
             $storeId = ($this->_node->isMultiStore() ? $order->getData('store_id') : 0);
 
             $stockitem = $this->_entityService->loadEntity(
@@ -242,16 +244,20 @@ class OrderGateway extends AbstractGateway
             if ($stockitem) {
                 if ($isOrderProcessing) {
                     $attributeCode = 'qty_pre_transit';
-                }else { // MAGENTO_STATUS_CANCELED
+                }else {
                     $attributeCode = 'available';
                 }
 
+                $attributeValue = $stockitem->getData($attributeCode, 0);
                 $itemQuantity = $orderitem->getData('quantity', 0);
-                $updateData = array($attributeCode=>$stockitem->getData($attributeCode, 0) + $itemQuantity);
+                if ($isOrderPending) {
+                    $itemQuantity *= -1;
+                }
+
+                $updateData = array($attributeCode =>($attributeValue + $itemQuantity));
                 $logData = array_merge($logData, array('quantity'=>$itemQuantity), $updateData);
 
                 try{
-                    $updateData;
                     $this->_entityService->updateEntity($this->_node->getNodeId(), $stockitem, $updateData, FALSE);
                     $success = TRUE;
 
@@ -495,7 +501,7 @@ class OrderGateway extends AbstractGateway
             if ($movedToProcessing || $movedToCancel) {
                 /** @var Order $order */
                 foreach ($order->getOrderitems() as $orderitem) {
-                    $this->updateQtyPreTransit($order, $orderitem);
+                    $this->updateStockQuantities($order, $orderitem);
                 }
             }
         }
@@ -883,7 +889,7 @@ class OrderGateway extends AbstractGateway
                 $this->_entityService
                     ->linkEntity($this->_node->getNodeId(), $entity, $localId);
 
-                $this->updateQtyPreTransit($order, $entity);
+                $this->updateStockQuantities($order, $entity);
             }
         }
 
