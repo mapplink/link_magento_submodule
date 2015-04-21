@@ -222,8 +222,12 @@ class OrderGateway extends AbstractGateway
     {
         $qtyPreTransit = NULL;
         $orderStatus = $order->getData('status');
+        $isOrderProcessing = self::hasOrderStateProcessing($orderStatus);
 
-        if (self::hasOrderStateProcessing($orderStatus)) {
+        $logData = array('order id'=>$order->getId(), 'orderitem'=>$orderitem->getId(), 'sku'=>$orderitem->getData('sku'));
+        $logEntities = array('node'=>$this->_node, 'order'=>$order, 'orderitem'=>$orderitem);
+
+        if ($isOrderProcessing || $orderStatus == self::MAGENTO_STATUS_CANCELED) {
             $storeId = ($this->_node->isMultiStore() ? $order->getData('store_id') : 0);
 
             $stockitem = $this->_entityService->loadEntity(
@@ -232,39 +236,55 @@ class OrderGateway extends AbstractGateway
                 $storeId,
                 $orderitem->getData('sku')
             );
+            $logEntities['stockitem'] = $stockitem;
 
             $success = FALSE;
             if ($stockitem) {
-                try{
-                    $qtyPreTransit = $stockitem->getData('qty_pre_transit', 0) + $orderitem->getData('quantity', 0);
-                    $updateData = array('qty_pre_transit'=>$qtyPreTransit);
-                    $this->_entityService->updateEntity($this->_node->getNodeId(), $stockitem, $updateData, FALSE);
-                    $success = TRUE;
-                }catch (\Exception $exception) {
+                $qtyPreTransit = $stockitem->getData('qty_pre_transit', 0);
+                $itemQuantity = $orderitem->getData('quantity', 0);
+                $logData = array_merge($logData, array('qty_pre_transit'=>$qtyPreTransit, 'quantity'=>$itemQuantity));
+
+                if (!$isOrderProcessing && $qtyPreTransit < $itemQuantity) {
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_ERROR,
-                            'upd_pre_trans_fail',
-                            'Update of qty_pre_transit failed on stockitem '.$stockitem->getEntityId(),
-                            array('sku'=>$stockitem->getUniqueId(), 'qty_pre_transit'=>$qtyPreTransit),
-                            array('node'=>$this->_node, 'stockitem'=>$stockitem, 'orderitem'=>$orderitem)
+                            'mag_rev_pre_fail',
+                            'Reversal of qty_pre_transit failed on orderitem '.$orderitem->getEntityId(),
+                            $logData, $logEntities
                         );
+                }else {
+                    try{
+                        if ($isOrderProcessing) {
+                            $qtyPreTransit += $itemQuantity;
+                        }else { // MAGENTO_STATUS_CANCELED
+                            $qtyPreTransit -= $itemQuantity;
+                        }
+                        $updateData = array('qty_pre_transit'=>$qtyPreTransit);
+                        $this->_entityService->updateEntity($this->_node->getNodeId(), $stockitem, $updateData, FALSE);
+                        $success = TRUE;
+                    }catch (\Exception $exception) {
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_ERROR,
+                                'mag_upd_pre_fail',
+                                'Update of qty_pre_transit failed on stockitem '.$stockitem->getEntityId(),
+                                $logData, $logEntities
+                            );
+                    }
                 }
-            }else {
+            }else{
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_ERROR,
-                        'stocki_noxis',
+                        'mag_o_sti_noxis',
                         'Stockitem '.$orderitem->getData('sku').' does not exist.',
-                        array('sku'=>$orderitem->getData('sku')),
-                        array('node'=>$this->_node, 'orderitem'=>$orderitem)
+                        $logData, $logEntities
                     );
             }
         }else{
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_DEBUGEXTRA,
-                    'upd_pre_trans_fail',
+                    'mag_upd_pre_fail',
                     'No update of qty_pre_transit. Order '.$order->getUniqueId().' has wrong status: '.$orderStatus,
                     array('order id'=>$order->getId()),
-                    array('node'=>$this->_node, 'order'=>$order)
+                    $logData, $logEntities
                 );
             $success = NULL;
         }
@@ -283,11 +303,11 @@ class OrderGateway extends AbstractGateway
     protected function storeOrderData(array $orderData, $forced = FALSE)
     {
         if ($forced) {
-            $logLevel = \Log\Service\LogService::LEVEL_WARN;
+            $logLevel = LogService::LEVEL_WARN;
             $logCodeSuffix = '_forced';
             $logMessageSuffix = ' (out of sync - forced)';
         }else{
-            $logLevel = \Log\Service\LogService::LEVEL_INFO;
+            $logLevel = LogService::LEVEL_INFO;
             $logMessageSuffix = $logCodeSuffix = '';
         }
         $correctionHours = sprintf('%+d hours', intval($this->_node->getConfig('time_correction_order')));
@@ -411,7 +431,7 @@ class OrderGateway extends AbstractGateway
 
                     $this->getServiceLocator()->get('logService')
                         ->log($logLevel,
-                            'ent_new'.$logCodeSuffix,
+                            'mag_o_new'.$logCodeSuffix,
                             'New order '.$uniqueId.$logMessageSuffix,
                             array('sku'=>$uniqueId),
                             array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -427,7 +447,7 @@ class OrderGateway extends AbstractGateway
                     }catch (\Exception $exception) {
                         $this->getServiceLocator()->get('logService')
                             ->log($logLevel,
-                                'ent_comment_err'.$logCodeSuffix,
+                                'mag_o_comm_err'.$logCodeSuffix,
                                 'Failed to write comment on order '.$uniqueId.$logMessageSuffix,
                                 array('exception message'=>$exception->getMessage()),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity, 'exception'=>$exception)
@@ -442,7 +462,7 @@ class OrderGateway extends AbstractGateway
             }else{
                 $this->getServiceLocator()->get('logService')
                     ->log($logLevel,
-                        'ent_link'.$logCodeSuffix,
+                        'mag_o_unlink'.$logCodeSuffix,
                         'Unlinked order '.$uniqueId.$logMessageSuffix,
                         array('sku'=>$uniqueId),
                         array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -458,7 +478,7 @@ class OrderGateway extends AbstractGateway
             }
             $this->getServiceLocator()->get('logService')
                 ->log($logLevel,
-                    'ent_update'.$logCodeSuffix,
+                    'mag_o_upd'.$logCodeSuffix,
                     'Updated order '.$uniqueId.$logMessageSuffix,
                     array('sku'=>$uniqueId),
                     array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -468,10 +488,12 @@ class OrderGateway extends AbstractGateway
         if ($needsUpdate) {
             $movedToProcessing = self::hasOrderStateProcessing($orderData['status'])
                 && !self::hasOrderStateProcessing($existingEntity->getData('status'));
+            $movedToCancel = $orderData['status'] == self::MAGENTO_STATUS_CANCELED
+                && $existingEntity->getData('status') != self::MAGENTO_STATUS_CANCELED;
             $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
 
             $order = $this->_entityService->loadEntityId($this->_node->getNodeId(), $existingEntity->getId());
-            if ($movedToProcessing) {
+            if ($movedToProcessing || $movedToCancel) {
                 /** @var Order $order */
                 foreach ($order->getOrderitems() as $orderitem) {
                     $this->updateQtyPreTransit($order, $orderitem);
@@ -493,8 +515,8 @@ class OrderGateway extends AbstractGateway
         $lastRetrieve = $this->getLastRetrieveDate();
 
         $this->getServiceLocator()->get('logService')
-            ->log(\Log\Service\LogService::LEVEL_INFO,
-                'retr_time',
+            ->log(LogService::LEVEL_INFO,
+                'mag_rtr_time',
                 'Retrieving orders updated since '.$lastRetrieve,
                 array('type'=>'order', 'timestamp'=>$lastRetrieve)
             );
@@ -528,8 +550,8 @@ class OrderGateway extends AbstractGateway
                 );
 
                 $this->getServiceLocator()->get('logService')
-                    ->log(\Log\Service\LogService::LEVEL_DEBUG,
-                        'salesOrderList',
+                    ->log(LogService::LEVEL_DEBUGEXTRA,
+                        'mag_salesOrderList',
                         'Retrieved salesOrderList updated from '.$lastRetrieve,
                         array('updated_at'=>$lastRetrieve, 'results'=>$results)
                     );
@@ -662,8 +684,8 @@ class OrderGateway extends AbstractGateway
         if (!$this->areOrdersInSync()) {
             $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
             $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_WARN,
-                    'forced_retrieve',
+                ->log(LogService::LEVEL_WARN,
+                    'mag_rtr_frc',
                     'Retrieving orders: '.$orderOutOfSyncList,
                     array(),
                     array('order increment ids out of sync'=>$orderOutOfSyncList)
@@ -720,8 +742,8 @@ class OrderGateway extends AbstractGateway
                 $success = FALSE;
                 $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
                 $this->getServiceLocator()->get('logService')
-                    ->log(\Log\Service\LogService::LEVEL_ERROR,
-                        'forced_retrieve_failed',
+                    ->log(LogService::LEVEL_ERROR,
+                        'mag_rtr_frc_fail',
                         'Retrieval failed for orders: '.$orderOutOfSyncList,
                         array(),
                         array('order increment ids still out of sync'=>$orderOutOfSyncList)
@@ -850,22 +872,17 @@ class OrderGateway extends AbstractGateway
                 $data['item_discount'] = ($data['quantity'] ? $data['total_discount'] / $data['quantity'] : 0);
 
                 $this->getServiceLocator()->get('logService')
-                    ->log(\Log\Service\LogService::LEVEL_INFO,
-                        'dataQuantity','dataQuantity',
-                        array('data'=>$data, 'dataQuantity'=>$data['quantity'])
+                    ->log(LogService::LEVEL_INFO,
+                        'mag_o_cr_oi', 'Create item data',
+                        array('orderitem uniqued id'=>$uniqueId, 'quantity'=>$data['quantity'],'data'=>$data)
                     );
 
                 $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
 
-                $entity = $this->_entityService->createEntity(
-                    $nodeId,
-                    'orderitem',
-                    $storeId,
-                    $uniqueId,
-                    $data,
-                    $parentId
-                );
-                $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                $entity = $this->_entityService
+                    ->createEntity($nodeId, 'orderitem', $storeId, $uniqueId, $data, $parentId);
+                $this->_entityService
+                    ->linkEntity($this->_node->getNodeId(), $entity, $localId);
 
                 $this->updateQtyPreTransit($order, $entity);
             }
@@ -1119,8 +1136,8 @@ class OrderGateway extends AbstractGateway
                         .'], comment '.$comment.', notifyCustomer '.$notify.', includeComment '.$sendComment
                         .', refundToStoreCreditAmount '.$creditRefund.'.';
                     $this->getServiceLocator()->get('logService')
-                        ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
-                            'mag_cr_cmemo',
+                        ->log(LogService::LEVEL_DEBUGEXTRA,
+                            'mag_o_cr_cm',
                             $message,
                             array(
                                 'entity (order)'=>$order,
@@ -1313,8 +1330,8 @@ class OrderGateway extends AbstractGateway
         $orderId = ($order->getData('original_order') != NULL ?
             $order->resolve('original_order', 'order')->getUniqueId() : $order->getUniqueId());
         $this->getServiceLocator()->get('logService')
-            ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
-                'ship_send',
+            ->log(LogService::LEVEL_DEBUGEXTRA,
+                'mag_ship_send',
                 'Sending shipment for '.$orderId,
                 array(
                     'ord'=>$order->getId(),
