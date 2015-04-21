@@ -240,35 +240,34 @@ class OrderGateway extends AbstractGateway
 
             $success = FALSE;
             if ($stockitem) {
-                $qtyPreTransit = $stockitem->getData('qty_pre_transit', 0);
-                $itemQuantity = $orderitem->getData('quantity', 0);
-                $logData = array_merge($logData, array('qty_pre_transit'=>$qtyPreTransit, 'quantity'=>$itemQuantity));
+                if ($isOrderProcessing) {
+                    $attributeCode = 'qty_pre_transit';
+                }else { // MAGENTO_STATUS_CANCELED
+                    $attributeCode = 'available';
+                }
 
-                if (!$isOrderProcessing && $qtyPreTransit < $itemQuantity) {
+                $itemQuantity = $orderitem->getData('quantity', 0);
+                $updateData = array($attributeCode=>$stockitem->getData($attributeCode, 0) + $itemQuantity);
+                $logData = array_merge($logData, array('quantity'=>$itemQuantity), $updateData);
+
+                try{
+                    $updateData;
+                    $this->_entityService->updateEntity($this->_node->getNodeId(), $stockitem, $updateData, FALSE);
+                    $success = TRUE;
+
                     $this->getServiceLocator()->get('logService')
-                        ->log(LogService::LEVEL_ERROR,
-                            'mag_rev_pre_fail',
-                            'Reversal of qty_pre_transit failed on orderitem '.$orderitem->getEntityId(),
+                        ->log(LogService::LEVEL_INFO,
+                            'mag_upd_pre',
+                            'Updated '.$attributeCode.' on stockitem '.$stockitem->getEntityId(),
                             $logData, $logEntities
                         );
-                }else {
-                    try{
-                        if ($isOrderProcessing) {
-                            $qtyPreTransit += $itemQuantity;
-                        }else { // MAGENTO_STATUS_CANCELED
-                            $qtyPreTransit -= $itemQuantity;
-                        }
-                        $updateData = array('qty_pre_transit'=>$qtyPreTransit);
-                        $this->_entityService->updateEntity($this->_node->getNodeId(), $stockitem, $updateData, FALSE);
-                        $success = TRUE;
-                    }catch (\Exception $exception) {
-                        $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_ERROR,
-                                'mag_upd_pre_fail',
-                                'Update of qty_pre_transit failed on stockitem '.$stockitem->getEntityId(),
-                                $logData, $logEntities
-                            );
-                    }
+                }catch (\Exception $exception) {
+                    $this->getServiceLocator()->get('logService')
+                        ->log(LogService::LEVEL_ERROR,
+                            'mag_upd_pre_fail',
+                            'Update of '.$attributeCode.' failed on stockitem '.$stockitem->getEntityId(),
+                            $logData, $logEntities
+                        );
                 }
             }else{
                 $this->getServiceLocator()->get('logService')
