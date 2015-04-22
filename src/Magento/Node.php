@@ -129,6 +129,30 @@ class Node extends AbstractNode {
     protected function _deinit() {}
 
     /**
+     * Updates all data into the node’s source - should load and collapse all pending updates and call writeUpdates,
+     *   as well as loading and sequencing all actions.
+     * @throws NodeException
+     */
+    public function update()
+    {
+        $this->_nodeService = $this->getServiceLocator()->get('nodeService');
+
+        $this->actions = $this->getPendingActions();
+        $this->updates = $this->getPendingUpdates();
+
+        $this->getServiceLocator()->get('logService')
+            ->log(\Log\Service\LogService::LEVEL_INFO,
+                'mag_node_upd',
+                'AbstractNode update: '.count($this->actions).' actions, '.count($this->updates).' updates.',
+                array(),
+                array('node'=>$this, 'actions'=>$this->actions, 'updates'=>$this->updates)
+            );
+
+        $this->processActions();
+        $this->processUpdates();
+    }
+
+    /**
      * Implemented in each NodeModule
      * Returns an instance of a subclass of AbstractGateway that can handle the provided entity type.
      *
