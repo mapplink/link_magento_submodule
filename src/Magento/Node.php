@@ -6,6 +6,7 @@ use Node\AbstractNode;
 use Node\AbstractGateway;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
+use Magelink\Exception\SyncException;
 
 class Node extends AbstractNode {
 
@@ -23,20 +24,27 @@ class Node extends AbstractNode {
      * @param string $type The type of API to establish - must be available as a service with the name "magento_{type}"
      * @return object|false
      */
-    public function getApi($type){
+    public function getApi($type)
+    {
         if(isset($this->_api[$type])){
             return $this->_api[$type];
         }
 
         $this->_api[$type] = $this->getServiceLocator()->get('magento_' . $type);
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'init_api', 'Creating API instance ' . $type, array('type'=>$type), array('node'=>$this));
-        $res = $this->_api[$type]->init($this);
-        if($res){
-            return $this->_api[$type];
-        }else{
-            $this->_api[$type] = false;
-            return false;
+        $this->getServiceLocator()->get('logService')
+            ->log(\Log\Service\LogService::LEVEL_INFO,
+                'init_api',
+                'Creating API instance '.$type,
+                array('type'=>$type),
+                array('node'=>$this)
+            );
+
+        $apiExists = $this->_api[$type]->init($this);
+        if (!$apiExists) {
+            $this->_api[$type] = FALSE;
         }
+
+        return $this->_api[$type];
     }
 
     protected $_storeViews = NULL;
@@ -58,7 +66,7 @@ class Node extends AbstractNode {
 
             $soap = $this->getApi('soap');
             if (!$soap) {
-                throw new \Magelink\Exception\SyncException('Failed to initialize SOAP api for store view fetch');
+                throw new SyncException('Failed to initialize SOAP api for store view fetch');
             }else{
                 /** @var \Magento\Api|Soap $soap */
                 $result = $soap->call('storeList', array());
@@ -90,12 +98,24 @@ class Node extends AbstractNode {
         $this->getStoreViews();
         $storeCount = count($this->_storeViews);
         if($storeCount == 1 && $this->isMultiStore()){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR, 'multistore_single', 'Multi-store enabled but only one store view!', array(), array('node'=>$this));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_ERROR,
+                    'multistore_single',
+                    'Multi-store enabled but only one store view!',
+                    array(),
+                    array('node'=>$this)
+                );
         }else if($storeCount > 1 && !$this->isMultiStore()){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'multistore_missing', 'Multi-store disabled but multiple store views!', array(), array('node'=>$this));
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_WARN,
+                    'multistore_missing',
+                    'Multi-store disabled but multiple store views!',
+                    array(),
+                    array('node'=>$this)
+                );
         }
 
-        if(!$this->isMultiStore()){
+        if (!$this->isMultiStore()) {
             $this->_storeViews = array(0=>array());
         }
     }
@@ -106,10 +126,7 @@ class Node extends AbstractNode {
      * This will always be the last call to the Node.
      * NOTE: This will be called even if the Node has thrown a NodeException, but NOT if a SyncException or other Exception is thrown (which represents an irrecoverable error)
      */
-    protected function _deinit()
-    {
-
-    }
+    protected function _deinit() {}
 
     /**
      * Implemented in each NodeModule
@@ -121,26 +138,25 @@ class Node extends AbstractNode {
      */
     protected function _createGateway($entity_type)
     {
-        if($entity_type == 'product'){
+        if ($entity_type == 'product') {
             return new Gateway\ProductGateway;
         }
-        if($entity_type == 'stockitem'){
+        if ($entity_type == 'stockitem') {
             return new Gateway\StockGateway;
         }
-        if($entity_type == 'order'){
+        if ($entity_type == 'order') {
             return new Gateway\OrderGateway;
         }
-        if($entity_type == 'creditmemo'){
+        if ($entity_type == 'creditmemo') {
             return new Gateway\CreditmemoGateway;
         }
-        if($entity_type == 'customer'){
+        if ($entity_type == 'customer') {
             return new Gateway\CustomerGateway;
         }
-        if($entity_type == 'address' || $entity_type == 'orderitem'){
-            return null;
+        if ($entity_type == 'address' || $entity_type == 'orderitem') {
+            return NULL;
         }
 
-
-        throw new MagelinkException('Unknown/invalid entity type ' . $entity_type);
+        throw new SyncException('Unknown/invalid entity type '.$entity_type);
     }
 }

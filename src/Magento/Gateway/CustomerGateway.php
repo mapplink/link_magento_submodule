@@ -2,91 +2,62 @@
 
 namespace Magento\Gateway;
 
+use Entity\Service\EntityService;
+use Magelink\Exception\NodeException;
+use Magelink\Exception\GatewayException;
 use Node\AbstractNode;
 use Node\Entity;
-use Magelink\Exception\MagelinkException;
-use Entity\Service\EntityService;
 
-class CustomerGateway extends AbstractGateway {
-
-    /**
-     * @var \Magento\Node
-     */
-    protected $_node;
-
-    /**
-     * @var \Node\Entity\Node
-     */
-    protected $_nodeEnt;
-
-    /**
-     * @var \Magento\Api\Soap
-     */
-    protected $_soap = null;
-
-    /**
-     * @var \Magento\Api\SoapV1
-     */
-    protected $_soapv1 = null;
-
-    /**
-     * @var \Magento\Api\Db
-     */
-    protected $_db = null;
-
-    /**
-     * @var \Node\Service\NodeService
-     */
-    protected $_ns = null;
-
-    /**
-     * @var array[]
-     */
-    protected $_custGroups = array();
+class CustomerGateway extends AbstractGateway
+{
 
     /**
      * Initialize the gateway and perform any setup actions required.
      * @param AbstractNode $node
      * @param Entity\Node $nodeEntity
-     * @param string $entity_type
-     * @throws \Magelink\Exception\MagelinkException
+     * @param string $entityType
+     * @throws GatewayException
+     * @throws MagelinkException
      * @return boolean
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entity_type)
+    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
     {
-        if(!($node instanceof \Magento\Node)){
-            throw new \Magelink\Exception\MagelinkException('Invalid node type for this gateway');
-        }
-        if($entity_type != 'customer'){
-            throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
-        }
+        if ($entityType != 'customer') {
+            $success = FALSE;
+            throw new GatewayException('Invalid entity type for this gateway');
+        }else{
+            $success = parent::init($node, $nodeEntity, $entityType);
 
-        $this->_node = $node;
-        $this->_nodeEnt = $nodeEntity;
+            if ($this->_node->getConfig('customer_attributes')
+                && strlen($this->_node->getConfig('customer_attributes'))) {
 
-        $this->_soap = $node->getApi('soap');
-        if(!$this->_soap){
-            throw new MagelinkException('SOAP is required for Magento Customers');
-        }
-        if($this->_node->getConfig('customer_attributes') && strlen($this->_node->getConfig('customer_attributes'))){
-            $this->_soapv1 = $node->getApi('soapv1');
-            if(!$this->_soapv1){
-                throw new MagelinkException('SOAP v1 is required for extended customer attributes');
+                $this->_soapv1 = $node->getApi('soapv1');
+                if (!$this->_soapv1) {
+                    $success = FALSE;
+                    throw new GatewayException('SOAP v1 is required for extended customer attributes');
+                }
+            }
+
+            try {
+                $groups = $this->_soap->call('customerGroupList', array());
+            }catch (\Exception $exception) {
+                throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+            }
+
+            $this->_custGroups = array();
+            foreach ($groups as $groupArray) {
+                $this->_custGroups[$groupArray['customer_group_id']] = $groupArray;
             }
         }
-        $this->_db = $node->getApi('db');
 
-        $this->_ns = $this->getServiceLocator()->get('nodeService');
-
-        $groups = $this->_soap->call('customerGroupList', array());
-        $this->_custGroups = array();
-        foreach($groups as $arr){
-            $this->_custGroups[$arr['customer_group_id']] = $arr;
-        }
+        return $success;
     }
 
     /**
      * Retrieve and action all updated records (either from polling, pushed data, or other sources).
+     * @throws GatewayException
+     * @throws MagelinkException
+     * @throws NodeException
      */
     public function retrieve()
     {
@@ -95,23 +66,30 @@ class CustomerGateway extends AbstractGateway {
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = time();
+        $timestamp = time() - $this->apiOverlappingSeconds;
 
-        $retTime = date('Y-m-d H:i:s', $this->_ns->getTimestamp($this->_nodeEnt->getNodeId(), 'customer', 'retrieve') + (intval($this->_node->getConfig('time_delta_customer')) * 3600));
+        $lastRetrieve = date('Y-m-d H:i:s',
+            $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve')
+                + (intval($this->_node->getConfig('time_delta_customer')) * 3600));
 
-        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'retr_time', 'Retrieving customers updated since ' . $retTime, array('type'=>'customer', 'timestamp'=>$retTime));
+        $this->getServiceLocator()->get('logService')
+            ->log(\Log\Service\LogService::LEVEL_INFO,
+                'retr_time',
+                'Retrieving customers updated since '.$lastRetrieve,
+                array('type'=>'customer', 'timestamp'=>$lastRetrieve)
+            );
 
-        if($this->_soap){
-            $results = $this->_soap->call('customerCustomerList', array(
-                array(
-                    'complex_filter'=>array(
-                        array(
-                            'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>$retTime),
-                        ),
-                    ),
-                ), // filters
-            ));
+        if ($this->_soap) {
+            try {
+                $results = $this->_soap->call('customerCustomerList', array(
+                    array('complex_filter'=>array(array(
+                        'key'=>'updated_at',
+                        'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
+                    )))
+                ));
+            }catch (\Exception $exception) {
+                throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+            }
 
             if (!is_array($results)) {
                 $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR,
@@ -121,131 +99,192 @@ class CustomerGateway extends AbstractGateway {
                     array('soap result'=>$results)
                 );
             }
-
-            /**$specialAtt = $this->_node->getConfig('customer_special_att');
-            if(!strlen(trim($specialAtt))){
+/*
+            $specialAtt = $this->_node->getConfig('customer_special_attributes');
+            if (!strlen(trim($specialAtt))) {
                 $specialAtt = false;
             }else{
                 $specialAtt = trim(strtolower($specialAtt));
-                if(!$entityConfigService->checkAttribute('customer', $specialAtt)){
-                    $entityConfigService->createAttribute($specialAtt, $specialAtt, 0, 'varchar', 'customer', 'Custom Magento attribute (special - taxvat)');
-                    $this->getServiceLocator()->get('nodeService')->subscribeAttribute($this->_node->getNodeId(), $specialAtt, 'customer');
+                if (!$entityConfigService->checkAttribute('customer', $specialAtt)) {
+                    $entityConfigService->createAttribute(
+                        $specialAtt, $specialAtt, 0, 'varchar', 'customer', 'Custom Magento attribute (special - taxvat)');
+                    $this->getServiceLocator()->get('nodeService')
+                        ->subscribeAttribute($this->_node->getNodeId(), $specialAtt, 'customer');
                 }
-            }**/
-
-            $additional = $this->_node->getConfig('customer_attributes');
-            if(is_string($additional)){
-                $additional = explode(',', $additional);
             }
-            if(!$additional || !is_array($additional)){
-                $additional = array();
+*/
+            $additionalAttributes = $this->_node->getConfig('customer_attributes');
+            if (is_string($additionalAttributes)) {
+                $additionalAttributes = explode(',', $additionalAttributes);
             }
-            foreach($additional as $k=>&$att){
-                $att = trim(strtolower($att));
-                if(!strlen($att)){
-                    unset($additional[$k]);
-                    continue;
-                }
-                if(!$entityConfigService->checkAttribute('customer', $att)){
-                    $entityConfigService->createAttribute($att, $att, 0, 'varchar', 'customer', 'Custom Magento attribute');
-                    $this->getServiceLocator()->get('nodeService')->subscribeAttribute($this->_node->getNodeId(), $att, 'customer');
-                }
-
+            if (!$additionalAttributes || !is_array($additionalAttributes)) {
+                $additionalAttributes = array();
             }
 
-            foreach($results as $cust){
+            foreach ($additionalAttributes as $k=>&$attributeCode) {
+                $attributeCode = trim(strtolower($attributeCode));
+                if (!strlen($attributeCode)) {
+                    unset($additionalAttributes[$k]);
+                }else{
+                    if (!$entityConfigService->checkAttribute('customer', $attributeCode)) {
+                        $entityConfigService->createAttribute(
+                            $attributeCode, $attributeCode, 0, 'varchar', 'customer', 'Custom Magento attribute');
+                        $this->getServiceLocator()->get('nodeService')
+                            ->subscribeAttribute($this->_node->getNodeId(), $attributeCode, 'customer');
+                    }
+                }
+            }
+
+            foreach ($results as $customer) {
                 $data = array();
 
-                $unique_id = $cust['email'];
-                $local_id = $cust['customer_id'];
-                $store_id = ($this->_node->isMultiStore() ? $cust['store_id'] : 0);
-                $parent_id = null;
+                $uniqueId = $customer['email'];
+                $local_id = $customer['customer_id'];
+                $storeId = ($this->_node->isMultiStore() ? $customer['store_id'] : 0);
+                $parentId = NULL;
 
-                $data['first_name'] = (isset($cust['firstname']) ? $cust['firstname'] : null);
-                $data['middle_name'] = (isset($cust['middlename']) ? $cust['middlename'] : null);
-                $data['last_name'] = (isset($cust['lastname']) ? $cust['lastname'] : null);
-                $data['date_of_birth'] = (isset($cust['dob']) ? $cust['dob'] : null);
+                $data['first_name'] = (isset($customer['firstname']) ? $customer['firstname'] : NULL);
+                $data['middle_name'] = (isset($customer['middlename']) ? $customer['middlename'] : NULL);
+                $data['last_name'] = (isset($customer['lastname']) ? $customer['lastname'] : NULL);
+                $data['date_of_birth'] = (isset($customer['dob']) ? $customer['dob'] : NULL);
 
                 /**if($specialAtt){
-                    $data[$specialAtt] = (isset($cust['taxvat']) ? $cust['taxvat'] : null);
+                    $data[$specialAtt] = (isset($customer['taxvat']) ? $customer['taxvat'] : NULL);
                 }**/
-                if(count($additional) && $this->_soapv1){
-                    $extra = $this->_soapv1->call('customer.info', array($cust['customer_id'], $additional));
-                    foreach($additional as $att){
-                        if(array_key_exists($att, $extra)){
-                            $data[$att] = $extra[$att];
+                if (count($additionalAttributes) && $this->_soapv1) {
+                    try {
+                        $extra = $this->_soapv1->call('customer.info',
+                            array($customer['customer_id'], $additionalAttributes));
+                    }catch (\Exception $exception) {
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    }
+
+                    foreach ($additionalAttributes as $attributeCode) {
+                        if (array_key_exists($attributeCode, $extra)) {
+                            $data[$attributeCode] = $extra[$attributeCode];
                         }else{
-                            $data[$att] = null;
+                            $data[$attributeCode] = NULL;
                         }
                     }
                 }
 
-                if(isset($this->_custGroups[intval($cust['group_id'])])){
-                    $data['customer_type'] = $this->_custGroups[intval($cust['group_id'])]['customer_group_code'];
+                if(isset($this->_custGroups[intval($customer['group_id'])])){
+                    $data['customer_type'] = $this->_custGroups[intval($customer['group_id'])]['customer_group_code'];
                 }else{
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'unknown_group', 'Unknown customer group ID ' . $cust['group_id'], array('group'=>$cust['group_id'], 'unique'=>$cust['email']));
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_WARN, 
+                            'unknown_group', 
+                            'Unknown customer group ID '.$customer['group_id'],
+                            array('group'=>$customer['group_id'], 'unique'=>$customer['email'])
+                        );
                 }
 
-                if($this->_node->getConfig('load_full_customer')){
-                    $data = array_merge($data, $this->createAddresses($cust, $entityService));
+                if ($this->_node->getConfig('load_full_customer')) {
+                    $data = array_merge($data, $this->createAddresses($customer, $entityService));
 
-                    if($this->_db){
-                        $data['enable_newsletter'] = $this->_db->getNewsletterStatus($local_id);
+                    if ($this->_db) {
+                        try {
+                            $data['enable_newsletter'] = $this->_db->getNewsletterStatus($local_id);
+                        }catch (\Exception $exception) {
+                            // store as sync issue
+                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                        }
                     }
                 }
 
                 /** @var boolean $needsUpdate Whether we need to perform an entity update here */
                 $needsUpdate = true;
 
-                $existingEntity = $entityService->loadEntityLocal($this->_node->getNodeId(), 'customer', $store_id, $local_id);
-                if(!$existingEntity){
-                    $existingEntity = $entityService->loadEntity($this->_node->getNodeId(), 'customer', $store_id, $unique_id);
-                    if(!$existingEntity){
-                        $existingEntity = $entityService->createEntity($this->_node->getNodeId(), 'customer', $store_id, $unique_id, $data, $parent_id);
+                $existingEntity = $entityService
+                    ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $local_id);
+                if (!$existingEntity) {
+                    $existingEntity = $entityService
+                        ->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $uniqueId);
+                    if (!$existingEntity) {
+                        $existingEntity = $entityService->createEntity(
+                            $this->_node->getNodeId(), 
+                            'customer', 
+                            $storeId, 
+                            $uniqueId, 
+                            $data, 
+                            $parentId
+                        );
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_new', 'New customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_INFO,
+                                'ent_new',
+                                'New customer '.$uniqueId,
+                                array('code'=>$uniqueId),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
                         $needsUpdate = false;
-                    }else if($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != null){
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_wronglink', 'Incorrectly linked customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                    }elseif ($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_INFO,
+                                'ent_wronglink',
+                                'Incorrectly linked customer '.$uniqueId,
+                                array('code'=>$uniqueId),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
                         $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }else{
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_link', 'Unlinked customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                        $this->getServiceLocator()->get('logService')
+                            ->log(\Log\Service\LogService::LEVEL_INFO,
+                                'ent_link',
+                                'Unlinked customer '.$uniqueId,
+                                array('code'=>$uniqueId),
+                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            );
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }
                 }else{
-                    $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_INFO, 'ent_update', 'Updated customer ' . $unique_id, array('code'=>$unique_id), array('node'=>$this->_node, 'entity'=>$existingEntity));
+                    $this->getServiceLocator()->get('logService')
+                        ->log(\Log\Service\LogService::LEVEL_INFO,
+                            'ent_update',
+                            'Updated customer '.$uniqueId,
+                            array('code'=>$uniqueId),
+                            array('node'=>$this->_node, 'entity'=>$existingEntity)
+                        );
                 }
-                if($needsUpdate){
+                if ($needsUpdate) {
                     $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, false);
                 }
             }
         }else{
             // Nothing worked
-            throw new \Magelink\Exception\NodeException('No valid API available for sync');
+            throw new NodeException('No valid API available for sync');
         }
-        $this->_ns->setTimestamp($this->_nodeEnt->getNodeId(), 'customer', 'retrieve', $timestamp);
+        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve', $timestamp);
     }
 
     /**
      * Create the Address entities for a given customer and pass them back as the appropriate attributes
      *
-     * @param array $cust
-     * @param EntityService $es
+     * @param array $customerData
+     * @param EntityService $entityService
      * @return array
      */
-    protected function createAddresses($cust, EntityService $es){
+    protected function createAddresses(array $customer, EntityService $entityService)
+    {
         $data = array();
 
-        $addressRes = $this->_soap->call('customerAddressList', array($cust['customer_id']));
-        foreach($addressRes as $a){
-            if($a['is_default_billing']){
-                $data['billing_address'] = $this->createAddressEntity($a, $cust, 'billing', $es);
+        try {
+            $addressList = $this->_soap->call('customerAddressList', array($customer['customer_id']));
+        }catch (\Exception $exception) {
+            // store as sync issue
+            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+        }
+
+        foreach ($addressList as $address) {
+            if ($address['is_default_billing']) {
+                $data['billing_address'] = $this->createAddressEntity($address, $customer, 'billing', $entityService);
             }
-            if($a['is_default_shipping']){
-                $data['shipping_address'] = $this->createAddressEntity($a, $cust, 'shipping', $es);
+            if ($address['is_default_shipping']) {
+                $data['shipping_address'] = $this->createAddressEntity($address, $customer, 'shipping', $entityService);
             }
-            if(!$a['is_default_billing'] && !$a['is_default_shipping']){
+            if (!$address['is_default_billing'] && !$address['is_default_shipping']) {
                 // TODO: Store this maybe? For now ignore
             }
         }
@@ -256,38 +295,49 @@ class CustomerGateway extends AbstractGateway {
      * Create an individual Address entity for a customer
      *
      * @param array $addressData
-     * @param array $cust
+     * @param array $customer
      * @param string $type "billing" or "shipping"
-     * @param EntityService $es
+     * @param EntityService $entityService
      * @return \Entity\Entity
      */
-    protected function createAddressEntity($addressData, $cust, $type, EntityService $es){
+    protected function createAddressEntity(array $addressData, array $customer, $type, EntityService $entityService)
+    {
+        $uniqueId = 'cust-'.$customer['customer_id'].'-'.$type;
 
-        $unique_id = 'cust-'.$cust['customer_id'].'-'.$type;
-
-        $e = $es->loadEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $cust['store_id'] : 0), $unique_id);
+        $entity = $entityService->loadEntity(
+            $this->_node->getNodeId(), 
+            'address', 
+            ($this->_node->isMultiStore() ? $customer['store_id'] : 0),
+            $uniqueId
+        );
 
         $data = array(
-            'first_name'=>(isset($addressData['firstname']) ? $addressData['firstname'] : null),
-            'middle_name'=>(isset($addressData['middlename']) ? $addressData['middlename'] : null),
-            'last_name'=>(isset($addressData['lastname']) ? $addressData['lastname'] : null),
-            'prefix'=>(isset($addressData['prefix']) ? $addressData['prefix'] : null),
-            'suffix'=>(isset($addressData['suffix']) ? $addressData['suffix'] : null),
-            'street'=>(isset($addressData['street']) ? $addressData['street'] : null),
-            'city'=>(isset($addressData['city']) ? $addressData['city'] : null),
-            'region'=>(isset($addressData['region']) ? $addressData['region'] : null),
-            'postcode'=>(isset($addressData['postcode']) ? $addressData['postcode'] : null),
-            'country_code'=>(isset($addressData['country_id']) ? $addressData['country_id'] : null),
-            'telephone'=>(isset($addressData['telephone']) ? $addressData['telephone'] : null),
-            'company'=>(isset($addressData['company']) ? $addressData['company'] : null)
+            'first_name'=>(isset($addressData['firstname']) ? $addressData['firstname'] : NULL),
+            'middle_name'=>(isset($addressData['middlename']) ? $addressData['middlename'] : NULL),
+            'last_name'=>(isset($addressData['lastname']) ? $addressData['lastname'] : NULL),
+            'prefix'=>(isset($addressData['prefix']) ? $addressData['prefix'] : NULL),
+            'suffix'=>(isset($addressData['suffix']) ? $addressData['suffix'] : NULL),
+            'street'=>(isset($addressData['street']) ? $addressData['street'] : NULL),
+            'city'=>(isset($addressData['city']) ? $addressData['city'] : NULL),
+            'region'=>(isset($addressData['region']) ? $addressData['region'] : NULL),
+            'postcode'=>(isset($addressData['postcode']) ? $addressData['postcode'] : NULL),
+            'country_code'=>(isset($addressData['country_id']) ? $addressData['country_id'] : NULL),
+            'telephone'=>(isset($addressData['telephone']) ? $addressData['telephone'] : NULL),
+            'company'=>(isset($addressData['company']) ? $addressData['company'] : NULL)
         );
-        if(!$e){
-            $e = $es->createEntity($this->_node->getNodeId(), 'address', ($this->_node->isMultiStore() ? $cust['store_id'] : 0), $unique_id, $data);
-            $es->linkEntity($this->_node->getNodeId(), $e, $addressData['customer_address_id']);
+
+        if (!$entity) {
+            $entity = $entityService->createEntity(
+                $this->_node->getNodeId(), 
+                'address', 
+                ($this->_node->isMultiStore() ? $customer['store_id'] : 0),
+                $uniqueId, $data
+            );
+            $entityService->linkEntity($this->_node->getNodeId(), $entity, $addressData['customer_address_id']);
         }else{
-            $es->updateEntity($this->_node->getNodeId(), $e, $data, false);
+            $entityService->updateEntity($this->_node->getNodeId(), $entity, $data, false);
         }
-        return $e;
+        return $entity;
     }
 
     /**
@@ -295,19 +345,22 @@ class CustomerGateway extends AbstractGateway {
      * @param \Entity\Entity $entity
      * @param \Entity\Attribute[] $attributes
      * @param int $type
-     * @throws MagelinkException
      */
-    public function writeUpdates(\Entity\Entity $entity, $attributes, $type=\Entity\Update::TYPE_UPDATE)
+    public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE)
     {
-        /** @var \Entity\Service\EntityService $entityService */
-        /*$entityService = $this->getServiceLocator()->get('entityService');
+        return FALSE;
 
-        $additional = $this->_node->getConfig('customer_attributes');
-        if(is_string($additional)){
-            $additional = explode(',', $additional);
+        // TODO: Implement writeUpdates() method.
+
+        /** @var \Entity\Service\EntityService $entityService */
+/*        $entityService = $this->getServiceLocator()->get('entityService');
+
+        $additionalAttributes = $this->_node->getConfig('customer_attributes');
+        if(is_string($additionalAttributes)){
+            $additionalAttributes = explode(',', $additionalAttributes);
         }
-        if(!$additional || !is_array($additional)){
-            $additional = array();
+        if(!$additionalAttributes || !is_array($additionalAttributes)){
+            $additionalAttributes = array();
         }
 
         $data = array(
@@ -319,7 +372,7 @@ class CustomerGateway extends AbstractGateway {
 
         foreach($attributes as $att){
             $v = $entity->getData($att);
-            if(in_array($att, $additional)){
+            if(in_array($att, $additionalAttributes)){
                 // Custom attribute
                 if(is_array($v)){
                     // TODO implement
@@ -383,7 +436,7 @@ class CustomerGateway extends AbstractGateway {
             $this->_soap->call('catalogCustomerUpdate', $req);
         }else if($type == \Entity\Update::TYPE_CREATE){
 
-            $attSet = null;
+            $attSet = NULL;
             foreach($this->_attSets as $setId=>$set){
                 if($set['name'] == $entity->getData('customer_class', 'default')){
                     $attSet = $setId;
@@ -402,25 +455,22 @@ class CustomerGateway extends AbstractGateway {
                 throw new MagelinkException('Error creating customer in Magento (' . $entity->getUniqueId() . '!');
             }
             $entityService->linkEntity($this->_node->getNodeId(), $entity, $res);
-        }*/
-
-        // TODO: Implement writeUpdates() method.
+        }
+*/
     }
 
     /**
      * Write out the given action.
      * @param \Entity\Action $action
-     * @throws MagelinkException
      */
     public function writeAction(\Entity\Action $action)
     {
-        return false;
-        /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator()->get('entityService');
-        /** @var \Entity\Service\EntityConfigService $entityConfigService */
-        $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
+        return FALSE;
 
-        /*$entity = $action->getEntity();
+        /** @var \Entity\Service\EntityService $entityService */
+/*        $entityService = $this->getServiceLocator()->get('entityService');
+
+        $entity = $action->getEntity();
 
         switch($action->getType()){
             case 'delete':
@@ -428,6 +478,8 @@ class CustomerGateway extends AbstractGateway {
                 break;
             default:
                 throw new MagelinkException('Unsupported action type ' . $action->getType() . ' for Magento Orders.');
-        }*/
+        }
+*/
     }
+
 }
