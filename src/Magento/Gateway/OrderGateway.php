@@ -1033,8 +1033,7 @@ class OrderGateway extends AbstractGateway
                 }
                 break;
             case 'cancel':
-                $isCancelable = (strpos($orderStatus, 'pending') === 0)
-                    || in_array($orderStatus, array('payment_review', 'fraud', 'fraud_dps'));
+                $isCancelable = self::hasOrderStatePending($orderStatus);
                 if ($orderStatus !== self::MAGENTO_STATUS_CANCELED) {
                     if (!$isCancelable){
                         $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
