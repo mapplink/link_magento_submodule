@@ -401,6 +401,7 @@ class OrderGateway extends AbstractGateway
         }
 
         $needsUpdate = TRUE;
+        $orderComment = FALSE;
 
         $existingEntity = $this->_entityService->loadEntityLocal(
             $this->_node->getNodeId(),
@@ -448,6 +449,8 @@ class OrderGateway extends AbstractGateway
                         // ToDo: Get new status from Magento to prevent overwrites (via db api?)
                         $status = $existingEntity->getData('status');
                         $comment = 'Order retrieved by MageLink, Entity #'.$existingEntity->getId();
+                        $orderComment = array('Initial sync'=>'Order #'.$uniqueId.' synced to HOPS.');
+
                         $this->_soap->call('salesOrderAddComment', array($uniqueId, $status, $comment, FALSE));
                     }catch (\Exception $exception) {
                         $this->getServiceLocator()->get('logService')
@@ -491,6 +494,13 @@ class OrderGateway extends AbstractGateway
         }
 
         if ($needsUpdate) {
+            $oldStatus = $existingEntity->getData('status', NULL);
+            $statusChanged = $oldStatus != $data['status'];
+            if (!$orderComment && $statusChanged) {
+                $orderComment = array(
+                    'Status change'=>'Order #'.$uniqueId.' moved from '.$oldStatus.' to '.$data['status']);
+            }
+
             $movedToProcessing = self::hasOrderStateProcessing($orderData['status'])
                 && !self::hasOrderStateProcessing($existingEntity->getData('status'));
             $movedToCancel = $orderData['status'] == self::MAGENTO_STATUS_CANCELED
@@ -505,6 +515,19 @@ class OrderGateway extends AbstractGateway
                 }
             }
         }
+
+        if ($orderComment) {
+            if (!is_array($orderComment)) {
+                $orderComment = array($orderComment=>$orderComment);
+            }
+            $this->_entityService->createEntityComment(
+                $existingEntity,
+                'Magento/HOPS',
+                key($orderComment),
+                current($orderComment)
+            );
+        }
+
         $this->updateStatusHistory($orderData, $existingEntity);
     }
 
