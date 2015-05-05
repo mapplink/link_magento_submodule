@@ -29,7 +29,7 @@ class Db implements ServiceLocatorAwareInterface
     protected $_node;
 
     /** @var array  */
-    protected $columns = NULL; /*array(
+    protected $columns = array(
         'entity_id',
         'status',
         'store_id',
@@ -90,7 +90,7 @@ class Db implements ServiceLocatorAwareInterface
         'total_item_count',
         'customer_gender',
         'gift_message_id',
-    );*/
+    );
 
 
     /**
