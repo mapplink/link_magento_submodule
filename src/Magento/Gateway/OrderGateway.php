@@ -435,6 +435,8 @@ class OrderGateway extends AbstractGateway
                     );
                     $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
 
+                    $orderComment = array('Initial sync'=>'Order #'.$uniqueId.' synced to HOPS.');
+
                     $this->getServiceLocator()->get('logService')
                         ->log($logLevel,
                             'mag_o_new'.$logCodeSuffix,
@@ -520,12 +522,8 @@ class OrderGateway extends AbstractGateway
             if (!is_array($orderComment)) {
                 $orderComment = array($orderComment=>$orderComment);
             }
-            $this->_entityService->createEntityComment(
-                $existingEntity,
-                'Magento/HOPS',
-                key($orderComment),
-                current($orderComment)
-            );
+            $this->_entityService
+                ->createEntityComment($existingEntity, 'Magento/HOPS', key($orderComment), current($orderComment));
         }
 
         $this->updateStatusHistory($orderData, $existingEntity);
