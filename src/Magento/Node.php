@@ -1,4 +1,11 @@
 <?php
+/**
+ * @category Magento
+ * @package Magento
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento;
 
@@ -8,7 +15,15 @@ use Node\Entity;
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\SyncException;
 
-class Node extends AbstractNode {
+class Node extends AbstractNode
+{
+
+    /** @var ServiceLocatorAwareInterface[] $_api */
+    protected $_api = array();
+
+    /** @var array|NULL $_storeViews */
+    protected $_storeViews = NULL;
+
 
     /**
      * @return bool Whether or not we should enable multi store mode
@@ -16,8 +31,6 @@ class Node extends AbstractNode {
     public function isMultiStore(){
         return (bool) $this->getConfig('multi_store');
     }
-
-    protected $_api = array();
 
     /**
      * Returns an api instance set up for this node. Will return false if that type of API is unavailable.
@@ -32,7 +45,7 @@ class Node extends AbstractNode {
 
         $this->_api[$type] = $this->getServiceLocator()->get('magento_' . $type);
         $this->getServiceLocator()->get('logService')
-            ->log(\Log\Service\LogService::LEVEL_INFO,
+            ->log(LogService::LEVEL_INFO,
                 'init_api',
                 'Creating API instance '.$type,
                 array('type'=>$type),
@@ -47,8 +60,6 @@ class Node extends AbstractNode {
         return $this->_api[$type];
     }
 
-    protected $_storeViews = NULL;
-
     /**
      * Return a data array of all store views
      * @return array
@@ -57,7 +68,7 @@ class Node extends AbstractNode {
     {
         if ($this->_storeViews === NULL) {
             $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_INFO,
+                ->log(LogService::LEVEL_INFO,
                     'storeviews',
                     'Loading store views',
                     array(),
@@ -99,7 +110,7 @@ class Node extends AbstractNode {
         $storeCount = count($this->_storeViews);
         if($storeCount == 1 && $this->isMultiStore()){
             $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_ERROR,
+                ->log(LogService::LEVEL_ERROR,
                     'multistore_single',
                     'Multi-store enabled but only one store view!',
                     array(),
@@ -107,7 +118,7 @@ class Node extends AbstractNode {
                 );
         }else if($storeCount > 1 && !$this->isMultiStore()){
             $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_WARN,
+                ->log(LogService::LEVEL_WARN,
                     'multistore_missing',
                     'Multi-store disabled but multiple store views!',
                     array(),
@@ -135,21 +146,20 @@ class Node extends AbstractNode {
      */
     public function update()
     {
-        $this->_nodeService = $this->getServiceLocator()->get('nodeService');
+        $logCode = $this->logTimes('Magento\Node');
 
-        $this->actions = $this->getPendingActions();
-        $this->updates = $this->getPendingUpdates();
+        $this->getPendingActions();
+        $this->getPendingUpdates();
 
-        $this->getServiceLocator()->get('logService')
-            ->log(\Log\Service\LogService::LEVEL_INFO,
-                'mag_node_upd',
-                'AbstractNode update: '.count($this->actions).' actions, '.count($this->updates).' updates.',
-                array(),
-                array('node'=>$this, 'actions'=>$this->actions, 'updates'=>$this->updates)
-            );
+        $logMessage = 'Magento\Node update: '.count($this->updates).' updates, '.count($this->actions).' actions.';
+        $logDataNumbers = array('updates'=>count($this->updates), 'actions'=>count($this->actions));
+        $logEntities = array('node'=>$this, 'actions'=>$this->actions, 'updates'=>$this->updates);
+        $this->_logService->log(LogService::LEVEL_INFO, $logCode.'_no', $logMessage, $logDataNumbers, $logEntities);
 
         $this->processActions();
         $this->processUpdates();
+
+        $this->logTimes('Magento\Node', TRUE);
     }
 
     /**
@@ -183,4 +193,5 @@ class Node extends AbstractNode {
 
         throw new SyncException('Unknown/invalid entity type '.$entity_type);
     }
+
 }
