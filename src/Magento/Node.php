@@ -9,6 +9,7 @@
 
 namespace Magento;
 
+use Log\Service\LogService;
 use Node\AbstractNode;
 use Node\AbstractGateway;
 use Node\Entity;
