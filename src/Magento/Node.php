@@ -168,31 +168,32 @@ class Node extends AbstractNode
      * Returns an instance of a subclass of AbstractGateway that can handle the provided entity type.
      *
      * @throws MagelinkException
-     * @param string $entity_type
+     * @param string $entityType
      * @return AbstractGateway
      */
-    protected function _createGateway($entity_type)
+    protected function _createGateway($entityType)
     {
-        if ($entity_type == 'product') {
-            return new Gateway\ProductGateway;
-        }
-        if ($entity_type == 'stockitem') {
-            return new Gateway\StockGateway;
-        }
-        if ($entity_type == 'order') {
-            return new Gateway\OrderGateway;
-        }
-        if ($entity_type == 'creditmemo') {
-            return new Gateway\CreditmemoGateway;
-        }
-        if ($entity_type == 'customer') {
-            return new Gateway\CustomerGateway;
-        }
-        if ($entity_type == 'address' || $entity_type == 'orderitem') {
-            return NULL;
+        switch ($entityType) {
+            case 'customer':
+                $gateway = new Gateway\CustomerGateway;
+                break;
+            case 'product':
+                $gateway = new Gateway\ProductGateway;
+                break;
+            case 'order':
+                $gateway = new Gateway\OrderGateway;
+                break;
+            case 'stockitem':
+                $gateway = new Gateway\StockGateway;
+                break;
+            case 'creditmemo':
+                $gateway = new Gateway\CreditmemoGateway;
+                break;
+            default:
+                throw new SyncException('Unknown/invalid entity type '.$entityType);
         }
 
-        throw new SyncException('Unknown/invalid entity type '.$entity_type);
+        return $gateway;
     }
 
 }
