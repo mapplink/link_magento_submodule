@@ -1,4 +1,12 @@
 <?php
+/**
+ * Magento Abstract Gateway
+ * @category Magento
+ * @package Magento\Api
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Gateway;
 
@@ -8,13 +16,9 @@ use Node\AbstractGateway as BaseAbstractGateway;
 use Node\AbstractNode;
 use Node\Entity;
 
+
 abstract class AbstractGateway extends BaseAbstractGateway
 {
-    /** @var \Magento\Node */
-    protected $_node;
-
-    /** @var \Node\Entity\Node */
-    protected $_nodeEntity;
 
     /** @var \Node\Service\NodeService */
     protected $_nodeService = NULL;
@@ -37,35 +41,21 @@ abstract class AbstractGateway extends BaseAbstractGateway
 
     /**
      * Initialize the gateway and perform any setup actions required.
-     * @param AbstractNode $node
-     * @param Entity\Node $nodeEntity
      * @param string $entityType
-     * @throws \Magelink\Exception\MagelinkException
-     * @return boolean
+     * @throws MagelinkException
+     * @return bool $success
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
+    protected function _init($entityType)
     {
-        $success = TRUE;
+        $this->_db = $this->_node->getApi('db');
+        $this->_soap = $this->_node->getApi('soap');
 
-        if (!($node instanceof \Magento\Node)) {
+        if (!$this->_soap) {
+            throw new GatewayException('SOAP is required for Magento '.ucfirst($entityType));
             $success = FALSE;
-            throw new MagelinkException('Invalid node type for this gateway');
         }else{
-            $this->_node = $node;
-            $this->_nodeEntity = $nodeEntity;
-            $this->_nodeService = $this->getServiceLocator()->get('nodeService');
-            $this->_entityService = $this->getServiceLocator()->get('entityService');
-            //$this->_entityConfigService = $this->getServiceLocator()->get('entityConfigService');
-
-            $this->_db = $node->getApi('db');
-            $this->_soap = $node->getApi('soap');
-
-            if (!$this->_soap) {
-                $success = FALSE;
-                throw new GatewayException('SOAP is required for Magento '.ucfirst($entityType));
-            }else{
-                $this->apiOverlappingSeconds += $this->_node->getConfig('api_overlapping_seconds');
-            }
+            $this->apiOverlappingSeconds += $this->_node->getConfig('api_overlapping_seconds');
+            $success = TRUE;
         }
 
         return $success;
