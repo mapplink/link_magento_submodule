@@ -24,19 +24,18 @@ class CreditmemoGateway extends AbstractGateway
 
     /**
      * Initialize the gateway and perform any setup actions required.
-     * @param AbstractNode $node
-     * @param Entity\Node $nodeEntity
-     * @param string $entity_type
+     * @param string $entityType
+     * @return bool $success
      * @throws GatewayException
-     * @return boolean
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
+
+    public function _init($entityType)
     {
         if ($entityType != 'creditmemo') {
-            $success = FALSE;
             throw new GatewayException('Invalid entity type for this gateway');
+            $success = FALSE;
         }else{
-            $success = parent::init($node, $nodeEntity, $entityType);
+            $success = TRUE;
         }
 
         return $success;

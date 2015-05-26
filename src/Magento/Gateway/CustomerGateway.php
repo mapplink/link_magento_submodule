@@ -3,6 +3,7 @@
 namespace Magento\Gateway;
 
 use Entity\Service\EntityService;
+use Magelink\Exception\MagelinkException;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
 use Node\AbstractNode;
@@ -13,33 +14,28 @@ class CustomerGateway extends AbstractGateway
 
     /**
      * Initialize the gateway and perform any setup actions required.
-     * @param AbstractNode $node
-     * @param Entity\Node $nodeEntity
      * @param string $entityType
+     * @return bool $success
      * @throws GatewayException
-     * @throws MagelinkException
-     * @return boolean
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
+    public function _init($entityType)
     {
+        $success = FALSE;
         if ($entityType != 'customer') {
-            $success = FALSE;
             throw new GatewayException('Invalid entity type for this gateway');
         }else{
-            $success = parent::init($node, $nodeEntity, $entityType);
-
             if ($this->_node->getConfig('customer_attributes')
                 && strlen($this->_node->getConfig('customer_attributes'))) {
 
-                $this->_soapv1 = $node->getApi('soapv1');
+                $this->_soapv1 = $this->_node->getApi('soapv1');
                 if (!$this->_soapv1) {
-                    $success = FALSE;
                     throw new GatewayException('SOAP v1 is required for extended customer attributes');
                 }
             }
 
             try {
                 $groups = $this->_soap->call('customerGroupList', array());
+                $success = TRUE;
             }catch (\Exception $exception) {
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
             }
@@ -55,9 +51,9 @@ class CustomerGateway extends AbstractGateway
 
     /**
      * Retrieve and action all updated records (either from polling, pushed data, or other sources).
-     * @throws GatewayException
      * @throws MagelinkException
      * @throws NodeException
+     * @throws GatewayException
      */
     public function retrieve()
     {
@@ -261,10 +257,10 @@ class CustomerGateway extends AbstractGateway
 
     /**
      * Create the Address entities for a given customer and pass them back as the appropriate attributes
-     *
      * @param array $customerData
      * @param EntityService $entityService
-     * @return array
+     * @return array $data
+     * @throws GatewayException
      */
     protected function createAddresses(array $customer, EntityService $entityService)
     {
@@ -298,13 +294,15 @@ class CustomerGateway extends AbstractGateway
      * @param array $customer
      * @param string $type "billing" or "shipping"
      * @param EntityService $entityService
-     * @return \Entity\Entity
+     * @return \Entity\Entity|NULL $addressEntity
+     * @throws MagelinkException
+     * @throws NodeException
      */
     protected function createAddressEntity(array $addressData, array $customer, $type, EntityService $entityService)
     {
         $uniqueId = 'cust-'.$customer['customer_id'].'-'.$type;
 
-        $entity = $entityService->loadEntity(
+        $addressEntity = $entityService->loadEntity(
             $this->_node->getNodeId(), 
             'address', 
             ($this->_node->isMultiStore() ? $customer['store_id'] : 0),
@@ -326,18 +324,18 @@ class CustomerGateway extends AbstractGateway
             'company'=>(isset($addressData['company']) ? $addressData['company'] : NULL)
         );
 
-        if (!$entity) {
-            $entity = $entityService->createEntity(
+        if (!$addressEntity) {
+            $addressEntity = $entityService->createEntity(
                 $this->_node->getNodeId(), 
                 'address', 
                 ($this->_node->isMultiStore() ? $customer['store_id'] : 0),
                 $uniqueId, $data
             );
-            $entityService->linkEntity($this->_node->getNodeId(), $entity, $addressData['customer_address_id']);
+            $entityService->linkEntity($this->_node->getNodeId(), $addressEntity, $addressData['customer_address_id']);
         }else{
-            $entityService->updateEntity($this->_node->getNodeId(), $entity, $data, false);
+            $entityService->updateEntity($this->_node->getNodeId(), $addressEntity, $data, FALSE);
         }
-        return $entity;
+        return $addressEntity;
     }
 
     /**
@@ -345,6 +343,7 @@ class CustomerGateway extends AbstractGateway
      * @param \Entity\Entity $entity
      * @param \Entity\Attribute[] $attributes
      * @param int $type
+     * @return bool
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE)
     {
@@ -462,6 +461,7 @@ class CustomerGateway extends AbstractGateway
     /**
      * Write out the given action.
      * @param \Entity\Action $action
+     * @return bool
      */
     public function writeAction(\Entity\Action $action)
     {

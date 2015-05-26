@@ -14,6 +14,7 @@ namespace Magento\Gateway;
 
 use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
+use Magelink\Exception\SyncException;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
 use Node\AbstractNode;
@@ -25,22 +26,19 @@ class ProductGateway extends AbstractGateway
 
     /**
      * Initialize the gateway and perform any setup actions required.
-     * @param AbstractNode $node
-     * @param Entity\Node $nodeEntity
-     * @param string $entity_type
-     * @throws \Magelink\Exception\MagelinkException
-     * @return boolean $success
+     * @param string $entityType
+     * @return bool $success
+     * @throws GatewayException
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType) 
+    public function _init($entityType)
     {
+        $success = FALSE;
         if ($entityType != 'product') {
-            $success = FALSE;
             throw new GatewayException('Invalid entity type for this gateway');
         }else{
-            $success = parent::init($node, $nodeEntity, $entityType);
-
             try {
                 $attributeSets = $this->_soap->call('catalogProductAttributeSetList',array());
+                $success = TRUE;
             }catch (\Exception $exception) {
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
             }
@@ -56,8 +54,12 @@ class ProductGateway extends AbstractGateway
 
     /**
      * Retrieve and action all updated records(either from polling, pushed data, or other sources) .
+     * @throws MagelinkException
+     * @throws NodeException
+     * @throws SyncException
+     * @throws GatewayException
      */
-    public function retrieve() 
+    public function retrieve()
     {
         /** @var \Entity\Service\EntityService $entityService */
         $entityService = $this->getServiceLocator()->get('entityService');
@@ -78,7 +80,7 @@ class ProductGateway extends AbstractGateway
                 ->log(LogService::LEVEL_INFO,
                     'mag_retr_time',
                     'Retrieving products updated since '.$lastRetrieve,
-                   array('type'=>'product', 'timestamp'=>$lastRetrieve) 
+                   array('type'=>'product', 'timestamp'=>$lastRetrieve)
                 );
 
             if ($this->_db) {
@@ -205,8 +207,8 @@ class ProductGateway extends AbstractGateway
                     $data = $product;
                     if ($this->_node->getConfig('load_full_product')) {
                         $data = array_merge(
-                            $data, 
-                            $this->loadFullProduct($product['product_id'], $storeId, $entityConfigService) 
+                            $data,
+                            $this->loadFullProduct($product['product_id'], $storeId, $entityConfigService)
                         );
                     }
 
@@ -217,8 +219,8 @@ class ProductGateway extends AbstractGateway
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_WARN,
                                 'mag_ukwn_set',
-                                'Unknown attribute set ID '.$data['set'], 
-                               array('set'=>$data['set'], 'sku'=>$data['sku']) 
+                                'Unknown attribute set ID '.$data['set'],
+                               array('set'=>$data['set'], 'sku'=>$data['sku'])
                             );
                     }
 

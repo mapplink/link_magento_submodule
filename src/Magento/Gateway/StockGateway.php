@@ -12,19 +12,17 @@ class StockGateway extends AbstractGateway
 
     /**
      * Initialize the gateway and perform any setup actions required.
-     * @param AbstractNode $node
-     * @param Entity\Node $nodeEntity
-     * @param string $entity_type
-     * @throws \Magelink\Exception\MagelinkException
-     * @return boolean
+     * @param string $entityType
+     * @return bool $success
+     * @throws MagelinkException
      */
-    public function init(AbstractNode $node, Entity\Node $nodeEntity, $entityType)
+    public function _init($entityType)
     {
         if ($entityType != 'stockitem') {
-            $success = FALSE;
             throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
+            $success = FALSE;
         }else{
-            $success = parent::init($node, $nodeEntity, $entityType);
+            $success = TRUE;
         }
 
         return $success;

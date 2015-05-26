@@ -90,19 +90,18 @@ class OrderGateway extends AbstractGateway
 
     /**
      * Initialize the gateway and perform any setup actions required.
-     * @param AbstractNode $node
-     * @param \Node\Entity\Node $nodeEntity
-     * @param string $entity_type
+     * @param string $entityType
+     * @return bool $success
+     * @throws MagelinkException
      * @throws GatewayException
-     * @return boolean
      */
-    public function init(AbstractNode $node, \Node\Entity\Node $nodeEntity, $entityType)
+    public function _init($entityType)
     {
         if ($entityType != 'order') {
-            $success = FALSE;
             throw new GatewayException('Invalid entity type for this gateway');
+            $success = FALSE;
         }else{
-            $success = parent::init($node, $nodeEntity, $entityType);
+            $success = TRUE;
         }
 
         return $success;
