@@ -31,11 +31,11 @@ class CreditmemoGateway extends AbstractGateway
 
     protected function _init($entityType)
     {
+        $success = parent::_init($entityType);
+
         if ($entityType != 'creditmemo') {
             throw new GatewayException('Invalid entity type for this gateway');
             $success = FALSE;
-        }else{
-            $success = parent::_init($entityType);
         }
 
         return $success;

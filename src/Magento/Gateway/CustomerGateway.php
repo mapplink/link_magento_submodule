@@ -20,12 +20,12 @@ class CustomerGateway extends AbstractGateway
      */
     protected function _init($entityType)
     {
+        $success = parent::_init($entityType);
+
         if ($entityType != 'customer') {
             throw new GatewayException('Invalid entity type for this gateway');
             $success = FALSE;
         }else{
-            $success = parent::_init($entityType);
-
             if ($this->_node->getConfig('customer_attributes')
                 && strlen($this->_node->getConfig('customer_attributes'))) {
 
