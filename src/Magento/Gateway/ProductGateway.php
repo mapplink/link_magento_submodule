@@ -30,17 +30,19 @@ class ProductGateway extends AbstractGateway
      * @return bool $success
      * @throws GatewayException
      */
-    public function _init($entityType)
+    protected function _init($entityType)
     {
-        $success = FALSE;
         if ($entityType != 'product') {
             throw new GatewayException('Invalid entity type for this gateway');
+            $success = FALSE;
         }else{
+            $success = parent::_init($entityType);
+
             try {
                 $attributeSets = $this->_soap->call('catalogProductAttributeSetList',array());
-                $success = TRUE;
             }catch (\Exception $exception) {
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                $success = FALSE;
             }
 
             $this->_attributeSets = array();

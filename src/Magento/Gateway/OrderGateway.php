@@ -95,13 +95,13 @@ class OrderGateway extends AbstractGateway
      * @throws MagelinkException
      * @throws GatewayException
      */
-    public function _init($entityType)
+    protected function _init($entityType)
     {
         if ($entityType != 'order') {
             throw new GatewayException('Invalid entity type for this gateway');
             $success = FALSE;
         }else{
-            $success = TRUE;
+            $success = parent::_init($entityType);
         }
 
         return $success;

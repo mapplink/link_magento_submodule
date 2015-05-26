@@ -16,13 +16,13 @@ class StockGateway extends AbstractGateway
      * @return bool $success
      * @throws MagelinkException
      */
-    public function _init($entityType)
+    protected function _init($entityType)
     {
         if ($entityType != 'stockitem') {
             throw new \Magelink\Exception\MagelinkException('Invalid entity type for this gateway');
             $success = FALSE;
         }else{
-            $success = TRUE;
+            $success = parent::_init($entityType);
         }
 
         return $success;

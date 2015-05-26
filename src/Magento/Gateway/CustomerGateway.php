@@ -18,12 +18,14 @@ class CustomerGateway extends AbstractGateway
      * @return bool $success
      * @throws GatewayException
      */
-    public function _init($entityType)
+    protected function _init($entityType)
     {
-        $success = FALSE;
         if ($entityType != 'customer') {
             throw new GatewayException('Invalid entity type for this gateway');
+            $success = FALSE;
         }else{
+            $success = parent::_init($entityType);
+
             if ($this->_node->getConfig('customer_attributes')
                 && strlen($this->_node->getConfig('customer_attributes'))) {
 
@@ -35,9 +37,9 @@ class CustomerGateway extends AbstractGateway
 
             try {
                 $groups = $this->_soap->call('customerGroupList', array());
-                $success = TRUE;
             }catch (\Exception $exception) {
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                $succes = FALSE;
             }
 
             $this->_custGroups = array();
