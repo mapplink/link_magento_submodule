@@ -19,9 +19,6 @@ use Magelink\Exception\SyncException;
 class Node extends AbstractNode
 {
 
-    /** @var ServiceLocatorAwareInterface[] $_api */
-    protected $_api = array();
-
     /** @var array|NULL $_storeViews */
     protected $_storeViews = NULL;
 
@@ -29,7 +26,8 @@ class Node extends AbstractNode
     /**
      * @return bool Whether or not we should enable multi store mode
      */
-    public function isMultiStore(){
+    public function isMultiStore()
+    {
         return (bool) $this->getConfig('multi_store');
     }
 
@@ -63,7 +61,7 @@ class Node extends AbstractNode
 
     /**
      * Return a data array of all store views
-     * @return array
+     * @return array $this->_storeViews
      */
     public function getStoreViews()
     {
@@ -99,17 +97,16 @@ class Node extends AbstractNode
     }
 
     /**
-     * Implemented in each NodeModule
      * Should set up any initial data structures, connections, and open any required files that the node needs to operate.
      * In the case of any errors that mean a successful sync is unlikely, a Magelink\Exception\InitException MUST be thrown.
-     *
      * @param Entity\Node $nodeEntity
      */
     protected function _init(\Node\Entity\Node $nodeEntity)
     {
         $this->getStoreViews();
         $storeCount = count($this->_storeViews);
-        if($storeCount == 1 && $this->isMultiStore()){
+
+        if ($storeCount == 1 && $this->isMultiStore()) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
                     'multistore_single',
@@ -117,7 +114,7 @@ class Node extends AbstractNode
                     array(),
                     array('node'=>$this)
                 );
-        }else if($storeCount > 1 && !$this->isMultiStore()){
+        }elseif ($storeCount > 1 && !$this->isMultiStore()) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_WARN,
                     'multistore_missing',
@@ -133,10 +130,7 @@ class Node extends AbstractNode
     }
 
     /**
-     * Implemented in each NodeModule
-     * The opposite of _init - close off any connections / files / etc that were opened at the beginning.
-     * This will always be the last call to the Node.
-     * NOTE: This will be called even if the Node has thrown a NodeException, but NOT if a SyncException or other Exception is thrown (which represents an irrecoverable error)
+     * This will always be the last call to the Node to close off any open connections, files, etc.
      */
     protected function _deinit() {}
 
