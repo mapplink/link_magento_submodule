@@ -495,25 +495,30 @@ class OrderGateway extends AbstractGateway
         }
 
         if ($needsUpdate) {
-            $oldStatus = $existingEntity->getData('status', NULL);
-            $statusChanged = $oldStatus != $data['status'];
-            if (!$orderComment && $statusChanged) {
-                $orderComment = array(
-                    'Status change'=>'Order #'.$uniqueId.' moved from '.$oldStatus.' to '.$data['status']);
-            }
-
-            $movedToProcessing = self::hasOrderStateProcessing($orderData['status'])
-                && !self::hasOrderStateProcessing($existingEntity->getData('status'));
-            $movedToCancel = $orderData['status'] == self::MAGENTO_STATUS_CANCELED
-                && $existingEntity->getData('status') != self::MAGENTO_STATUS_CANCELED;
-            $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
-
-            $order = $this->_entityService->loadEntityId($this->_node->getNodeId(), $existingEntity->getId());
-            if ($movedToProcessing || $movedToCancel) {
-                /** @var Order $order */
-                foreach ($order->getOrderitems() as $orderitem) {
-                    $this->updateStockQuantities($order, $orderitem);
+            try{
+                $oldStatus = $existingEntity->getData('status', NULL);
+                $statusChanged = $oldStatus != $data['status'];
+                if (!$orderComment && $statusChanged) {
+                    $orderComment = array(
+                        'Status change' => 'Order #'.$uniqueId.' moved from '.$oldStatus.' to '.$data['status']
+                    );
                 }
+
+                $movedToProcessing = self::hasOrderStateProcessing($orderData['status'])
+                    && !self::hasOrderStateProcessing($existingEntity->getData('status'));
+                $movedToCancel = $orderData['status'] == self::MAGENTO_STATUS_CANCELED
+                    && $existingEntity->getData('status') != self::MAGENTO_STATUS_CANCELED;
+                $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
+
+                $order = $this->_entityService->loadEntityId($this->_node->getNodeId(), $existingEntity->getId());
+                if ($movedToProcessing || $movedToCancel) {
+                    /** @var Order $order */
+                    foreach ($order->getOrderitems() as $orderitem) {
+                        $this->updateStockQuantities($order, $orderitem);
+                    }
+                }
+            }catch (\Exception $exception) {
+                throw new GatewayException('Needs update: '.$exception->getMessage(), 0, $exception);
             }
         }
 
