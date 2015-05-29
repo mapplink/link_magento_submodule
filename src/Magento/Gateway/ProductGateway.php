@@ -309,7 +309,7 @@ class ProductGateway extends AbstractGateway
                     ->log(LogService::LEVEL_ERROR,
                         'mag_ent_wronglink',
                         'Incorrectly linked product '.$sku,
-                       array('code'=>$sku),
+                       array('code'=>$sku, 'correct product id'=>$productId),
                        array('node'=>$this->_node, 'entity'=>$existingEntity) 
                     );
                 $this->_entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);

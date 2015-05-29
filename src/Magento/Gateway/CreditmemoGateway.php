@@ -205,10 +205,10 @@ class CreditmemoGateway extends AbstractGateway
                             $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                             $this->getServiceLocator()->get('logService')
                                 ->log(\Log\Service\LogService::LEVEL_INFO,
-                                    'ent_new',
+                                    'mag_c_new',
                                     'New creditmemo '.$uniqueId,
-                                    array('sku'=>$uniqueId),
-                                    array('node'=>$this->_node, 'entity'=>$existingEntity)
+                                    array('creditmemo unique id'=>$uniqueId),
+                                    array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
                                 );
                             $this->createItems($creditmemo, $existingEntity->getId(), $entityService, TRUE);
                             $entityService->commitEntityTransaction('magento-creditmemo-'.$uniqueId);
@@ -221,10 +221,10 @@ class CreditmemoGateway extends AbstractGateway
                     }else{
                         $this->getServiceLocator()->get('logService')
                             ->log(\Log\Service\LogService::LEVEL_WARN,
-                                'ent_link',
+                                'mag_c_link',
                                 'Unlinked creditmemo '.$uniqueId,
-                                array('sku'=>$uniqueId),
-                                array('node'=>$this->_node, 'entity'=>$existingEntity)
+                                array('creditmemo unique id'=>$uniqueId),
+                                array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
                             );
                         try{
                             $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
@@ -236,12 +236,13 @@ class CreditmemoGateway extends AbstractGateway
                 }else{
                     $this->getServiceLocator()->get('logService')
                         ->log(\Log\Service\LogService::LEVEL_INFO,
-                            'ent_update',
+                            'mag_c_upd',
                             'Updated creditmemo '.$uniqueId,
-                            array('sku'=>$uniqueId),
-                            array('node'=>$this->_node, 'entity'=>$existingEntity)
+                            array('creditmemo unique id'=>$uniqueId),
+                            array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
                         );
                 }
+
                 if ($needsUpdate) {
                     $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
                     $this->createItems($creditmemo, $existingEntity->getId(), $entityService, FALSE);
@@ -346,7 +347,7 @@ class CreditmemoGateway extends AbstractGateway
                 $logLevel = ($creationMode ? \Log\Service\LogService::LEVEL_INFO : \Log\Service\LogService::LEVEL_WARN);
                 $this->getServiceLocator()->get('logService')
                     ->log($logLevel,
-                        'ent_new_item',
+                        'mag_ci_new',
                         'New creditmemo item '.$uniqueId.' : '.$localId,
                         array('uniq'=>$uniqueId, 'local'=>$localId),
                         array('node'=>$this->_node, 'entity'=>$entity)
