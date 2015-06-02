@@ -171,7 +171,7 @@ class StockGateway extends AbstractGateway
                     $logLevel = LogService::LEVEL_WARN;
                     $logCode .= '_prnt_loc';
                     $logMessage = 'Stock update for '.$entity->getUniqueId().' had to use parent local!';
-                    $logData['parent'] = $entity->getParentId());
+                    $logData['parent'] = $entity->getParentId();
                 }else{
                     $logLevel = LogService::LEVEL_ERROR;
                     $logCode .= '_nolocal';
