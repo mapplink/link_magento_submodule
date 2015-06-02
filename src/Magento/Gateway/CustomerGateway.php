@@ -3,6 +3,7 @@
 namespace Magento\Gateway;
 
 use Entity\Service\EntityService;
+use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
@@ -71,8 +72,8 @@ class CustomerGateway extends AbstractGateway
                 + (intval($this->_node->getConfig('time_delta_customer')) * 3600));
 
         $this->getServiceLocator()->get('logService')
-            ->log(\Log\Service\LogService::LEVEL_INFO,
-                'retr_time',
+            ->log(LogService::LEVEL_INFO,
+                'mag_cu_rtr_time',
                 'Retrieving customers updated since '.$lastRetrieve,
                 array('type'=>'customer', 'timestamp'=>$lastRetrieve)
             );
@@ -90,8 +91,8 @@ class CustomerGateway extends AbstractGateway
             }
 
             if (!is_array($results)) {
-                $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR,
-                    'mag_soap_customer',
+                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
+                    'mag_cu_soap',
                     'SOAP (customerCustomerList) did not return an array but '.gettype($results).' instead.',
                     array('type'=>gettype($results), 'class'=>(is_object($results) ? get_class($results) : 'no object')),
                     array('soap result'=>$results)
@@ -171,8 +172,8 @@ class CustomerGateway extends AbstractGateway
                     $data['customer_type'] = $this->_custGroups[intval($customer['group_id'])]['customer_group_code'];
                 }else{
                     $this->getServiceLocator()->get('logService')
-                        ->log(\Log\Service\LogService::LEVEL_WARN, 
-                            'unknown_group', 
+                        ->log(LogService::LEVEL_WARN,
+                            'mag_cu_ukwn_grp',
                             'Unknown customer group ID '.$customer['group_id'],
                             array('group'=>$customer['group_id'], 'unique'=>$customer['email'])
                         );
@@ -210,8 +211,8 @@ class CustomerGateway extends AbstractGateway
                         );
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                         $this->getServiceLocator()->get('logService')
-                            ->log(\Log\Service\LogService::LEVEL_INFO,
-                                'ent_new',
+                            ->log(LogService::LEVEL_INFO,
+                                'mag_cu_new',
                                 'New customer '.$uniqueId,
                                 array('code'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -219,8 +220,8 @@ class CustomerGateway extends AbstractGateway
                         $needsUpdate = false;
                     }elseif ($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
                         $this->getServiceLocator()->get('logService')
-                            ->log(\Log\Service\LogService::LEVEL_INFO,
-                                'ent_wronglink',
+                            ->log(LogService::LEVEL_INFO,
+                                'mag_cu_wronglink',
                                 'Incorrectly linked customer '.$uniqueId,
                                 array('code'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -229,8 +230,8 @@ class CustomerGateway extends AbstractGateway
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
                     }else{
                         $this->getServiceLocator()->get('logService')
-                            ->log(\Log\Service\LogService::LEVEL_INFO,
-                                'ent_link',
+                            ->log(LogService::LEVEL_INFO,
+                                'mag_cu_link',
                                 'Unlinked customer '.$uniqueId,
                                 array('code'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -239,8 +240,8 @@ class CustomerGateway extends AbstractGateway
                     }
                 }else{
                     $this->getServiceLocator()->get('logService')
-                        ->log(\Log\Service\LogService::LEVEL_INFO,
-                            'ent_update',
+                        ->log(LogService::LEVEL_INFO,
+                            'mag_cu_upd',
                             'Updated customer '.$uniqueId,
                             array('code'=>$uniqueId),
                             array('node'=>$this->_node, 'entity'=>$existingEntity)

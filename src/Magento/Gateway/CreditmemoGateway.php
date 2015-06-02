@@ -13,6 +13,7 @@
 namespace Magento\Gateway;
 
 use Entity\Service\EntityService;
+use Log\Service\LogService;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
 use Node\AbstractNode;
@@ -204,8 +205,8 @@ class CreditmemoGateway extends AbstractGateway
                                 $this->_node->getNodeId(), 'creditmemo', $storeId, $uniqueId, $data, $parentId);
                             $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                             $this->getServiceLocator()->get('logService')
-                                ->log(\Log\Service\LogService::LEVEL_INFO,
-                                    'mag_c_new',
+                                ->log(LogService::LEVEL_INFO,
+                                    'mag_cm_new',
                                     'New creditmemo '.$uniqueId,
                                     array('creditmemo unique id'=>$uniqueId),
                                     array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
@@ -220,8 +221,8 @@ class CreditmemoGateway extends AbstractGateway
                         $needsUpdate = FALSE;
                     }else{
                         $this->getServiceLocator()->get('logService')
-                            ->log(\Log\Service\LogService::LEVEL_WARN,
-                                'mag_c_link',
+                            ->log(LogService::LEVEL_WARN,
+                                'mag_cm_unlink',
                                 'Unlinked creditmemo '.$uniqueId,
                                 array('creditmemo unique id'=>$uniqueId),
                                 array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
@@ -235,8 +236,8 @@ class CreditmemoGateway extends AbstractGateway
                     }
                 }else{
                     $this->getServiceLocator()->get('logService')
-                        ->log(\Log\Service\LogService::LEVEL_INFO,
-                            'mag_c_upd',
+                        ->log(LogService::LEVEL_INFO,
+                            'mag_cm_upd',
                             'Updated creditmemo '.$uniqueId,
                             array('creditmemo unique id'=>$uniqueId),
                             array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
@@ -344,10 +345,10 @@ class CreditmemoGateway extends AbstractGateway
                 $uniqueId
             );
             if (!$entity){
-                $logLevel = ($creationMode ? \Log\Service\LogService::LEVEL_INFO : \Log\Service\LogService::LEVEL_WARN);
+                $logLevel = ($creationMode ? LogService::LEVEL_INFO : LogService::LEVEL_WARN);
                 $this->getServiceLocator()->get('logService')
                     ->log($logLevel,
-                        'mag_ci_new',
+                        'mag_cmi_new',
                         'New creditmemo item '.$uniqueId.' : '.$localId,
                         array('uniq'=>$uniqueId, 'local'=>$localId),
                         array('node'=>$this->_node, 'entity'=>$entity)
