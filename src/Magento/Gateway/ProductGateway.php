@@ -189,7 +189,7 @@ class ProductGateway extends AbstractGateway
                     $parentId = NULL; // TODO: Calculate
                     $sku = $rawData['sku'];
 
-                    $this->processUpdate($entityService, $productId, $sku, $storeId, $parentId, $data);
+                    $this->processUpdate($productId, $sku, $storeId, $parentId, $data);
                 }
 
             }elseif ($this->_soap) {
