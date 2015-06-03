@@ -19,7 +19,7 @@ return array (
             //'transform_order_total'=>FALSE
         ),
     ),
-	'node_types'=>array(
+    'node_types'=>array(
         'magento'=>array(
             'module'=>'Magento', // Module name used for this node
             'name'=>'Magento', // Human-readable node name
@@ -39,25 +39,79 @@ return array (
                     'type'=>'Checkbox', 
                     'default'=>TRUE
                 ),
-                'web_url'=>array('label'=>'Base Web URL', 'type'=>'Text', 'required'=>TRUE),
+                'web_url'=>array(
+                    'label'=>'Base Web URL',
+                    'type'=>'Text',
+                    'required'=>TRUE
+                ),
                 'enterprise'=>array(
                     'label'=>'Enterprise Edition? (DO NOT CHANGE)',
                     'type'=>'Checkbox',
                     'default'=>FALSE
                 ),
-                'soap_username'=>array('label'=>'SOAP Username','type'=>'Text', 'required'=>TRUE),
-                'soap_password'=>array('label'=>'SOAP Password','type'=>'Text', 'required'=>TRUE),
-                'rest_key'=>array('label'=>'REST Consumer Key','type'=>'Text', 'required'=>FALSE),
-                'rest_secret'=>array('label'=>'REST Consumer Secret','type'=>'Text', 'required'=>FALSE),
-                'db_hostname'=>array('label'=>'Database Host','type'=>'Text', 'required'=>FALSE),
-                'db_schema'=>array('label'=>'Database Schema','type'=>'Text', 'required'=>FALSE),
-                'db_username'=>array('label'=>'Database Username','type'=>'Text', 'required'=>FALSE),
-                'db_password'=>array('label'=>'Database Password','type'=>'Text', 'required'=>FALSE),
 
-                'load_full_product'=>array('label'=>'Load full product data?', 'type'=>'Checkbox', 'default'=>FALSE),
-                'load_stock'=>array('label'=>'Load stock data? (SLOW)', 'type'=>'Checkbox', 'default'=>FALSE),
-                'load_full_customer'=>array('label'=>'Load full customer data?', 'type'=>'Checkbox', 'default'=>FALSE),
-                'load_full_order'=>array('label'=>'Load full order data?', 'type'=>'Checkbox', 'default'=>FALSE),
+                'soap_username'=>array(
+                    'label'=>'SOAP Username',
+                    'type'=>'Text',
+                    'required'=>TRUE
+                ),
+                'soap_password'=>array(
+                    'label'=>'SOAP Password',
+                    'type'=>'Text',
+                    'required'=>TRUE
+                ),
+                'rest_key'=>array(
+                    'label'=>'REST Consumer Key',
+                    'type'=>'Text',
+                    'required'=>FALSE
+                ),
+                'rest_secret'=>array(
+                    'label'=>'REST Consumer Secret',
+                    'type'=>'Text',
+                    'required'=>FALSE
+                ),
+
+                'db_hostname'=>array(
+                    'label'=>'Database Host',
+                    'type'=>'Text',
+                    'required'=>FALSE
+                ),
+                'db_schema'=>array(
+                    'label'=>'Database Schema',
+                    'type'=>'Text',
+                    'required'=>FALSE
+                ),
+                'db_username'=>array(
+                    'label'=>'Database Username',
+                    'type'=>'Text',
+                    'required'=>FALSE
+                ),
+                'db_password'=>array(
+                    'label'=>'Database Password',
+                    'type'=>'Text',
+                    'required'=>FALSE
+                ),
+
+                'load_full_product'=>array(
+                    'label'=>'Load full product data?',
+                    'type'=>'Checkbox',
+                    'default'=>FALSE
+                ),
+                'load_stock'=>array(
+                    'label'=>'Load stock data? (SLOW)',
+                    'type'=>'Checkbox',
+                    'default'=>FALSE
+                ),
+                'load_full_customer'=>array(
+                    'label'=>'Load full customer data?',
+                    'type'=>'Checkbox',
+                    'default'=>FALSE
+                ),
+                'load_full_order'=>array(
+                    'label'=>'Load full order data?',
+                    'type'=>'Checkbox',
+                    'default'=>FALSE
+                ),
 
                 'product_attributes'=>array(
                     'label'=>'Extra product attributes to load',
@@ -107,20 +161,20 @@ return array (
             ),
         )
     ),
-    'controllers' => array(
-        'invokables' => array(
-            'Magento\Controller\Console' => 'Magento\Controller\Console',
+    'controllers'=>array(
+        'invokables'=>array(
+            'Magento\Controller\Console'=>'Magento\Controller\Console',
         ),
     ),
-    'console' => array(
-        'router' => array(
-            'routes' => array(
-                'magento-console' => array(
-                    'options' => array(
-                        'route'    => 'magento <task> <id> [<params>]',
-                        'defaults' => array(
-                            'controller' => 'Magento\Controller\Console',
-                            'action'     => 'run'
+    'console'=>array(
+        'router'=>array(
+            'routes'=>array(
+                'magento-console'=>array(
+                    'options'=>array(
+                        'route'=>'magento <task> <id> [<params>]',
+                        'defaults'=>array(
+                            'controller'=>'Magento\Controller\Console',
+                            'action'=>'run'
                         )
                     )
                 )
