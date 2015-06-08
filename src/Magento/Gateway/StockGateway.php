@@ -225,7 +225,7 @@ class StockGateway extends AbstractGateway
 
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_WARN,
-                                'mag_si_unlink',
+                                $logCode.'_unlink',
                                 'Removed stockitem local id from '.$entity->getUniqueId().' ('.$nodeId.')',
                                 $logData, $logEntities
                             );
@@ -247,14 +247,20 @@ class StockGateway extends AbstractGateway
                 }
             }while (!$quit);
 
-            if ($success && $isUnlinked) {
-                $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+            if ($isUnlinked) {
+                if ($success) {
+                    $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                    $logLevel = LogService::LEVEL_INFO;
+                    $logCode .= '_link';
+                    $logMessage = 'Linked stockitem '.$entity->getUniqueId().' on node '.$nodeId;
+                }else{
+                    $logLevel = LogService::LEVEL_INFO;
+                    $logCode .= '_link_fail';
+                    $logMessage = 'Stockitem '.$entity->getUniqueId().' could not be linked on node '.$nodeId;
+
+                }
                 $this->getServiceLocator()->get('logService')
-                    ->log(LogService::LEVEL_INFO,
-                        'mag_si_link',
-                        'Linked stockitem '.$entity->getUniqueId().' on node '.$nodeId,
-                        $logData, $logEntities
-                    );
+                    ->log($logLevel, $logCode, $logMessage, $logData, $logEntities);
             }
         }else{
             // We don't care about any other attributes
