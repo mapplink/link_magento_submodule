@@ -254,10 +254,9 @@ class StockGateway extends AbstractGateway
                     $logCode .= '_link';
                     $logMessage = 'Linked stockitem '.$entity->getUniqueId().' on node '.$nodeId;
                 }else{
-                    $logLevel = LogService::LEVEL_INFO;
+                    $logLevel = LogService::LEVEL_WARN;
                     $logCode .= '_link_fail';
                     $logMessage = 'Stockitem '.$entity->getUniqueId().' could not be linked on node '.$nodeId;
-
                 }
                 $this->getServiceLocator()->get('logService')
                     ->log($logLevel, $logCode, $logMessage, $logData, $logEntities);
