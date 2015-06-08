@@ -741,6 +741,7 @@ class ProductGateway extends AbstractGateway
             'soap data keys'=>array_keys($soapData),
             'soap data'=>$soapData
         );
+        $soapResult = NULL;
 
         if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
             $updateViaDbApi =  $this->_db && $localId;
