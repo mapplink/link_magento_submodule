@@ -99,9 +99,8 @@ class Node extends AbstractNode
     /**
      * Should set up any initial data structures, connections, and open any required files that the node needs to operate.
      * In the case of any errors that mean a successful sync is unlikely, a Magelink\Exception\InitException MUST be thrown.
-     * @param Entity\Node $nodeEntity
      */
-    protected function _init(\Node\Entity\Node $nodeEntity)
+    protected function _init()
     {
         $this->getStoreViews();
         $storeCount = count($this->_storeViews);
