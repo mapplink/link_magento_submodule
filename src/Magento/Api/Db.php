@@ -220,7 +220,7 @@ class Db implements ServiceLocatorAwareInterface
         if ($this->_debug) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_DEBUGEXTRA,
-                    'dbapi_sql',
+                    'mag_dbapi_sql',
                     'DB API SQL: '.$sql,
                     array('sql'=>$sql),
                     array('node'=>$this->_node->getNodeId())
