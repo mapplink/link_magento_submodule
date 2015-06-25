@@ -262,14 +262,14 @@ class OrderGateway extends AbstractGateway
 
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_INFO,
-                            'mag_upd_pre',
+                            'mag_o_pre_upd',
                             'Updated '.$attributeCode.' on stockitem '.$stockitem->getEntityId(),
                             $logData, $logEntities
                         );
                 }catch (\Exception $exception) {
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_ERROR,
-                            'mag_upd_pre_fail',
+                            'mag_o_pre_upderr',
                             'Update of '.$attributeCode.' failed on stockitem '.$stockitem->getEntityId(),
                             $logData, $logEntities
                         );
@@ -277,7 +277,7 @@ class OrderGateway extends AbstractGateway
             }else{
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_ERROR,
-                        'mag_o_si_noxis',
+                        'mag_o_pre_sinoex',
                         'Stockitem '.$orderitem->getData('sku').' does not exist.',
                         $logData, $logEntities
                     );
@@ -285,7 +285,7 @@ class OrderGateway extends AbstractGateway
         }else{
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_DEBUGEXTRA,
-                    'mag_upd_pre_fail',
+                    'mag_o_pre_err',
                     'No update of qty_pre_transit. Order '.$order->getUniqueId().' has wrong status: '.$orderStatus,
                     array('order id'=>$order->getId()),
                     $logData, $logEntities
@@ -581,7 +581,7 @@ class OrderGateway extends AbstractGateway
 
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_DEBUGEXTRA,
-                        'mag_salesOrderList',
+                        'mag_o_soap_list',
                         'Retrieved salesOrderList updated from '.$lastRetrieve,
                         array('updated_at'=>$lastRetrieve, 'results'=>$results)
                     );
@@ -715,7 +715,7 @@ class OrderGateway extends AbstractGateway
             $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_WARN,
-                    'mag_rtr_frc',
+                    'mag_o_rtr_frc',
                     'Retrieving orders: '.$orderOutOfSyncList,
                     array(),
                     array('order increment ids out of sync'=>$orderOutOfSyncList)
@@ -773,7 +773,7 @@ class OrderGateway extends AbstractGateway
                 $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_ERROR,
-                        'mag_rtr_frc_fail',
+                        'mag_o_rtr_frcerr',
                         'Retrieval failed for orders: '.$orderOutOfSyncList,
                         array(),
                         array('order increment ids still out of sync'=>$orderOutOfSyncList)

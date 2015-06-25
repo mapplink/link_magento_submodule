@@ -2,10 +2,12 @@
 
 namespace Magento\Gateway;
 
+use Entity\Service\EntityService;
+use Log\Service\LogService;
 use Node\AbstractNode;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
-use Entity\Service\EntityService;
+
 
 class StockGateway extends AbstractGateway
 {
@@ -38,14 +40,12 @@ class StockGateway extends AbstractGateway
             return;
         }
 
-        /** @var \Entity\Service\EntityService $entityService */
-        $entityService = $this->getServiceLocator()->get('entityService');
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
         $timestamp = time() - $this->apiOverlappingSeconds;
 
-        $products = $entityService->locateEntity(
+        $products = $this->_entityService->locateEntity(
             $this->_node->getNodeId(),
             'product',
             0,
@@ -65,12 +65,12 @@ class StockGateway extends AbstractGateway
             foreach($results as $item){
                 $data = array();
                 $unique_id = $item['sku'];
-                $local_id = $item['product_id'];
+                $localId = $item['product_id'];
 
                 $data = array('available'=>$item['qty']);
 
                 foreach ($this->_node->getStoreViews() as $store_id=>$store_view) {
-                    $product = $entityService->loadEntity($this->_node->getNodeId(), 'product', $store_id, $item['sku']);
+                    $product = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', $store_id, $item['sku']);
 
                     if (!$product) {
                         // No product exists, leave for now. May not be in this store.
@@ -82,21 +82,21 @@ class StockGateway extends AbstractGateway
                     /** @var boolean $needsUpdate Whether we need to perform an entity update here */
                     $needsUpdate = TRUE;
 
-                    $existingEntity = $entityService->loadEntityLocal(
+                    $existingEntity = $this->_entityService->loadEntityLocal(
                         $this->_node->getNodeId(),
                         'stockitem',
                         $store_id,
-                        $local_id
+                        $localId
                     );
                     if (!$existingEntity) {
-                        $existingEntity = $entityService->loadEntity(
+                        $existingEntity = $this->_entityService->loadEntity(
                             $this->_node->getNodeId(),
                             'stockitem',
                             $store_id,
                             $unique_id
                         );
                         if (!$existingEntity) {
-                            $existingEntity = $entityService->createEntity(
+                            $existingEntity = $this->_entityService->createEntity(
                                 $this->_node->getNodeId(),
                                 'stockitem',
                                 $store_id,
@@ -104,11 +104,11 @@ class StockGateway extends AbstractGateway
                                 $data,
                                 $parent_id
                             );
-                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                            $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
 
                             $this->getServiceLocator()->get('logService')
-                                ->log(\Log\Service\LogService::LEVEL_INFO,
-                                    'ent_new',
+                                ->log(LogService::LEVEL_INFO,
+                                    'mag_si_new',
                                     'New stockitem '.$unique_id,
                                     array('code'=>$unique_id),
                                     array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -116,25 +116,25 @@ class StockGateway extends AbstractGateway
                             $needsUpdate = FALSE;
                         }else{
                             $this->getServiceLocator()->get('logService')
-                                ->log(\Log\Service\LogService::LEVEL_INFO,
-                                    'ent_link',
+                                ->log(LogService::LEVEL_INFO,
+                                    'mag_si_link',
                                     'Unlinked stockitem '.$unique_id,
                                     array('code'=>$unique_id),
                                     array('node'=>$this->_node, 'entity'=>$existingEntity)
                                 );
-                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                            $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                         }
                     }else{
                         $this->getServiceLocator()->get('logService')
-                            ->log(\Log\Service\LogService::LEVEL_INFO,
-                                'ent_update',
+                            ->log(LogService::LEVEL_INFO,
+                                'mag_si_upd',
                                 'Updated stockitem '.$unique_id,
                                 array('code'=>$unique_id),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
                             );
                     }
                     if ($needsUpdate) {
-                        $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
+                        $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
                     }
                 }
             }
@@ -154,45 +154,49 @@ class StockGateway extends AbstractGateway
      */
     public function writeUpdates(\Entity\Entity $entity, $attributes, $type=\Entity\Update::TYPE_UPDATE)
     {
+        $logCode = 'mag_si';
+        $logData = array('data'=>$entity->getAllSetData());
+        $logEntities = array('node' => $this->_node, 'entity' => $entity);
+
         if (in_array('available', $attributes)) {
-            /** @var \Entity\Service\EntityService $entityService */
-            $entityService = $this->getServiceLocator()->get('entityService');
-            $local_id = $entityService->getLocalId($this->_node->getNodeId(), $entity);
-            if (!$local_id) {
-                $this->getServiceLocator()->get('logService')
-                    ->log(\Log\Service\LogService::LEVEL_WARN,
-                        'stock_prodlocal',
-                        'Stock update for '.$entity->getUniqueId().' had to use parent local!',
-                        array('parent'=>$entity->getParentId()),
-                        array('node'=>$this->_node, 'entity'=>$entity)
-                    );
-                $local_id = $entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
-                if (!$local_id) {
-                    $this->getServiceLocator()->get('logService')
-                        ->log(\Log\Service\LogService::LEVEL_ERROR,
-                            'stock_nolocal',
-                            'Stock update for '.$entity->getUniqueId().' had no local ID!',
-                            array('data'=>$entity->getAllSetData()),
-                            array('node'=>$this->_node, 'entity'=>$entity)
-                        );
-                    return;
+
+            $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
+            if ($localId) {
+                $logLevel = LogService::LEVEL_INFO;
+                $logCode .= '_upd';
+                $logMessage = 'Update stock '.$entity->getUniqueId().'.';
+            }else{
+                $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
+                if ($localId) {
+                    $logLevel = LogService::LEVEL_WARN;
+                    $logCode .= '_prnt_loc';
+                    $logMessage = 'Stock update for '.$entity->getUniqueId().' had to use parent local!';
+                    $logData['parent'] = $entity->getParentId();
+                }else{
+                    $logLevel = LogService::LEVEL_ERROR;
+                    $logCode .= '_nolocal';
+                    $logMessage = 'Stock update for '.$entity->getUniqueId().' had no local ID!';
                 }
             }
 
-            $qty = $entity->getData('available');
-            $is_in_stock = ($qty > 0);
+            $this->getServiceLocator()->get('logService')
+                ->log($logLevel, $logCode, $logMessage, $logData, $logEntities);
 
-            if ($this->_db) {
-                $this->_db->updateStock($local_id, $qty, $is_in_stock ? 1 : 0);
-            }else{
-                $this->_soap->call('catalogInventoryStockItemUpdate', array(
-                    'product'=>$local_id,
-                    'productId'=>$local_id,
-                    'data'=>array(
-                        'qty'=>$qty,
-                        'is_in_stock'=>($is_in_stock ? 1 : 0)
-                    )
-                ));
+            if ($localId) {
+                $qty = $entity->getData('available');
+                $is_in_stock = ($qty > 0);
+
+                if ($this->_db) {
+                    $this->_db->updateStock($localId, $qty, $is_in_stock ? 1 : 0);
+                }else{
+                    $this->_soap->call('catalogInventoryStockItemUpdate',
+                        // ToDo : Check if product can be removed
+                        array('product'=>$localId, 'productId'=>$localId, 'data'=>array(
+                            'qty' => $qty,
+                            'is_in_stock' => ($is_in_stock ? 1 : 0)
+                        ))
+                    );
+                }
             }
         }else{
             // We don't care about any other attributes

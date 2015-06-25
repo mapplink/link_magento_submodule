@@ -20,23 +20,16 @@ use Node\Entity;
 abstract class AbstractGateway extends BaseAbstractGateway
 {
 
-    /** @var \Node\Service\NodeService */
-    protected $_nodeService = NULL;
-
-    /** @var \Entity\Service\EntityService $entityService */
-    protected $_entityService = NULL;
-
     /** @var \Entity\Service\EntityConfigService $entityConfigService */
     protected $entityConfigService = NULL;
 
+    /** @var \Magento\Api\Db */
+    protected $_db = NULL;
     /** @var \Magento\Api\Soap */
     protected $_soap = NULL;
 
     /** @var int $apiOverlappingSeconds */
     protected $apiOverlappingSeconds = 3;
-
-    /** @var \Magento\Api\Db */
-    protected $_db = NULL;
 
 
     /**

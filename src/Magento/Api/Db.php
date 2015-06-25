@@ -2,12 +2,13 @@
 
 namespace Magento\Api;
 
-use Zend\ServiceManager\ServiceLocatorAwareInterface;
-use Zend\ServiceManager\ServiceLocatorInterface;
-use Magento\Node;
+use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
+use Magento\Node;
 use Zend\Db\Adapter\Adapter;
 use Zend\Db\TableGateway\TableGateway;
+use Zend\ServiceManager\ServiceLocatorAwareInterface;
+use Zend\ServiceManager\ServiceLocatorInterface;
 
 
 /**
@@ -19,15 +20,22 @@ class Db implements ServiceLocatorAwareInterface
     /** @var bool $_debug */
     protected $_debug = TRUE;
 
-    /** @var \Zend\Db\Adapter\Adapter $_adapter */
-    protected $_adapter;
-
-    /** @var bool $_enterprise */
-    protected $_enterprise = FALSE;
-
     /** @var \Magento\Node */
     protected $_node;
 
+    /** @var \Zend\Db\Adapter\Adapter $_adapter */
+    protected $_adapter;
+    /** @var array $_tgCache */
+    protected $_tgCache = array();
+
+    /** @var array $_entityTypeCache */
+    protected $_entityTypeCache = array();
+
+    /** @var array $_attributeCache */
+    protected $_attributeCache = array();
+
+    /** @var bool $_enterprise */
+    protected $_enterprise = FALSE;
     /** @var array  */
     protected $columns = array(
         'entity_id',
@@ -93,6 +101,28 @@ class Db implements ServiceLocatorAwareInterface
     );
 
 
+    /** @var ServiceLocatorInterface $_serviceLocator*/
+    protected $_serviceLocator;
+
+
+    /**
+     * Set service locator
+     * @param ServiceLocatorInterface $serviceLocator
+     */
+    public function setServiceLocator(ServiceLocatorInterface $serviceLocator)
+    {
+        $this->_serviceLocator = $serviceLocator;
+    }
+
+    /**
+     * Get service locator
+     * @return ServiceLocatorInterface
+     */
+    public function getServiceLocator()
+    {
+        return $this->_serviceLocator;
+    }
+
     /**
      * Initialize the DB API
      * @param Node $magentoNode
@@ -110,7 +140,7 @@ class Db implements ServiceLocatorAwareInterface
         $username = $magentoNode->getConfig('db_username');
         $password = $magentoNode->getConfig('db_password');
 
-        if (!$schema || !$hostname){
+        if (!$schema || !$hostname) {
             $success = FALSE;
         }else {
             try{
@@ -167,10 +197,10 @@ class Db implements ServiceLocatorAwareInterface
                         )
                     );
                 }
-            }catch(\Exception $exception){
+            }catch(\Exception $exception) {
                 $success = FALSE;
                 $this->getServiceLocator()->get('logService')
-                    ->log(\Log\Service\LogService::LEVEL_DEBUG,
+                    ->log(LogService::LEVEL_DEBUG,
                         'init_fail',
                         'DB API init failed - '.$exception->getMessage(),
                         array('hostname'=>$hostname, 'schema'=>$schema, 'message'=>$exception->getMessage()),
@@ -189,8 +219,8 @@ class Db implements ServiceLocatorAwareInterface
     {
         if ($this->_debug) {
             $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
-                    'dbapi_sql',
+                ->log(LogService::LEVEL_DEBUGEXTRA,
+                    'mag_dbapi_sql',
                     'DB API SQL: '.$sql,
                     array('sql'=>$sql),
                     array('node'=>$this->_node->getNodeId())
@@ -236,7 +266,7 @@ class Db implements ServiceLocatorAwareInterface
     /**
      * Retrieve some or all magento orders, optionally filtering by an updated at date.
      *
-     * @param int|bool $storeId The store ID to look at, or false if irrelevant
+     * @param int|bool $storeId The store ID to look at, or FALSE if irrelevant
      * @param array|bool $orderIds
      * @param bool|string $updatedSince
      * @return array
@@ -263,35 +293,35 @@ class Db implements ServiceLocatorAwareInterface
     /**
      * Fetch stock levels for all or some products
      *
-     * @param array|bool|false $product_ids An array of product entity IDs, or false if desiring all.
+     * @param array|FALSE $productIds An array of product entity IDs, or FALSE if desiring all.
      * @return array
      */
-    public function getStock($product_ids=false){
-        $criteria = array(
-            'stock_id'=>1,
-        );
-        if(is_array($product_ids)){
-            $criteria['product_id'] = $product_ids;
+    public function getStock($productIds = FALSE)
+    {
+        $criteria = array('stock_id'=>1);
+        if (is_array($productIds)) {
+            $criteria['product_id'] = $productIds;
         }
-        $res = $this->getTableGateway('cataloginventory_stock_item')->select($criteria);
+        $stockItems = $this->getTableGateway('cataloginventory_stock_item')->select($criteria);
 
-        $ret = array();
-        foreach($res as $row){
-            $ret[$row['product_id']] = $row['qty'];
+        $stockPerProduct = array();
+        foreach ($stockItems as $row) {
+            $stockPerProduct[$row['product_id']] = $row['qty'];
         }
 
-        return $ret;
+        return $stockPerProduct;
     }
 
     /**
      * Update stock level for a single product
-     *
      * @param int $product_id Product Entity ID
      * @param float $qty Quantity available
      * @param bool $is_in_stock Whether the product should be in stock
      */
-    public function updateStock($product_id, $qty, $is_in_stock){
-        $this->getTableGateway('cataloginventory_stock_item')->update(array('qty'=>$qty, 'is_in_stock'=>$is_in_stock), array('product_id'=>$product_id, 'stock_id'=>1));
+    public function updateStock($product_id, $qty, $is_in_stock)
+    {
+        $this->getTableGateway('cataloginventory_stock_item')
+            ->update(array('qty'=>$qty, 'is_in_stock'=>$is_in_stock), array('product_id'=>$product_id, 'stock_id'=>1));
     }
 
     /**
@@ -300,17 +330,21 @@ class Db implements ServiceLocatorAwareInterface
      * @param int $customer_id The Magento customer ID to look up the status for
      * @return bool
      */
-    public function getNewsletterStatus($customer_id){
-        $sql = 'SELECT subscriber_id FROM newsletter_subscriber WHERE customer_id = ' . $customer_id . ' AND subscriber_status IN (1,4)';
+    public function getNewsletterStatus($customer_id)
+    {
+        $sql = 'SELECT subscriber_id FROM newsletter_subscriber WHERE customer_id = '.$customer_id
+            .' AND subscriber_status IN (1,4)';
         $this->debugSql($sql);
 
-        $res = $this->_adapter->query($sql, \Zend\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
-        foreach($res as $row){
-            if($row['subscriber_id']){
-                return true;
+        $newsletterSubscribers = $this->_adapter->query($sql, \Zend\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+
+        foreach ($newsletterSubscribers as $row) {
+            if ($row['subscriber_id']) {
+                break;
             }
         }
-        return false;
+
+        return (isset($row) && isset($row['subscriber_id']) && $row['subscriber_id'] ? TRUE : FALSE);
     }
 
     /**
@@ -378,8 +412,8 @@ class Db implements ServiceLocatorAwareInterface
 
                 $doSourceTranslation = FALSE;
                 $sourceTranslation = array();
-                if($type == 'source_int'){
-                    $type = $prefix . '_entity_int';
+                if ($type == 'source_int') {
+                    $type = $prefix.'_entity_int';
                     $doSourceTranslation = true;
 
                     foreach ($singleTypeAttributes as $code=>$attributeId) {
@@ -388,17 +422,17 @@ class Db implements ServiceLocatorAwareInterface
                     }
                 }
 
-                foreach($singleTypeAttributes as $code=>$attributeId){
+                foreach ($singleTypeAttributes as $code=>$attributeId) {
 
                     $value = $data[$code];
-                    if($doSourceTranslation){
-                        if(isset($sourceTranslation[$attributeId][$value])){
+                    if ($doSourceTranslation) {
+                        if (isset($sourceTranslation[$attributeId][$value])) {
                             $value = $sourceTranslation[$attributeId][$value];
                         }else{
                             $message = 'DB API found unmatched value '.$value
                                 .' for attribute '.$attributesById[$attributeId]['attribute_code'];
                             $this->getServiceLocator()->get('logService')
-                                ->log(\Log\Service\LogService::LEVEL_WARN,
+                                ->log(LogService::LEVEL_WARN,
                                     'invalid_value',
                                     $message,
                                     array('value'=>$value, 'options'=>$sourceTranslation[$attributeId]),
@@ -407,7 +441,7 @@ class Db implements ServiceLocatorAwareInterface
                         }
                     }
 
-                    if($storeId > 0){
+                    if ($storeId > 0) {
                         $resultsDefault = $this->getTableGateway($type)
                             ->select(array(
                                 'entity_id'=>$entityId,
@@ -416,7 +450,7 @@ class Db implements ServiceLocatorAwareInterface
                                 'attribute_id'=>$attributeId,
                             ));
 
-                        if(!$resultsDefault || !count($resultsDefault)){
+                        if (!$resultsDefault || !count($resultsDefault)) {
                             $this->getTableGateway($type)
                                 ->insert(array(
                                     'entity_id'=>$entityId,
@@ -435,7 +469,7 @@ class Db implements ServiceLocatorAwareInterface
                         'attribute_id'=>$attributeId,
                     ));
 
-                    if(!$resultsStore || !count($resultsStore)){
+                    if (!$resultsStore || !count($resultsStore)) {
                         $this->getTableGateway($type)->insert(array(
                             'entity_id'=>$entityId,
                             'entity_type_id'=>$entityTypeData['entity_type_id'],
@@ -459,7 +493,7 @@ class Db implements ServiceLocatorAwareInterface
 
             $this->_adapter->getDriver()->getConnection()->commit();
 
-        }catch(\Exception $exception){
+        }catch(\Exception $exception) {
             $this->_adapter->getDriver()->getConnection()->rollback();
             throw $exception;
         }
@@ -467,210 +501,120 @@ class Db implements ServiceLocatorAwareInterface
 
     /**
      * Load a single entity from the EAV tables, with the specified attributes
-     * @param string $entity_type The type of entity to load
-     * @param int $entity_id The entity ID to load
-     * @param int|false $store_id The store to retrieve values for
-     * @param array $attributes An array of attribute codes
-     * @return array|null
-     * @throws \Magelink\Exception\MagelinkException
-     */
-    public function loadEntityEav($entity_type, $entity_id, $store_id, $attributes){
-        $entityTypeData = $this->getEntityType($entity_type);
-        $prefix = $this->getEntityPrefix($entity_type);
-
-        $entityRow = $this->getTableGateway($prefix.'_entity')->select(array('entity_id'=>$entity_id));
-        if(!$entityRow || !count($entityRow)){
-            return null;
-        }
-        $entityRow = array_shift($entityRow->toArray());
-
-        $attributesByType = $this->preprocessEavAttributes($entity_type, $attributes);
-
-        $attributesById = array();
-        foreach($attributes as $code){
-            $attr = $this->getAttribute($entity_type, $code);
-            $attributesById[$attr['attribute_id']] = $attr;
-        }
-
-        $resultRow = array();
-
-        $resultRow['entity_id'] = $entity_id;
-
-        foreach($attributesByType as $type=>$atts){
-            if($type == 'static'){
-                foreach($atts as $code){
-                    if(isset($entityRow[$code])){
-                        $resultRow[$code] = $entityRow[$code];
-                    }else{
-                        throw new MagelinkException('Invalid static attribute '.$code.' on entity with id '.$entity_id);
-                    }
-                }
-                continue;
-            }
-            $doSourceTranslation = false;
-            $sourceTranslation = array();
-            if($type == 'source_int'){
-                $type = $prefix . '_entity_int';
-                $doSourceTranslation = true;
-
-                foreach($atts as $code=>$aid){
-                    $sourceTranslation[$aid] = $this->loadAttributeOptions($aid, $store_id);
-                }
-
-            }
-            $resultsDefault = $this->getTableGateway($type)->select(array(
-                'entity_id'=>$entity_id,
-                'entity_type_id'=>$entityTypeData['entity_type_id'],
-                'store_id'=>0,
-                'attribute_id'=>array_values($atts),
-            ));
-            $resultsStore = array();
-            if($store_id !== false){
-                $resultsStore = $this->getTableGateway($type)->select(array(
-                    'entity_id'=>$entity_id,
-                    'entity_type_id'=>$entityTypeData['entity_type_id'],
-                    'store_id'=>$store_id,
-                    'attribute_id'=>array_values($atts),
-                ));
-            }
-            foreach($resultsDefault as $row){
-                $value = $row['value'];
-                if($doSourceTranslation){
-                    if(isset($sourceTranslation[$row['attribute_id']][$value])){
-                        $value = $sourceTranslation[$row['attribute_id']][$value];
-                    }else{
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value ' . $value . ' for att ' . $attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
-                    }
-                }
-                $resultRow[$attributesById[$row['attribute_id']]['attribute_code']] = $value;
-            }
-            if($store_id !== false){
-                foreach($resultsStore as $row){
-                    $value = $row['value'];
-                    if($doSourceTranslation){
-                        if(isset($sourceTranslation[$row['attribute_id']][$value])){
-                            $value = $sourceTranslation[$row['attribute_id']][$value];
-                        }else{
-                            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value ' . $value . ' for att ' . $attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
-                        }
-                    }
-                    $resultRow[$attributesById[$row['attribute_id']]['attribute_code']] = $value;
-                }
-            }
-        }
-
-        return $resultRow;
-    }
-
-    /**
-     * Identical to loadEntityEav() but takes an array of entity IDs
-     * @param string $entity_type
-     * @param array|null $entity_ids Entity IDs to fetch, or null if load all
-     * @param int|false $store_id
+     * @param string $entityType
+     * @param array|NULL $entityIds Entity IDs to fetch, or NULL if load all
+     * @param int|FALSE $storeId
      * @param array $attributes
      * @return array
      * @throws MagelinkException
      */
-    public function loadEntitiesEav($entity_type, $entity_ids, $store_id, $attributes){
-        $entityTypeData = $this->getEntityType($entity_type);
-        $prefix = $this->getEntityPrefix($entity_type);
+    public function loadEntitiesEav($entityType, $entityIds, $storeId, $attributes)
+    {
+        $entityTypeData = $this->getEntityType($entityType);
+        $prefix = $this->getEntityPrefix($entityType);
 
-        if($entity_ids != null){
-            $entityRowRaw = $this->getTableGateway($prefix.'_entity')->select(array('entity_id'=>$entity_ids));
+        if ($entityIds != NULL) {
+            $entityRowRaw = $this->getTableGateway($prefix.'_entity')
+                ->select(array('entity_id'=>$entityIds));
         }else{
-            $entityRowRaw = $this->getTableGateway($prefix.'_entity')->select();
+            $entityRowRaw = $this->getTableGateway($prefix.'_entity')
+                ->select();
         }
-        if(!$entityRowRaw || !count($entityRowRaw)){
+        if (!$entityRowRaw || !count($entityRowRaw)) {
             return array();
         }
 
-        $populateEntityIds = false;
-        if($entity_ids == null){
-            $entity_ids = array();
-            $populateEntityIds = true;
+        $populateEntityIds = FALSE;
+        if ($entityIds == NULL) {
+            $entityIds = array();
+            $populateEntityIds = TRUE;
         }
         $entityRow = array();
-        foreach($entityRowRaw as $row){
+        foreach ($entityRowRaw as $row) {
             $entityRow[$row['entity_id']] = $row;
-            if($populateEntityIds){
-                $entity_ids[] = $row['entity_id'];
+            if ($populateEntityIds) {
+                $entityIds[] = $row['entity_id'];
             }
         }
 
-        $attributesByType = $this->preprocessEavAttributes($entity_type, $attributes);
+        $attributesByType = $this->preprocessEavAttributes($entityType, $attributes);
 
         $attributesById = array();
-        foreach($attributes as $code){
-            $attr = $this->getAttribute($entity_type, $code);
-            $attributesById[$attr['attribute_id']] = $attr;
+        foreach ($attributes as $code) {
+            $attribute = $this->getAttribute($entityType, $code);
+            $attributesById[$attribute['attribute_id']] = $attribute;
         }
 
         $results = array();
-        foreach($entity_ids as $id){
+        foreach ($entityIds as $id) {
             $results[$id] = array('entity_id'=>$id);
         }
 
-        foreach($attributesByType as $type=>$atts){
-            if($type == 'static'){
-                foreach($atts as $code=>$aid){
-                    foreach($entity_ids as $entity_id){
-                        if(!isset($entityRow[$entity_id])){
-                            continue;
-                        }
-                        if(isset($entityRow[$entity_id][$code])){
-                            $results[$entity_id][$code] = $entityRow[$entity_id][$code];
-                        }else{
-                            throw new MagelinkException('Invalid static attribute '.$code.' on entity with id '.$entity_id);
+        foreach ($attributesByType as $type=>$attributes) {
+            if ($type == 'static') {
+                foreach ($attributes as $code=>$attributeId) {
+                    foreach ($entityIds as $entityId) {
+                        if (isset($entityRow[$entityId])) {
+                            if (isset($entityRow[$entityId][$code])) {
+                                $results[$entityId][$code] = $entityRow[$entityId][$code];
+                            }else{
+                                $message = 'Invalid static attribute '.$code.' on entity with id '.$entityId
+                                    .' (type '.$entityType.', store '.$storeId.').';
+                                throw new MagelinkException($message);
+                            }
                         }
                     }
                 }
-                continue;
             }
-            $doSourceTranslation = false;
+
+            $doSourceTranslation = FALSE;
             $sourceTranslation = array();
-            if($type == 'source_int'){
-                $type = $prefix . '_entity_int';
-                $doSourceTranslation = true;
+            if ($type == 'source_int') {
+                $type = $prefix.'_entity_int';
+                $doSourceTranslation = TRUE;
 
-                foreach($atts as $code=>$aid){
-                    $sourceTranslation[$aid] = $this->loadAttributeOptions($aid, $store_id);
+                foreach ($attributes as $code=>$attributeId) {
+                    $sourceTranslation[$attributeId] = $this->loadAttributeOptions($attributeId, $storeId);
                 }
-
             }
+
             $resultsDefault = $this->getTableGateway($type)->select(array(
-                'entity_id'=>$entity_ids,
+                'entity_id'=>$entityIds,
                 'entity_type_id'=>$entityTypeData['entity_type_id'],
                 'store_id'=>0,
-                'attribute_id'=>array_values($atts),
+                'attribute_id'=>array_values($attributes),
             ));
+
             $resultsStore = array();
-            if($store_id !== false){
+            if ($storeId !== FALSE) {
                 $resultsStore = $this->getTableGateway($type)->select(array(
-                    'entity_id'=>$entity_ids,
+                    'entity_id'=>$entityIds,
                     'entity_type_id'=>$entityTypeData['entity_type_id'],
-                    'store_id'=>$store_id,
-                    'attribute_id'=>array_values($atts),
+                    'store_id'=>$storeId,
+                    'attribute_id'=>array_values($attributes),
                 ));
             }
-            foreach($resultsDefault as $row){
+            foreach ($resultsDefault as $row) {
                 $value = $row['value'];
-                if($doSourceTranslation){
-                    if(isset($sourceTranslation[$row['attribute_id']][$value])){
+                if ($doSourceTranslation) {
+                    if (isset($sourceTranslation[$row['attribute_id']][$value])) {
                         $value = $sourceTranslation[$row['attribute_id']][$value];
                     }else{
-                        $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value ' . $value . ' for att ' . $attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value '.$value.' for att '.$attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
                     }
                 }
                 $results[intval($row['entity_id'])][$attributesById[$row['attribute_id']]['attribute_code']] = $value;
             }
-            if($store_id !== false){
-                foreach($resultsStore as $row){
+            if ($storeId !== FALSE) {
+                foreach ($resultsStore as $row) {
                     $value = $row['value'];
-                    if($doSourceTranslation){
-                        if(isset($sourceTranslation[$row['attribute_id']][$value])){
+                    if ($doSourceTranslation) {
+                        if (isset($sourceTranslation[$row['attribute_id']][$value])) {
                             $value = $sourceTranslation[$row['attribute_id']][$value];
                         }else{
-                            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value ' . $value . ' for att ' . $attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
+                            $this->getServiceLocator()->get('logService')
+                                ->log(LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value '.$value.' for att '.$attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
                         }
                     }
                     $results[intval($row['entity_id'])][$attributesById[$row['attribute_id']]['attribute_code']] = $value;
@@ -683,62 +627,68 @@ class Db implements ServiceLocatorAwareInterface
 
     /**
      * Returns a key-value array of option id -> value for the given attribute
-     * @param int $att_id
-     * @param int $store_id
+     * @param int $attributeId
+     * @param int $storeId
      * @return array
      */
-    protected function loadAttributeOptions($att_id, $store_id=0){
-        $option_ids = array();
+    protected function loadAttributeOptions($attributeId, $storeId=0)
+    {
+        $optionIds = array();
         $ret = array();
-        $options = $this->getTableGateway('eav_attribute_option')->select(array('attribute_id'=>$att_id));
-        foreach($options as $row){
-            $option_ids[] = $row['option_id'];
+
+        $options = $this->getTableGateway('eav_attribute_option')->select(array('attribute_id'=>$attributeId));
+        foreach ($options as $row) {
+            $optionIds[] = $row['option_id'];
         }
-        $values = $this->getTableGateway('eav_attribute_option_value')->select(array('option_id'=>$option_ids, 'store_id'=>array(0, $store_id)));
-        foreach($values as $row){
-            if($row['store_id'] == 0 && !isset($ret[$row['option_id']])){
+        $values = $this->getTableGateway('eav_attribute_option_value')
+            ->select(array('option_id'=>$optionIds, 'store_id'=>array(0, $storeId)));
+
+        foreach ($values as $row) {
+            if ($row['store_id'] == 0 && !isset($ret[$row['option_id']])) {
                 $ret[$row['option_id']] = $row['value'];
-            }else if($row['store_id'] > 0){
+            }else if ($row['store_id'] > 0) {
                 $ret[$row['option_id']] = $row['value'];
             }
         }
+
         return $ret;
     }
 
     /**
      * Preprocess a list of attribute codes into the respective tables
      *
-     * @param string $entity_type
+     * @param string $entityType
      * @param array $attributes
      * @throws MagelinkException if an invalid attribute code is passed
      * @return array
      */
-    protected function preprocessEavAttributes($entity_type, $attributes){
-        $prefix = $this->getEntityPrefix($entity_type);
+    protected function preprocessEavAttributes($entityType, $attributes)
+    {
+        $prefix = $this->getEntityPrefix($entityType);
 
-        if(!isset($attributesByType['static'])){
+        if (!isset($attributesByType['static'])) {
             $attributesByType['static'] = array();
         }
 
         $attributesByType = array();
-        foreach($attributes as $code){
-            if(in_array($code, array('attribute_set_id', 'type_id'))){
+        foreach ($attributes as $code) {
+            if (in_array($code, array('attribute_set_id', 'type_id'))) {
                 $attributesByType['static'][$code] = $code;
                 continue;
             }
 
             $code = trim($code);
-            if(!strlen($code)){
+            if (!strlen($code)) {
                 continue;
             }
 
-            $attr = $this->getAttribute($entity_type, $code);
+            $attr = $this->getAttribute($entityType, $code);
             if ($attr == NULL) {
-                //*** ToDo throw new MagelinkException('Invalid Magento attribute code ' . $code . ' for ' . $entity_type);
+                //*** ToDo throw new MagelinkException('Invalid Magento attribute code '.$code.' for '.$entityType);
             }else{
                 $table = $this->getAttributeTable($prefix, $attr);
 
-                if(!isset($attributesByType[$table])){
+                if (!isset($attributesByType[$table])) {
                     $attributesByType[$table] = array();
                 }
 
@@ -755,136 +705,104 @@ class Db implements ServiceLocatorAwareInterface
      * @param array $attrData
      * @return string The table name or "static"
      */
-    protected function getAttributeTable($prefix, $attrData){
-        if($attrData['backend_type'] == 'static'){
+    protected function getAttributeTable($prefix, $attrData)
+    {
+        if ($attrData['backend_type'] == 'static') {
             return 'static';
-        }else if($attrData['backend_table'] != null){
+        }else if ($attrData['backend_table'] != NULL) {
             return $attrData['backend_table'];
-        }else if($attrData['backend_type'] == 'int' && $attrData['source_model'] == 'eav/entity_attribute_source_table'){
+        }else if ($attrData['backend_type'] == 'int' && $attrData['source_model'] == 'eav/entity_attribute_source_table') {
             return 'source_int';
         } else{
-            return $prefix . '_entity_' . $attrData['backend_type'];
+            return $prefix.'_entity_'.$attrData['backend_type'];
         }
     }
 
     /**
      * Returns the table prefix for entities of the given type
-     * @param $entity_type
+     * @param $entityType
      * @return string
      * @throws \Magelink\Exception\MagelinkException
      */
-    protected function getEntityPrefix($entity_type){
-        switch($entity_type){
+    protected function getEntityPrefix($entityType)
+    {
+        switch ($entityType) {
             case 'catalog_product':
             case 'catalog_category':
             case 'customer':
             case 'customer_address':
-                return $entity_type;
+                return $entityType;
             case 'rma_item':
                 return 'enterprise_rma_item';
             default:
                 // Maybe warn? This should be a safe default
-                return $entity_type;
+                return $entityType;
         }
     }
-
-    /**
-     * @var array Cache for getEntityType
-     */
-    protected $_entityTypeCache = array();
 
     /**
      * Returns the entity type table entry for the given type
-     * @param $entity_type_code
-     * @return null
+     * @param $entityTypeCode
+     * @return NULL
      */
-    protected function getEntityType($entity_type_code){
-        if(isset($this->_entityTypeCache[$entity_type_code])){
-            return $this->_entityTypeCache[$entity_type_code];
+    protected function getEntityType($entityTypeCode)
+    {
+        if (isset($this->_entityTypeCache[$entityTypeCode])) {
+            return $this->_entityTypeCache[$entityTypeCode];
         }
-        $res = $this->getTableGateway('eav_entity_type')->select(array('entity_type_code'=>$entity_type_code));
-        foreach($res as $row){
-            $this->_entityTypeCache[$entity_type_code] = $row;
+
+        $res = $this->getTableGateway('eav_entity_type')->select(array('entity_type_code'=>$entityTypeCode));
+        foreach ($res as $row) {
+            $this->_entityTypeCache[$entityTypeCode] = $row;
             return $row;
         }
-        $this->_entityTypeCache[$entity_type_code] = null;
-        return null;
-    }
+        $this->_entityTypeCache[$entityTypeCode] = NULL;
 
-    /**
-     * @var array Cache for getAttribute
-     */
-    protected $_attributeCache = array();
+        return $this->_entityTypeCache[$entityTypeCode];
+    }
 
     /**
      * Returns the eav attribute table entry for the given code
-     * @param $entity_type
+     * @param $entityType
      * @param $attribute_code
-     * @return null
+     * @return NULL
      */
-    protected function getAttribute($entity_type, $attribute_code){
-        $entity_type = $this->getEntityType($entity_type);
-        $entity_type = $entity_type['entity_type_id'];
+    protected function getAttribute($entityType, $attribute_code) {
+        $entityType = $this->getEntityType($entityType);
+        $entityType = $entityType['entity_type_id'];
 
-        if(isset($this->_attributeCache[$entity_type])){
-            if(isset($this->_attributeCache[$entity_type][$attribute_code])){
-                return $this->_attributeCache[$entity_type][$attribute_code];
+        if (isset($this->_attributeCache[$entityType])) {
+            if (isset($this->_attributeCache[$entityType][$attribute_code])) {
+                return $this->_attributeCache[$entityType][$attribute_code];
             }
         }else{
-            $this->_attributeCache[$entity_type] = array();
+            $this->_attributeCache[$entityType] = array();
         }
 
+        $res = $this->getTableGateway('eav_attribute')
+            ->select(array('entity_type_id'=>$entityType, 'attribute_code'=>$attribute_code));
 
-        $res = $this->getTableGateway('eav_attribute')->select(array('entity_type_id'=>$entity_type, 'attribute_code'=>$attribute_code));
-        foreach($res as $row){
-            $this->_attributeCache[$entity_type][$attribute_code] = $row;
-            return $row;
+        $this->_attributeCache[$entityType][$attribute_code] = NULL;
+        foreach ($res as $row) {
+            $this->_attributeCache[$entityType][$attribute_code] = $row;
+            break;
         }
 
-        $this->_attributeCache[$entity_type][$attribute_code] = null;
-        return null;
+        return $this->_attributeCache[$entityType][$attribute_code];
     }
-
-    /**
-     * @var array
-     */
-    protected $_tgCache = array();
 
     /**
      * Returns a new TableGateway instance for the requested table
      * @param string $table
      * @return \Zend\Db\TableGateway\TableGateway
      */
-    protected function getTableGateway($table){
-        if(isset($this->_tgCache[$table])){
-            return $this->_tgCache[$table];
+    protected function getTableGateway($table)
+    {
+        if (!isset($this->_tgCache[$table])) {
+            $this->_tgCache[$table] = new TableGateway($table, $this->_adapter);
         }
-        $this->_tgCache[$table] = new TableGateway($table, $this->_adapter);
+
         return $this->_tgCache[$table];
     }
 
-    /**
-     * @var ServiceLocatorInterface Local service locator instance
-     */
-    protected $_serviceLocator;
-
-    /**
-     * Set service locator
-     *
-     * @param ServiceLocatorInterface $serviceLocator
-     */
-    public function setServiceLocator(ServiceLocatorInterface $serviceLocator)
-    {
-        $this->_serviceLocator = $serviceLocator;
-    }
-
-    /**
-     * Get service locator
-     *
-     * @return ServiceLocatorInterface
-     */
-    public function getServiceLocator()
-    {
-        return $this->_serviceLocator;
-    }
 }
