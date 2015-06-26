@@ -662,8 +662,8 @@ class ProductGateway extends AbstractGateway
                 ->log(LogService::LEVEL_WARN,
                     'mag_p_wr_noupd',
                     'No update required for '.$entity->getUniqueId() .' but requested was '.implode(', ', $attributes),
-                   array('attributes'=>$attributes),
-                   array('entity'=>$entity) 
+                    array('attributes'=>$attributes),
+                    array('entity'=>$entity)
                 );
         }
 
