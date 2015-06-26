@@ -622,7 +622,7 @@ class Db implements ServiceLocatorAwareInterface
                             }else{
                                 $logMessage = 'DB API found unmatched value '.$value.' for att '
                                     .$attributesById[$row['attribute_id']]['attribute_code'];
-                                $logData = array('row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]),
+                                $logData = array('row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]);
                                 $this->getServiceLocator()->get('logService')
                                     ->log(LogService::LEVEL_WARN, 'mag_db_ivld_stor', $logMessage, $logData);
                             }
