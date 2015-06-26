@@ -681,8 +681,8 @@ class ProductGateway extends AbstractGateway
                 ->log(LogService::LEVEL_INFO,
                     'mag_p_wr_upd_non',
                     'No update required for '.$sku.' but requested was '.implode(', ', $attributes),
-                   array('attributes'=>$attributes),
-                   array('entity'=>$entity) 
+                    array('attributes'=>$attributes),
+                    array('entity'=>$entity)
                 );
         }
 
