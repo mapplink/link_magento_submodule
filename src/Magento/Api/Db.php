@@ -565,59 +565,71 @@ class Db implements ServiceLocatorAwareInterface
                         }
                     }
                 }
-            }
+            }else{
+                $doSourceTranslation = FALSE;
+                $sourceTranslation = array();
+                if ($type == 'source_int') {
+                    $type = $prefix.'_entity_int';
+                    $doSourceTranslation = TRUE;
 
-            $doSourceTranslation = FALSE;
-            $sourceTranslation = array();
-            if ($type == 'source_int') {
-                $type = $prefix.'_entity_int';
-                $doSourceTranslation = TRUE;
-
-                foreach ($attributes as $code=>$attributeId) {
-                    $sourceTranslation[$attributeId] = $this->loadAttributeOptions($attributeId, $storeId);
-                }
-            }
-
-            $resultsDefault = $this->getTableGateway($type)->select(array(
-                'entity_id'=>$entityIds,
-                'entity_type_id'=>$entityTypeData['entity_type_id'],
-                'store_id'=>0,
-                'attribute_id'=>array_values($attributes),
-            ));
-
-            $resultsStore = array();
-            if ($storeId !== FALSE) {
-                $resultsStore = $this->getTableGateway($type)->select(array(
-                    'entity_id'=>$entityIds,
-                    'entity_type_id'=>$entityTypeData['entity_type_id'],
-                    'store_id'=>$storeId,
-                    'attribute_id'=>array_values($attributes),
-                ));
-            }
-            foreach ($resultsDefault as $row) {
-                $value = $row['value'];
-                if ($doSourceTranslation) {
-                    if (isset($sourceTranslation[$row['attribute_id']][$value])) {
-                        $value = $sourceTranslation[$row['attribute_id']][$value];
-                    }else{
-                        $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value '.$value.' for att '.$attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
+                    foreach ($attributes as $code=>$attributeId) {
+                        $sourceTranslation[$attributeId] = $this->loadAttributeOptions($attributeId, $storeId);
                     }
                 }
-                $results[intval($row['entity_id'])][$attributesById[$row['attribute_id']]['attribute_code']] = $value;
-            }
-            if ($storeId !== FALSE) {
-                foreach ($resultsStore as $row) {
+
+                $resultsDefault = $this->getTableGateway($type)->select(
+                    array(
+                        'entity_id'=>$entityIds,
+                        'entity_type_id'=>$entityTypeData['entity_type_id'],
+                        'store_id'=>0,
+                        'attribute_id'=>array_values($attributes),
+                    )
+                );
+
+                $resultsStore = array();
+                if ($storeId !== FALSE) {
+                    $resultsStore = $this->getTableGateway($type)->select(array(
+                            'entity_id'=>$entityIds,
+                            'entity_type_id'=>$entityTypeData['entity_type_id'],
+                            'store_id'=>$storeId,
+                            'attribute_id'=>array_values($attributes),
+                        )
+                    );
+                }
+                foreach ($resultsDefault as $row) {
                     $value = $row['value'];
                     if ($doSourceTranslation) {
                         if (isset($sourceTranslation[$row['attribute_id']][$value])) {
                             $value = $sourceTranslation[$row['attribute_id']][$value];
                         }else{
+                            $logMessage = 'DB API found unmatched value '.$value.' for attribute '
+                                .$attributesById[$row['attribute_id']]['attribute_code'];
+                            $logData = array('row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]);
                             $this->getServiceLocator()->get('logService')
-                                ->log(LogService::LEVEL_WARN, 'invalid_value', 'DB API found unmatched value '.$value.' for att '.$attributesById[$row['attribute_id']]['attribute_code'], array('value'=>$value, 'row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]), array());
+                                ->log(LogService::LEVEL_WARN, 'mag_db_ivld', $logMessage, $logData);
                         }
                     }
                     $results[intval($row['entity_id'])][$attributesById[$row['attribute_id']]['attribute_code']] = $value;
+                }
+
+                if ($storeId !== FALSE) {
+                    foreach ($resultsStore as $row) {
+                        $value = $row['value'];
+                        $entityId = intval($row['entity_id']);
+                        if ($doSourceTranslation) {
+                            if (isset($sourceTranslation[$row['attribute_id']][$value])) {
+                                $value = $sourceTranslation[$row['attribute_id']][$value];
+                            }else{
+                                $logMessage = 'DB API found unmatched value '.$value.' for att '
+                                    .$attributesById[$row['attribute_id']]['attribute_code'];
+                                $logData = array('row'=>$row, 'options'=>$sourceTranslation[$row['attribute_id']]),
+                                $this->getServiceLocator()->get('logService')
+                                    ->log(LogService::LEVEL_WARN, 'mag_db_ivld_stor', $logMessage, $logData);
+                            }
+                        }
+
+                        $results[$entityId][$attributesById[$row['attribute_id']]['attribute_code']] = $value;
+                    }
                 }
             }
         }
@@ -684,7 +696,7 @@ class Db implements ServiceLocatorAwareInterface
 
             $attr = $this->getAttribute($entityType, $code);
             if ($attr == NULL) {
-                //*** ToDo throw new MagelinkException('Invalid Magento attribute code '.$code.' for '.$entityType);
+                // ToDo (maybe): throw new MagelinkException('Invalid Magento attribute code '.$code.' for '.$entityType);
             }else{
                 $table = $this->getAttributeTable($prefix, $attr);
 
