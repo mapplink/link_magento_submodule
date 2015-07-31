@@ -229,7 +229,7 @@ class OrderGateway extends AbstractGateway
         $logEntities = array('node'=>$this->_node, 'order'=>$order, 'orderitem'=>$orderitem);
 
         if ($isOrderPending || $isOrderProcessing || $isOrderCancelled) {
-            $storeId = ($this->_node->isMultiStore() ? $order->getData('store_id') : 0);
+            $storeId = ($this->_node->isMultiStore() ? $order->getStoreId() : 0);
 
             $stockitem = $this->_entityService->loadEntity(
                 $this->_node->getNodeId(),
