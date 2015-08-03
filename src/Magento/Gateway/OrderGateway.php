@@ -389,7 +389,7 @@ class OrderGateway extends AbstractGateway
 
         if (isset($orderData['customer_id']) && $orderData['customer_id'] ){
             $customer = $this->_entityService
-                ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_id']);
+                ->loadEntityLocal($this->_node->getNodeId(), 'customer', 0, $orderData['customer_id']);
             // $customer = $this->_entityService->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_email']);
             if ($customer && $customer->getId()) {
                 $data['customer'] = $customer;

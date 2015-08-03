@@ -138,7 +138,7 @@ class CustomerGateway extends AbstractGateway
                 $data = array();
 
                 $uniqueId = $customer['email'];
-                $local_id = $customer['customer_id'];
+                $localId = $customer['customer_id'];
                 $storeId = ($this->_node->isMultiStore() ? $customer['store_id'] : 0);
                 $parentId = NULL;
 
@@ -184,7 +184,7 @@ class CustomerGateway extends AbstractGateway
 
                     if ($this->_db) {
                         try {
-                            $data['enable_newsletter'] = $this->_db->getNewsletterStatus($local_id);
+                            $data['enable_newsletter'] = $this->_db->getNewsletterStatus($localId);
                         }catch (\Exception $exception) {
                             // store as sync issue
                             throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
@@ -193,10 +193,10 @@ class CustomerGateway extends AbstractGateway
                 }
 
                 /** @var boolean $needsUpdate Whether we need to perform an entity update here */
-                $needsUpdate = true;
+                $needsUpdate = TRUE;
 
                 $existingEntity = $entityService
-                    ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $local_id);
+                    ->loadEntityLocal($this->_node->getNodeId(), 'customer', 0, $localId);
                 if (!$existingEntity) {
                     $existingEntity = $entityService
                         ->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $uniqueId);
@@ -209,7 +209,7 @@ class CustomerGateway extends AbstractGateway
                             $data, 
                             $parentId
                         );
-                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_INFO,
                                 'mag_cu_new',
@@ -227,7 +227,7 @@ class CustomerGateway extends AbstractGateway
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
                             );
                         $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
-                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                     }else{
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_INFO,
@@ -236,7 +236,7 @@ class CustomerGateway extends AbstractGateway
                                 array('code'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
                             );
-                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $local_id);
+                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
                     }
                 }else{
                     $this->getServiceLocator()->get('logService')
