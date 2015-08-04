@@ -264,18 +264,12 @@ class ProductGateway extends AbstractGateway
         /** @var boolean $needsUpdate Whether we need to perform an entity update here */
         $needsUpdate = TRUE;
 
-        $existingEntity = $this->_entityService->loadEntityLocal($this->_node->getNodeId(), 'product', $storeId, $productId);
+        $existingEntity = $this->_entityService->loadEntityLocal($this->_node->getNodeId(), 'product', 0, $productId);
         if (!$existingEntity) {
-            $existingEntity = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', $storeId, $sku);
+            $existingEntity = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', 0, $sku);
             if (!$existingEntity) {
-                $existingEntity = $this->_entityService->createEntity(
-                    $this->_node->getNodeId(),
-                    'product',
-                    $storeId,
-                    $sku,
-                    $data,
-                    $parentId
-                );
+                $existingEntity = $this->_entityService
+                    ->createEntity($this->_node->getNodeId(), 'product', 0, $sku, $data, $parentId);
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_INFO,
@@ -285,14 +279,8 @@ class ProductGateway extends AbstractGateway
                        array('node'=>$this->_node, 'entity'=>$existingEntity) 
                     );
                 try{
-                    $stockEntity = $this->_entityService->createEntity(
-                        $this->_node->getNodeId(),
-                        'stockitem',
-                        $storeId,
-                        $sku,
-                       array(),
-                        $existingEntity
-                    );
+                    $stockEntity = $this->_entityService
+                        ->createEntity($this->_node->getNodeId(), 'stockitem',0, $sku, array(), $existingEntity);
                     $this->_entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
                 }catch (\Exception $exception) {
                     $this->getServiceLocator() ->get('logService') 

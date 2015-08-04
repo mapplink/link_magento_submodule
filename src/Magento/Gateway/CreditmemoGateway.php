@@ -300,12 +300,7 @@ class CreditmemoGateway extends AbstractGateway
             $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
             $localId = $item['item_id'];
 
-            $product = $entityService->loadEntityLocal(
-                $this->_node->getNodeId(),
-                'product',
-                ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0),
-                $item['product_id']
-            );
+            $product = $entityService->loadEntityLocal($this->_node->getNodeId(), 'product', 0, $item['product_id']);
 
             $parent_item = $entityService->loadEntityLocal(
                 $this->_node->getNodeId(),

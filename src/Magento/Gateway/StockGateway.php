@@ -70,7 +70,7 @@ class StockGateway extends AbstractGateway
                 $data = array('available'=>$item['qty']);
 
                 foreach ($this->_node->getStoreViews() as $store_id=>$store_view) {
-                    $product = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', $store_id, $item['sku']);
+                    $product = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', 0, $item['sku']);
 
                     if (!$product) {
                         // No product exists, leave for now. May not be in this store.
@@ -82,12 +82,8 @@ class StockGateway extends AbstractGateway
                     /** @var boolean $needsUpdate Whether we need to perform an entity update here */
                     $needsUpdate = TRUE;
 
-                    $existingEntity = $this->_entityService->loadEntityLocal(
-                        $this->_node->getNodeId(),
-                        'stockitem',
-                        $store_id,
-                        $localId
-                    );
+                    $existingEntity = $this->_entityService
+                        ->loadEntityLocal($this->_node->getNodeId(), 'stockitem', 0, $localId);
                     if (!$existingEntity) {
                         $existingEntity = $this->_entityService->loadEntity(
                             $this->_node->getNodeId(),

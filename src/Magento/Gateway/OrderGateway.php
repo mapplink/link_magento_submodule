@@ -869,12 +869,7 @@ class OrderGateway extends AbstractGateway
                 );
             if (!$entity) {
                 $localId = $item['item_id'];
-                $product = $this->_entityService->loadEntity(
-                    $this->_node->getNodeId(),
-                    'product',
-                    ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
-                    $item['sku']
-                );
+                $product = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', 0, $item['sku']);
                 $data = array(
                     'product'=>($product ? $product->getId() : null),
                     'sku'=>$item['sku'],
