@@ -81,6 +81,15 @@ class ProductGateway extends AbstractGateway
                    array('type'=>'product', 'timestamp'=>$lastRetrieve)
                 );
 
+            $additional = $this->_node->getConfig('product_attributes');
+            if (is_string($additional)) {
+                $additional = explode(',', $additional);
+            }
+            if (!$additional || !is_array($additional)) {
+                $additional = array();
+            }
+
+
             if ($this->_db) {
                 try {
                     $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', $lastRetrieve);
@@ -107,24 +116,13 @@ class ProductGateway extends AbstractGateway
                         'tax_class_id',
                         'special_price',
                         'special_from_date',
-                        'special_to_date',
+                        'special_to_date'
                     );
-
-                    $additional = $this->_node->getConfig('product_attributes');
-                    if (is_string($additional)) {
-                        $additional = explode(',', $additional);
-                    }
-                    if (!$additional || !is_array($additional)) {
-                        $additional = array();
-                    }
 
                     foreach ($additional as $key=>$attributeCode) {
                         if (!strlen(trim($attributeCode))) {
                             unset($additional[$key]);
-                            continue;
-                        }
-
-                        if (!$entityConfigService->checkAttribute('product', $attributeCode)) {
+                        }elseif (!$entityConfigService->checkAttribute('product', $attributeCode)) {
                             $entityConfigService->createAttribute($attributeCode, $attributeCode, FALSE, 'varchar',
                                 'product', 'Magento Additional Attribute');
                             try {
@@ -155,18 +153,18 @@ class ProductGateway extends AbstractGateway
                     }
 
                     foreach ($productData as $productId=>$rawData) {
-                        $data = $this->convertFromMagento($rawData, $additional);
+                        $productData = $this->convertFromMagento($rawData, $additional);
 
-                        if ($brands && isset($data['brand']) && is_numeric($data['brand'])) {
-                            if (isset($brands[intval($data['brand'])])) {
-                                $data['brand'] = $brands[intval($data['brand'])]['name'];
+                        if ($brands && isset($productData['brand']) && is_numeric($productData['brand'])) {
+                            if (isset($brands[intval($productData['brand'])])) {
+                                $productData['brand'] = $brands[intval($productData['brand'])]['name'];
                             }else{
-                                $data['brand'] = NULL;
+                                $productData['brand'] = NULL;
                             }
                         }
 
                         if (isset($this->_attributeSets[intval($rawData['attribute_set_id'])])) {
-                            $data['product_class'] = $this->_attributeSets[intval(
+                            $productData['product_class'] = $this->_attributeSets[intval(
                                 $rawData['attribute_set_id']
                             )]['name'];
                         }else{
@@ -180,7 +178,7 @@ class ProductGateway extends AbstractGateway
                         $sku = $rawData['sku'];
 
                         try {
-                            $this->processUpdate($productId, $sku, $storeId, $parentId, $data);
+                            $this->processUpdate($productId, $sku, $storeId, $parentId, $productData);
                         }catch (\Exception $exception) {
                             // store as sync issue
                             throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
@@ -201,43 +199,60 @@ class ProductGateway extends AbstractGateway
                     throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                 }
 
-                foreach ($results as $product) {
-                    $data = $product;
+                foreach ($results as $productData) {
+                    $productId = $productData['product_id'];
+
+                    $productInfo = $this->_soap->call('catalogProductInfo', array($productId));
+                    $productInfoData = array();
+
+                    if ($productInfo) {
+                        if (isset($productInfo['result'])) {
+                            $productInfo = $productInfo['result'];
+                        }
+
+                        foreach ($additional as $attributeCode) {
+                            if (strlen(trim($attributeCode)) && isset($productInfo[$attributeCode])) {
+                                $productInfoData[$attributeCode] = $productInfo[$attributeCode];
+                            }
+                        }
+                    }
+
                     if ($this->_node->getConfig('load_full_product')) {
-                        $data = array_merge(
-                            $data,
-                            $this->loadFullProduct($product['product_id'], $storeId, $entityConfigService)
+                        $productData = array_merge(
+                            $productData,
+                            $productInfoData,
+                            $this->loadFullProduct($productId, $storeId, $entityConfigService)
                         );
                     }
 
-                    if (isset($this->_attributeSets[intval($data['set']) ])) {
-                        $data['product_class'] = $this->_attributeSets[intval($data['set']) ]['name'];
-                        unset($data['set']);
+                    if (isset($this->_attributeSets[intval($productData['set']) ])) {
+                        $productData['product_class'] = $this->_attributeSets[intval($productData['set']) ]['name'];
+                        unset($productData['set']);
                     }else{
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_WARN,
                                 'mag_p_soap_uset',
-                                'Unknown attribute set ID '.$data['set'],
-                               array('set'=>$data['set'], 'sku'=>$data['sku'])
+                                'Unknown attribute set ID '.$productData['set'],
+                               array('set'=>$productData['set'], 'sku'=>$productData['sku'])
                             );
                     }
 
-                    if (isset($data[''])) {
-                        unset($data['']);
+                    if (isset($productData[''])) {
+                        unset($productData['']);
                     }
 
-                    unset($data['category_ids']); // TODO parse into categories
-                    unset($data['website_ids']); // Not used
+                    unset($productData['category_ids']); // TODO parse into categories
+                    unset($productData['website_ids']); // Not used
 
-                    $productId = $data['product_id'];
-                    $sku = $data['sku'];
-                    unset($data['product_id']);
-                    unset($data['sku']);
+                    $productId = $productData['product_id'];
+                    $sku = $productData['sku'];
+                    unset($productData['product_id']);
+                    unset($productData['sku']);
 
                     $parentId = NULL; // TODO: Calculate
 
                     try {
-                        $this->processUpdate($productId, $sku, $storeId, $parentId, $data);
+                        $this->processUpdate($productId, $sku, $storeId, $parentId, $productData);
                     }catch (\Exception $exception) {
                         // store as sync issue
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
