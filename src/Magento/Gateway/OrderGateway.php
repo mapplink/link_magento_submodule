@@ -519,15 +519,12 @@ class OrderGateway extends AbstractGateway
             }
         }elseif ($this->_soap) {
             try{
-                $results = $this->_soap->call(
-                    'salesOrderList',
-                    array(array('complex_filter' => array(
-                        array(
-                            'key' => 'updated_at',
-                            'value' => array('key' => 'gt', 'value' => $lastRetrieve),
-                        )
+                $results = $this->_soap->call('salesOrderList', array(
+                    array('complex_filter'=>array(array(
+                        'key'=>'updated_at',
+                        'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
                     )))
-                );
+                ));
 
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_DEBUGEXTRA,

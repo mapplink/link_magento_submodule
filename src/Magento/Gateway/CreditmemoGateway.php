@@ -63,14 +63,10 @@ class CreditmemoGateway extends AbstractGateway
         }elseif ($this->_soap) {
             try {
                 $results = $this->_soap->call('salesOrderCreditmemoList', array(
-                    array('complex_filter'=>array(
-                        array(
-                            'key'=>'updated_at',
-                            'value'=>array(
-                                'key'=>'gt',
-                                'value'=>date('Y-m-d H:i:s', $lastRetrieve)
-                            )
-                        )))
+                    array('complex_filter'=>array(array(
+                        'key'=>'updated_at',
+                        'value'=>array('key'=>'gt', 'value'=>$lastRetrieve)
+                    )))
                 ));
             }catch (\Exception $exception) {
                 // store as sync issue
