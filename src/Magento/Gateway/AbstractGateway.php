@@ -31,6 +31,12 @@ abstract class AbstractGateway extends BaseAbstractGateway
     /** @var int $apiOverlappingSeconds */
     protected $apiOverlappingSeconds = 3;
 
+    /** @var int $lastRetrieveTimestamp */
+    protected $lastRetrieveTimestamp = NULL;
+
+    /** @var int $newRetrieveTimestamp */
+    protected $newRetrieveTimestamp = NULL;
+
 
     /**
      * Initialize the gateway and perform any setup actions required.

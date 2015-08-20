@@ -81,12 +81,6 @@ class OrderGateway extends AbstractGateway
         self::MAGENTO_STATUS_CANCELED
     );
 
-    /** @var int $lastRetrieveTimestamp */
-    protected $lastRetrieveTimestamp = NULL;
-
-    /** @var int $newRetrieveTimestamp */
-    protected $newRetrieveTimestamp = NULL;
-
     /** @var array $notRetrievedOrderIncrementIds */
     protected $notRetrievedOrderIncrementIds = NULL;
 
