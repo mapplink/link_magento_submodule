@@ -40,9 +40,6 @@ class StockGateway extends AbstractGateway
             return;
         }
 
-        /** @var \Entity\Service\EntityConfigService $entityConfigService */
-        $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
-
         $timestamp = time() - $this->apiOverlappingSeconds;
 
         $products = $this->_entityService->locateEntity(
