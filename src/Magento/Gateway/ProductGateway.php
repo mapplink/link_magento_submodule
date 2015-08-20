@@ -24,6 +24,9 @@ use Node\Entity;
 class ProductGateway extends AbstractGateway
 {
 
+    const GATEWAY_ENTITY = 'product';
+
+
     /**
      * Initialize the gateway and perform any setup actions required.
      * @param string $entityType
@@ -66,13 +69,10 @@ class ProductGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = time() - $this->apiOverlappingSeconds;
+        $timestamp = $this->getNewRetrieveTimestamp();
+        $lastRetrieve = $this->getLastRetrieveDate();
 
         foreach ($this->_node->getStoreViews() as $storeId=>$storeView) {
-            $lastRetrieve = date('Y-m-d H:i:s',
-                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve')
-                    + (intval($this->_node->getConfig('time_delta_product')) * 3600)
-            );
 
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,

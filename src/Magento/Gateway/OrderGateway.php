@@ -26,6 +26,9 @@ use Zend\Stdlib\ArrayObject;
 
 class OrderGateway extends AbstractGateway
 {
+
+    const GATEWAY_ENTITY = 'order';
+
     const MAGENTO_STATUS_PENDING = 'pending';
     const MAGENTO_STATUS_PENDING_ALIPAY = 'pending_alipay';
     const MAGENTO_STATUS_PENDING_ALIPAY_NEW = 'new';
@@ -105,54 +108,6 @@ class OrderGateway extends AbstractGateway
         }
 
         return $success;
-    }
-
-    /**
-     * @param int $timestamp
-     * @return bool|string $date
-     */
-    protected function convertTimestampToMagentoDateFormat($timestamp)
-    {
-        $deltaInSeconds = intval($this->_node->getConfig('time_delta_order')) * 3600;
-        $date = date('Y-m-d H:i:s', $timestamp + $deltaInSeconds);
-        return $date;
-    }
-
-    /**
-     * Get new retrieve timestamp
-     * @return int
-     */
-    protected function getNewRetrieveTimestamp()
-    {
-        if ($this->newRetrieveTimestamp === NULL) {
-            $this->newRetrieveTimestamp = time() - $this->apiOverlappingSeconds;
-        }
-
-        return $this->newRetrieveTimestamp;
-    }
-
-    /**
-     * Get last retrieve date from the database
-     * @return bool|string
-     */
-    protected function getLastRetrieveTimestamp()
-    {
-        if ($this->lastRetrieveTimestamp === NULL) {
-            $this->lastRetrieveTimestamp =
-                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve');
-        }
-
-        return $this->lastRetrieveTimestamp;
-    }
-
-    /**
-     * Get last retrieve date from the database
-     * @return bool|string
-     */
-    protected function getLastRetrieveDate()
-    {
-        $lastRetrieve = $this->convertTimestampToMagentoDateFormat($this->getLastRetrieveTimestamp());
-        return $lastRetrieve;
     }
 
     /**

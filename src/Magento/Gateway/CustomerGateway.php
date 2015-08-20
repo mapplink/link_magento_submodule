@@ -13,6 +13,9 @@ use Node\Entity;
 class CustomerGateway extends AbstractGateway
 {
 
+    const GATEWAY_ENTITY = 'customer';
+
+
     /**
      * Initialize the gateway and perform any setup actions required.
      * @param string $entityType
@@ -65,11 +68,8 @@ class CustomerGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = time() - $this->apiOverlappingSeconds;
-
-        $lastRetrieve = date('Y-m-d H:i:s',
-            $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve')
-                + (intval($this->_node->getConfig('time_delta_customer')) * 3600));
+        $timestamp = $this->getNewRetrieveTimestamp();
+        $lastRetrieve = $this->getLastRetrieveDate();
 
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,

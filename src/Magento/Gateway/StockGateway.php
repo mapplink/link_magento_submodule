@@ -40,7 +40,8 @@ class StockGateway extends AbstractGateway
             return;
         }
 
-        $timestamp = time() - $this->apiOverlappingSeconds;
+        $timestamp = $this->getNewRetrieveTimestamp();
+//        $lastRetrieve = $this->getLastRetrieveDate();
 
         $products = $this->_entityService->locateEntity(
             $this->_node->getNodeId(),
