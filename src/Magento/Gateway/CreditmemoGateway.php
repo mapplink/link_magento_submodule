@@ -443,7 +443,8 @@ class CreditmemoGateway extends AbstractGateway
                     );
 
                     try {
-                        $storeCreditRefundInChosenCurrency = $entity->getData('customer_balance', 0)
+                        // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
+                        $storeCreditRefundAdjusted = $entity->getData('customer_balance', 0)
                             / $originalOrder->getData('base_to_currency_rate', 1);
                         $soapResult = $this->_soap->call(
                             'salesOrderCreditmemoCreate',
@@ -453,7 +454,7 @@ class CreditmemoGateway extends AbstractGateway
                                 '',
                                 false,
                                 false,
-                                $storeCreditRefundInChosenCurrency
+                                $storeCreditRefundAdjusted
                             )
                         );
                     }catch (\Exception $exception) {
