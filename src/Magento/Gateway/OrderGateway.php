@@ -331,6 +331,7 @@ class OrderGateway extends AbstractGateway
             'status'=>$orderData['status'],
             'placed_at'=>date('Y-m-d H:i:s', strtotime($correctionHours, $createdAtTimestamp)),
             'grand_total'=>$orderData['base_grand_total'],
+            'base_to_currency_rate'=>$orderData['base_to_order_rate'],
             'weight_total'=>(array_key_exists('weight', $orderData)
                 ? $orderData['weight'] : 0),
             'discount_total'=>(array_key_exists('base_discount_amount', $orderData)

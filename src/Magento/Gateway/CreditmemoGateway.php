@@ -443,6 +443,8 @@ class CreditmemoGateway extends AbstractGateway
                     );
 
                     try {
+                        $storeCreditRefundInChosenCurrency = $entity->getData('customer_balance', 0)
+                            / $originalOrder->getData('base_to_currency_rate', 1);
                         $soapResult = $this->_soap->call(
                             'salesOrderCreditmemoCreate',
                             array(
@@ -451,7 +453,7 @@ class CreditmemoGateway extends AbstractGateway
                                 '',
                                 false,
                                 false,
-                                $entity->getData('customer_balance', 0)
+                                $storeCreditRefundInChosenCurrency
                             )
                         );
                     }catch (\Exception $exception) {
