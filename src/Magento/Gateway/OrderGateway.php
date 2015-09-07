@@ -820,20 +820,6 @@ class OrderGateway extends AbstractGateway
             }
             $notifyCustomer = isset($historyItem['is_customer_notified']) && $historyItem['is_customer_notified'] == '1';
 
-            $addCustomerComment = $orderEntity->hasAttribute('delivery_instruction')
-                && !$orderEntity->getData('delivery_instruction')
-                && strpos(strtolower($historyItem['comment']), Comment::CUSTOMER_COMMENT_PREFIX) === 0;
-
-            if ($addCustomerComment) {
-                $instruction = trim(substr($historyItem['comment'], strlen(Comment::CUSTOMER_COMMENT_PREFIX)));
-                if (strlen($instruction)) {
-                    $this->_entityService->updateEntity(
-                        $this->_node->getNodeId(),
-                        $orderEntity,
-                        array('delivery_instruction'=>$instruction)
-                    );
-                }
-            }
             $this->_entityService->createEntityComment(
                 $orderEntity,
                 'Magento',
