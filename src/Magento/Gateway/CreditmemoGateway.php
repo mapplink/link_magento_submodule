@@ -300,12 +300,7 @@ class CreditmemoGateway extends AbstractGateway
             $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
             $localId = $item['item_id'];
 
-            $product = $entityService->loadEntityLocal(
-                $this->_node->getNodeId(),
-                'product',
-                ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0),
-                $item['product_id']
-            );
+            $product = $entityService->loadEntityLocal($this->_node->getNodeId(), 'product', 0, $item['product_id']);
 
             $parent_item = $entityService->loadEntityLocal(
                 $this->_node->getNodeId(),
@@ -448,6 +443,9 @@ class CreditmemoGateway extends AbstractGateway
                     );
 
                     try {
+                        // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
+                        $storeCreditRefundAdjusted = $entity->getData('customer_balance', 0)
+                            / $originalOrder->getData('base_to_currency_rate', 1);
                         $soapResult = $this->_soap->call(
                             'salesOrderCreditmemoCreate',
                             array(
@@ -456,7 +454,7 @@ class CreditmemoGateway extends AbstractGateway
                                 '',
                                 false,
                                 false,
-                                $entity->getData('customer_balance', 0)
+                                $storeCreditRefundAdjusted
                             )
                         );
                     }catch (\Exception $exception) {

@@ -229,7 +229,7 @@ class OrderGateway extends AbstractGateway
         $logEntities = array('node'=>$this->_node, 'order'=>$order, 'orderitem'=>$orderitem);
 
         if ($isOrderPending || $isOrderProcessing || $isOrderCancelled) {
-            $storeId = ($this->_node->isMultiStore() ? $order->getData('store_id') : 0);
+            $storeId = ($this->_node->isMultiStore() ? $order->getStoreId() : 0);
 
             $stockitem = $this->_entityService->loadEntity(
                 $this->_node->getNodeId(),
@@ -331,6 +331,7 @@ class OrderGateway extends AbstractGateway
             'status'=>$orderData['status'],
             'placed_at'=>date('Y-m-d H:i:s', strtotime($correctionHours, $createdAtTimestamp)),
             'grand_total'=>$orderData['base_grand_total'],
+            'base_to_currency_rate'=>$orderData['base_to_order_rate'],
             'weight_total'=>(array_key_exists('weight', $orderData)
                 ? $orderData['weight'] : 0),
             'discount_total'=>(array_key_exists('base_discount_amount', $orderData)
@@ -389,7 +390,7 @@ class OrderGateway extends AbstractGateway
 
         if (isset($orderData['customer_id']) && $orderData['customer_id'] ){
             $customer = $this->_entityService
-                ->loadEntityLocal($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_id']);
+                ->loadEntityLocal($this->_node->getNodeId(), 'customer', 0, $orderData['customer_id']);
             // $customer = $this->_entityService->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_email']);
             if ($customer && $customer->getId()) {
                 $data['customer'] = $customer;
@@ -869,12 +870,7 @@ class OrderGateway extends AbstractGateway
                 );
             if (!$entity) {
                 $localId = $item['item_id'];
-                $product = $this->_entityService->loadEntity(
-                    $this->_node->getNodeId(),
-                    'product',
-                    ($this->_node->isMultiStore() ? $orderData['store_id'] : 0),
-                    $item['sku']
-                );
+                $product = $this->_entityService->loadEntity($this->_node->getNodeId(), 'product', 0, $item['sku']);
                 $data = array(
                     'product'=>($product ? $product->getId() : null),
                     'sku'=>$item['sku'],
