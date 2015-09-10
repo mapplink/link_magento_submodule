@@ -6,6 +6,7 @@ use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
 use Magento\Node;
 use Zend\Db\Adapter\Adapter;
+use Zend\Db\Sql\Where;
 use Zend\Db\TableGateway\TableGateway;
 use Zend\ServiceManager\ServiceLocatorAwareInterface;
 use Zend\ServiceManager\ServiceLocatorInterface;
@@ -282,7 +283,9 @@ class Db implements ServiceLocatorAwareInterface
             $select->where(array('entity_id'=>$orderIds));
         }
         if ($updatedSince) {
-            $select->where("updated_at > '".$updatedSince."'");
+            $where = new Where();
+            $where->greaterThan('updated_at', $updatedSince);
+            $select->where($where);
         }
 
         $ordersDataArray = $this->getOrdersFromDatabase($select);
