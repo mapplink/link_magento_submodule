@@ -612,13 +612,13 @@ class OrderGateway extends AbstractGateway
                     $magentoOrder = (array) $magentoOrder;
                 }
                 if ($this->isOrderToBeRetrieved((array) $magentoOrder)) {
-                    $magelinkOrder = $this->_entityService->loadEntity(
+                    $isMagelinkOrder = $this->_entityService->isEntity(
                         $this->_nodeEntity->getNodeId(),
                         'order',
                         0,
                         $magentoOrder['increment_id']
                     );
-                    if (!$magelinkOrder) {
+                    if (!$isMagelinkOrder) {
                         $notRetrievedOrderIncrementIds[$magentoOrder['increment_id']] = $magentoOrder['increment_id'];
                     }
                 }
