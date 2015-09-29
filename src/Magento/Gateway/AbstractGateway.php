@@ -31,6 +31,12 @@ abstract class AbstractGateway extends BaseAbstractGateway
     /** @var int $apiOverlappingSeconds */
     protected $apiOverlappingSeconds = 3;
 
+    /** @var int $lastRetrieveTimestamp */
+    protected $lastRetrieveTimestamp = NULL;
+
+    /** @var int $newRetrieveTimestamp */
+    protected $newRetrieveTimestamp = NULL;
+
 
     /**
      * Initialize the gateway and perform any setup actions required.
@@ -53,4 +59,43 @@ abstract class AbstractGateway extends BaseAbstractGateway
 
         return $success;
     }
+
+    /** @return int $this->newRetrieveTimestamp */
+    protected function getNewRetrieveTimestamp()
+    {
+        if ($this->newRetrieveTimestamp === NULL) {
+            $this->newRetrieveTimestamp = time() - $this->apiOverlappingSeconds;
+        }
+
+        return $this->newRetrieveTimestamp;
+    }
+
+    /** @param int $timestamp
+     * @return bool|string $date */
+    protected function convertTimestampToMagentoDateFormat($timestamp)
+    {
+        $deltaInSeconds = intval($this->_node->getConfig('time_delta_'.static::GATEWAY_ENTITY)) * 3600;
+        $date = date('Y-m-d H:i:s', $timestamp + $deltaInSeconds);
+
+        return $date;
+    }
+
+    /** @return bool|string $lastRetrieve */
+    protected function getLastRetrieveDate()
+    {
+        $lastRetrieve = $this->convertTimestampToMagentoDateFormat($this->getLastRetrieveTimestamp());
+        return $lastRetrieve;
+    }
+
+    /** @return bool|int $this->lastRetrieveTimestamp */
+    protected function getLastRetrieveTimestamp()
+    {
+        if ($this->lastRetrieveTimestamp === NULL) {
+            $this->lastRetrieveTimestamp =
+                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), static::GATEWAY_ENTITY, 'retrieve');
+        }
+
+        return $this->lastRetrieveTimestamp;
+    }
+
 }

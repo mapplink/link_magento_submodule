@@ -23,6 +23,9 @@ use Node\Entity;
 class CreditmemoGateway extends AbstractGateway
 {
 
+    const GATEWAY_ENTITY = 'creditmemo';
+
+
     /**
      * Initialize the gateway and perform any setup actions required.
      * @param string $entityType
@@ -52,23 +55,18 @@ class CreditmemoGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = time() - $this->apiOverlappingSeconds;
+        $timestamp = $this->getNewRetrieveTimestamp();
+        $lastRetrieve = $this->getLastRetrieveDate();
 
         if (FALSE && $this->_db) {
             // ToDo: Implement
         }elseif ($this->_soap) {
-            $lastRetrieve = $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve')
-                + (intval($this->_node->getConfig('time_delta_creditmemo')) * 3600);
             try {
                 $results = $this->_soap->call('salesOrderCreditmemoList', array(
-                    array('complex_filter'=>array(
-                        array(
-                            'key'=>'updated_at',
-                            'value'=>array(
-                                'key'=>'gt',
-                                'value'=>date('Y-m-d H:i:s', $lastRetrieve)
-                            )
-                        )))
+                    array('complex_filter'=>array(array(
+                        'key'=>'updated_at',
+                        'value'=>array('key'=>'gt', 'value'=>$lastRetrieve)
+                    )))
                 ));
             }catch (\Exception $exception) {
                 // store as sync issue

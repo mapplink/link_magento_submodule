@@ -26,6 +26,9 @@ use Zend\Stdlib\ArrayObject;
 
 class OrderGateway extends AbstractGateway
 {
+
+    const GATEWAY_ENTITY = 'order';
+
     const MAGENTO_STATUS_PENDING = 'pending';
     const MAGENTO_STATUS_PENDING_ALIPAY = 'pending_alipay';
     const MAGENTO_STATUS_PENDING_ALIPAY_NEW = 'new';
@@ -78,12 +81,6 @@ class OrderGateway extends AbstractGateway
         self::MAGENTO_STATUS_CANCELED
     );
 
-    /** @var int $lastRetrieveTimestamp */
-    protected $lastRetrieveTimestamp = NULL;
-
-    /** @var int $newRetrieveTimestamp */
-    protected $newRetrieveTimestamp = NULL;
-
     /** @var array $notRetrievedOrderIncrementIds */
     protected $notRetrievedOrderIncrementIds = NULL;
 
@@ -105,54 +102,6 @@ class OrderGateway extends AbstractGateway
         }
 
         return $success;
-    }
-
-    /**
-     * @param int $timestamp
-     * @return bool|string $date
-     */
-    protected function convertTimestampToMagentoDateFormat($timestamp)
-    {
-        $deltaInSeconds = intval($this->_node->getConfig('time_delta_order')) * 3600;
-        $date = date('Y-m-d H:i:s', $timestamp + $deltaInSeconds);
-        return $date;
-    }
-
-    /**
-     * Get new retrieve timestamp
-     * @return int
-     */
-    protected function getNewRetrieveTimestamp()
-    {
-        if ($this->newRetrieveTimestamp === NULL) {
-            $this->newRetrieveTimestamp = time() - $this->apiOverlappingSeconds;
-        }
-
-        return $this->newRetrieveTimestamp;
-    }
-
-    /**
-     * Get last retrieve date from the database
-     * @return bool|string
-     */
-    protected function getLastRetrieveTimestamp()
-    {
-        if ($this->lastRetrieveTimestamp === NULL) {
-            $this->lastRetrieveTimestamp =
-                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve');
-        }
-
-        return $this->lastRetrieveTimestamp;
-    }
-
-    /**
-     * Get last retrieve date from the database
-     * @return bool|string
-     */
-    protected function getLastRetrieveDate()
-    {
-        $lastRetrieve = $this->convertTimestampToMagentoDateFormat($this->getLastRetrieveTimestamp());
-        return $lastRetrieve;
     }
 
     /**
@@ -570,15 +519,12 @@ class OrderGateway extends AbstractGateway
             }
         }elseif ($this->_soap) {
             try{
-                $results = $this->_soap->call(
-                    'salesOrderList',
-                    array(array('complex_filter' => array(
-                        array(
-                            'key' => 'updated_at',
-                            'value' => array('key' => 'gt', 'value' => $lastRetrieve),
-                        )
+                $results = $this->_soap->call('salesOrderList', array(
+                    array('complex_filter'=>array(array(
+                        'key'=>'updated_at',
+                        'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
                     )))
-                );
+                ));
 
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_DEBUGEXTRA,
@@ -666,13 +612,13 @@ class OrderGateway extends AbstractGateway
                     $magentoOrder = (array) $magentoOrder;
                 }
                 if ($this->isOrderToBeRetrieved((array) $magentoOrder)) {
-                    $magelinkOrder = $this->_entityService->loadEntity(
+                    $isMagelinkOrder = $this->_entityService->isEntity(
                         $this->_nodeEntity->getNodeId(),
                         'order',
                         0,
                         $magentoOrder['increment_id']
                     );
-                    if (!$magelinkOrder) {
+                    if (!$isMagelinkOrder) {
                         $notRetrievedOrderIncrementIds[$magentoOrder['increment_id']] = $magentoOrder['increment_id'];
                     }
                 }
