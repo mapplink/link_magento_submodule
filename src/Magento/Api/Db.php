@@ -24,7 +24,7 @@ class Db implements ServiceLocatorAwareInterface
     /** @var \Magento\Node */
     protected $_node;
 
-    /** @var \Zend\Db\Adapter\Adapter $_adapter */
+    /** @var Adapter $_adapter */
     protected $_adapter;
     /** @var array $_tgCache */
     protected $_tgCache = array();
