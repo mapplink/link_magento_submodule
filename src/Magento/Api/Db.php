@@ -147,12 +147,12 @@ class Db implements ServiceLocatorAwareInterface
             try{
                 $this->_adapter = new \Zend\Db\Adapter\Adapter(
                     array(
-                        'driver' => 'Pdo',
-                        'dsn' => 'mysql:dbname='.$schema.';host='.$hostname,
-                        'username' => $username,
-                        'password' => $password,
-                        'driver_options' => array(
-                            \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES \'UTF8\''
+                        'driver'=>'Pdo',
+                        'dsn'=>'mysql:host='.$hostname.';dbname='.$schema,
+                        'username'=>$username,
+                        'password'=>$password,
+                        'driver_options'=>array(
+                            \PDO::MYSQL_ATTR_INIT_COMMAND=>"SET NAMES 'UTF8'"
                         ),
                     )
                 );
