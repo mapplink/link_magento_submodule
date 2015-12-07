@@ -12,6 +12,7 @@
 
 namespace Magento\Gateway;
 
+use Magento\Service\MagentoService;
 use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\SyncException;
@@ -146,14 +147,15 @@ class ProductGateway extends AbstractGateway
                     }
 
                     try {
-                        $productData = $this->_db->loadEntitiesEav('catalog_product',
+                        $productsData = $this->_db->loadEntitiesEav('catalog_product',
                             $updatedProducts, $storeId, $attributes);
                     }catch (\Exception $exception) {
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                     }
 
-                    foreach ($productData as $productId=>$rawData) {
-                        $productData = $this->convertFromMagento($rawData, $additional);
+                    foreach ($productsData as $productId=>$rawData) {
+                        $rawData = $this->convertFromMagento($rawData, $additional);
+                        $productData = $this->mapProductData($rawData, $storeId);
 
                         if ($brands && isset($productData['brand']) && is_numeric($productData['brand'])) {
                             if (isset($brands[intval($productData['brand'])])) {
@@ -218,9 +220,11 @@ class ProductGateway extends AbstractGateway
                     }
 
                     if ($this->_node->getConfig('load_full_product')) {
+                        $productData = array_merge($productData, $productInfoData);
+                        $productData = $this->mapProductData($productData, $storeId);
+
                         $productData = array_merge(
                             $productData,
-                            $productInfoData,
                             $this->loadFullProduct($productId, $storeId, $entityConfigService)
                         );
                     }
@@ -424,66 +428,66 @@ class ProductGateway extends AbstractGateway
 
     /**
      * Converts Magento-named attributes into our internal Magelink attributes / formats.
-     * @param array $res Input array of Magento attribute codes
+     * @param array $rawData Input array of Magento attribute codes
      * @param array $additional Additional product attributes to load in
      * @return array
      */
-    protected function convertFromMagento($res, $additional) {
+    protected function convertFromMagento($rawData, $additional) {
         $data = array();
-        if (isset($res['type_id'])) {
-            $data['type'] = $res['type_id'];
+        if (isset($rawData['type_id'])) {
+            $data['type'] = $rawData['type_id'];
         }else{
-            if (isset($res['type'])) {
-                $data['type'] = $res['type'];
+            if (isset($rawData['type'])) {
+                $data['type'] = $rawData['type'];
             }else{
                 $data['type'] = NULL;
             }
         }
-        if (isset($res['name'])) {
-            $data['name'] = $res['name'];
+        if (isset($rawData['name'])) {
+            $data['name'] = $rawData['name'];
         }else{
             $data['name'] = NULL;
         }
-        if (isset($res['description'])) {
-            $data['description'] = $res['description'];
+        if (isset($rawData['description'])) {
+            $data['description'] = $rawData['description'];
         }else{
             $data['description'] = NULL;
         }
-        if (isset($res['short_description'])) {
-            $data['short_description'] = $res['short_description'];
+        if (isset($rawData['short_description'])) {
+            $data['short_description'] = $rawData['short_description'];
         }else{
             $data['short_description'] = NULL;
         }
-        if (isset($res['status'])) {
-            $data['enabled'] =($res['status'] == 1) ? 1 : 0;
+        if (isset($rawData['status'])) {
+            $data['enabled'] =($rawData['status'] == 1) ? 1 : 0;
         }else{
             $data['enabled'] = 0;
         }
-        if (isset($res['visibility'])) {
-            $data['visible'] =($res['visibility'] == 4) ? 1 : 0;
+        if (isset($rawData['visibility'])) {
+            $data['visible'] =($rawData['visibility'] == 4) ? 1 : 0;
         }else{
             $data['visible'] = 0;
         }
-        if (isset($res['price'])) {
-            $data['price'] = $res['price'];
+        if (isset($rawData['price'])) {
+            $data['price'] = $rawData['price'];
         }else{
             $data['price'] = NULL;
         }
-        if (isset($res['tax_class_id'])) {
-            $data['taxable'] =($res['tax_class_id'] == 2) ? 1 : 0;
+        if (isset($rawData['tax_class_id'])) {
+            $data['taxable'] =($rawData['tax_class_id'] == 2) ? 1 : 0;
         }else{
             $data['taxable'] = 0;
         }
-        if (isset($res['special_price'])) {
-            $data['special_price'] = $res['special_price'];
+        if (isset($rawData['special_price'])) {
+            $data['special_price'] = $rawData['special_price'];
 
-            if (isset($res['special_from_date'])) {
-                $data['special_from_date'] = $res['special_from_date'];
+            if (isset($rawData['special_from_date'])) {
+                $data['special_from_date'] = $rawData['special_from_date'];
             }else{
                 $data['special_from_date'] = NULL;
             }
-            if (isset($res['special_to_date'])) {
-                $data['special_to_date'] = $res['special_to_date'];
+            if (isset($rawData['special_to_date'])) {
+                $data['special_to_date'] = $rawData['special_to_date'];
             }else{
                 $data['special_to_date'] = NULL;
             }
@@ -493,8 +497,8 @@ class ProductGateway extends AbstractGateway
             $data['special_to_date'] = NULL;
         }
 
-        if (isset($res['additional_attributes'])) {
-            foreach ($res['additional_attributes'] as $pair) {
+        if (isset($rawData['additional_attributes'])) {
+            foreach ($rawData['additional_attributes'] as $pair) {
                 $attributeCode = trim(strtolower($pair['key']));
                 if (!in_array($attributeCode, $additional)) {
                     throw new GatewayException('Invalid attribute returned by Magento: '.$attributeCode);
@@ -506,9 +510,9 @@ class ProductGateway extends AbstractGateway
                 }
             }
         }else{
-            foreach ($additional as $k) {
-                if (isset($res[$k])) {
-                    $data[$k] = $res[$k];
+            foreach ($additional as $code) {
+                if (isset($rawData[$code])) {
+                    $data[$code] = $rawData[$code];
                 }
             }
         }
@@ -590,27 +594,30 @@ class ProductGateway extends AbstractGateway
                array('entity'=>$entity) 
             );
 
-        $data = array();
+        $productData = $entity->getFullArrayCopy();
         $attributeCodes = array_unique(array_merge(
             //array('special_price', 'special_from_date', 'special_to_date'), // force update off these attributes
             //$customAttributes,
             $attributes
         ));
 
-        foreach ($attributeCodes as $attributeCode) {
-
-            if (strlen(trim($attributeCode)) == 0) {
-                continue;
+        $data = array();
+        foreach ($productData as $attributeCode=>$attributeValue) {
+            if (in_array($attributeCode, $attributeCodes)) {
+                $data[$attributeCode] = $productData[$attributeCode];
             }
+        }
+        $productData = $this->mapProductData($data, $entity->getStoreId(), FALSE);
+        unset($data);
 
-            $value = $entity->getData($attributeCode);
-            switch($attributeCode) {
+        foreach ($productData as $code=>$value) {
+            switch($code) {
                 // Normal attributes
                 case 'price':
                 case 'special_price':
                 case 'special_from_date':
                 case 'special_to_date':
-                    $value =($value ? $value : NULL);
+                    $value = ($value ? $value : NULL);
                 case 'name':
                 case 'description':
                 case 'short_description':
@@ -620,20 +627,20 @@ class ProductGateway extends AbstractGateway
                 case 'bin_location':
                 case 'msrp':
                     // Same name in both systems
-                    $data[$attributeCode] = $value;
+                    $productData[$code] = $value;
                     break;
 
                 case 'enabled':
-                    $data['status'] =($value == 1 ? 2 : 1);
+                    $productData['status'] =($value == 1 ? 2 : 1);
                     break;
                 case 'visible':
-                    $data['visibility'] =($value == 1 ? 4 : 1);
+                    $data['visibility'] = ($value == 1 ? 4 : 1);
                     break;
                 case 'taxable':
-                    $data['tax_class_id'] =($value == 1 ? 2 : 1);
+                    $data['tax_class_id'] = ($value == 1 ? 2 : 1);
                     break;
 
-                // ToDo(maybe) : Add logic for this custom attributes
+                // ToDo (maybe) : Add logic for this custom attributes
                 case 'brand':
                 case 'size':
                     // Ignore attributes
@@ -651,8 +658,8 @@ class ProductGateway extends AbstractGateway
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_WARN,
                             'mag_p_wr_invdata',
-                            'Unsupported attribute for update of '.$entity->getUniqueId() .': '.$attributeCode,
-                           array('attribute'=>$attributeCode),
+                            'Unsupported attribute for update of '.$entity->getUniqueId() .': '.$code,
+                           array('attribute'=>$code),
                            array('entity'=>$entity) 
                         );
                     // Warn unsupported attribute
@@ -660,7 +667,7 @@ class ProductGateway extends AbstractGateway
             }
         }
 
-        if (!count($data)) {
+        if (!count($productData)) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_WARN,
                     'mag_p_wr_noupd',
@@ -672,7 +679,7 @@ class ProductGateway extends AbstractGateway
 
         $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
 
-        $data['website_ids'] = array($entity->getStoreId());
+        $productData['website_ids'] = array($entity->getStoreId());
         if (count($this->_node->getStoreViews()) && $type != \Entity\Update::TYPE_DELETE) {
 
             foreach ($this->_node->getStoreViews() as $storeId=>$store_name) {
@@ -683,8 +690,8 @@ class ProductGateway extends AbstractGateway
                 $loadedEntity = $this->_entityService->loadEntity(
                     $this->_node->getNodeId(), $entity->getType(), $storeId, $entity->getUniqueId());
                 if ($loadedEntity) {
-                    if (!in_array($loadedEntity->getStoreId(), $data['website_ids'])) {
-                        $data['website_ids'][] = $loadedEntity->getStoreId();
+                    if (!in_array($loadedEntity->getStoreId(), $productData['website_ids'])) {
+                        $productData['website_ids'][] = $loadedEntity->getStoreId();
                     }
 
                     if ($type == \Entity\Update::TYPE_CREATE && !$localId) {
@@ -715,14 +722,14 @@ class ProductGateway extends AbstractGateway
             }
         }
 
-        $soapData = $this->getUpdateDataForSoapCall($data, $customAttributes);
+        $soapData = $this->getUpdateDataForSoapCall($productData, $customAttributes);
         if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
 
             $logData = array(
                 'type'=>$entity->getData('type'),
-                'websites'=>$data['website_ids'],
-                'data keys'=>array_keys($data),
-                'data'=>$data
+                'websites'=>$productData['website_ids'],
+                'data keys'=>array_keys($productData),
+                'data'=>$productData
             );
 
             $updateViaDbApi =  $this->_db && $localId;
@@ -736,7 +743,7 @@ class ProductGateway extends AbstractGateway
             }
 
             $message = 'Updating product('.$message.') : '
-                .$entity->getUniqueId() .' with '.implode(', ', array_keys($data));
+                .$entity->getUniqueId() .' with '.implode(', ', array_keys($productData));
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO, 'mag_p_wr_upd', $message, $logData);
 
@@ -746,7 +753,7 @@ class ProductGateway extends AbstractGateway
                     $tablePrefix,
                     $localId,
                     $entity->getStoreId(),
-                    $data
+                    $productData
                 );
             }else{
                 $request = array(
@@ -771,17 +778,17 @@ class ProductGateway extends AbstractGateway
                 throw new \Magelink\Exception\SyncException($message);
             }
 
-            $message = 'Creating product(SOAP) : '.$entity->getUniqueId() .' with '.implode(', ', array_keys($data));
+            $message = 'Creating product(SOAP) : '.$entity->getUniqueId() .' with '.implode(', ', array_keys($productData));
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
                     'mag_p_wr_cr',
                     $message,
                    array(
                         'type'=>$entity->getData('type'),
-                        'websites'=>$data['website_ids'],
+                        'websites'=>$productData['website_ids'],
                         'set'=>$attributeSet,
-                        'data keys'=>array_keys($data),
-                        'data'=>$data,
+                        'data keys'=>array_keys($productData),
+                        'data'=>$productData,
                         'soap data keys'=>array_keys($soapData),
                         'soap data'=>$soapData
                     ) 

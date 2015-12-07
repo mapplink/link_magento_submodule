@@ -10,6 +10,8 @@
 
 namespace Magento\Service;
 
+use Log\Service\LogService;
+use Magelink\Exception\GatewayException;
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\NodeException;
 use Zend\Db\TableGateway\TableGateway;
@@ -60,6 +62,48 @@ class MagentoService implements ServiceLocatorAwareInterface
 
         $isShippable = !in_array($productType, $notShippableTypes);
         return $isShippable;
+    }
+
+    /**
+     * @param string $entityType
+     * @param array $data
+     * @param int $storeId
+     * @param bool $readFromMagento
+     * @throws GatewayException
+     * @return array $mappedData
+     * @throws GatewayException
+     */
+    protected function mapData($entityType, array $data, $storeId, $readFromMagento)
+    {
+        /** @var \Magento\Service\MagentoConfigService $configService */
+        $configService = $this->getServiceLocator()->get('magentoConfigService');
+        $map = $configService->getMap($entityType, $storeId, $readFromMagento);
+
+        foreach ($map as $mapFrom=>$mapTo)
+        {
+            if (array_key_exists($mapTo, $data)) {
+                $message = 'Re-mapping from '.$mapFrom.' to '.$mapTo.' failed because key is already existing in '
+                    .$entityType.' data: '.implode(', ', array_keys($data)).'.';
+                throw new GatewayException($message);
+            }elseif (array_key_exists($mapFrom, $data)) {
+                $data[$mapTo] = $data[$mapFrom];
+                unset($mapFrom);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array $productData
+     * @param int $storeId
+     * @param bool|true $readFromMagento
+     * @return array $mappedProductData
+     */
+    public function mapProductData(array $productData, $storeId, $readFromMagento = TRUE)
+    {
+        $mappedProductData = $this->getMappedData('product', $productData, $storeId, $readFromMagento);
+        return $mappedProductData;
     }
 
 }
