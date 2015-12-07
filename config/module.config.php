@@ -1,24 +1,6 @@
 <?php
 
-return array (
-    'service_manager'=>array(
-        'invokables'=>array(
-            'magento_soap'=>'Magento\Api\Soap',
-            'magento_soapv1'=>'Magento\Api\SoapV1',
-            'magento_rest'=>'Magento\Api\Rest',
-            'magento_db'=>'Magento\Api\Db',
-            'magentoService'=>'Magento\Service\MagentoService',
-            //'transform_order_total'=>'Magento\Transform\OrderTotalTransform'
-        ),
-        'shared'=>array(
-            'magento_soap'=>FALSE,
-            'magento_soapv1'=>FALSE,
-            'magento_rest'=>FALSE,
-            'magento_db'=>FALSE,
-            'magentoService'=>FALSE
-            //'transform_order_total'=>FALSE
-        ),
-    ),
+$moduleConfig = array (
     'node_types'=>array(
         'magento'=>array(
             'module'=>'Magento', // Module name used for this node
@@ -166,6 +148,26 @@ return array (
             'Magento\Controller\Console'=>'Magento\Controller\Console',
         ),
     ),
+    'service_manager'=>array(
+        'invokables'=>array(
+            'magento_soap'=>'Magento\Api\Soap',
+            'magento_soapv1'=>'Magento\Api\SoapV1',
+            'magento_rest'=>'Magento\Api\Rest',
+            'magento_db'=>'Magento\Api\Db',
+            'magentoService'=>'Magento\Service\MagentoService',
+            'magentoConfigService'=>'Magento\Service\MagentoConfigService',
+            //'transform_order_total'=>'Magento\Transform\OrderTotalTransform'
+        ),
+        'shared'=>array(
+            'magento_soap'=>FALSE,
+            'magento_soapv1'=>FALSE,
+            'magento_rest'=>FALSE,
+            'magento_db'=>FALSE,
+            'magentoService'=>FALSE,
+            'magentoConfigService'=>FALSE,
+            //'transform_order_total'=>FALSE
+        )
+    ),
     'console'=>array(
         'router'=>array(
             'routes'=>array(
@@ -182,3 +184,6 @@ return array (
         )
     )
 );
+
+return $moduleConfig;
+?>
