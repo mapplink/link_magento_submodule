@@ -1,0 +1,8 @@
+<?php
+return array(
+    'store_map'=>array(
+        // <store id> => array(<magento code> => <magelink code>, ...)
+    )
+);
+
+?>
