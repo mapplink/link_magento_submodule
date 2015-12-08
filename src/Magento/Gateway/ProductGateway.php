@@ -221,7 +221,8 @@ class ProductGateway extends AbstractGateway
 
                     if ($this->_node->getConfig('load_full_product')) {
                         $productData = array_merge($productData, $productInfoData);
-                        $productData = $this->mapProductData($productData, $storeId);
+                        $productData = $this->getServiceLocator()->get('magentoService')
+                            ->mapProductData($productData, $storeId);
 
                         $productData = array_merge(
                             $productData,
@@ -607,7 +608,8 @@ class ProductGateway extends AbstractGateway
                 $data[$attributeCode] = $productData[$attributeCode];
             }
         }
-        $productData = $this->mapProductData($data, $entity->getStoreId(), FALSE);
+        $productData = $this->getServiceLocator()->get('magentoService')
+            ->mapProductData($data, $entity->getStoreId(), FALSE);
         unset($data);
 
         foreach ($productData as $code=>$value) {
