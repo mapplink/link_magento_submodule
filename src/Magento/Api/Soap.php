@@ -85,24 +85,24 @@ class Soap implements ServiceLocatorAwareInterface {
                     'soap_call',
                     'Successful SOAP call '.$call.'.',
                     array(
-                        'keys'=>array_keys($data),
+                        'data'=>$data,
                         'result'=>$result
                     )
                 );
-        }catch(\SoapFault $sf){
+        }catch (\SoapFault $soapFault) {
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_ERROR,
                     'soap_fault',
-                    'SOAP Fault with call '.$call.': '.$sf->getMessage(),
+                    'SOAP Fault with call '.$call.': '.$soapFault->getMessage(),
                     array(
-                        'keys'=>array_keys($data),
-                        'code'=>$sf->getCode(),
-                        'trace'=>$sf->getTraceAsString(),
-                        'req'=>$this->_soapClient->getLastRequest(),
-                        'resp'=>$this->_soapClient->getLastResponse())
+                        'data'=>$data,
+                        'code'=>$soapFault->getCode(),
+                        'trace'=>$soapFault->getTraceAsString(),
+                        'request'=>$this->_soapClient->getLastRequest(),
+                        'response'=>$this->_soapClient->getLastResponse())
                 );
             $this->forceStdoutDebug();
-            throw new \Magelink\Exception\MagelinkException('Soap Fault - '.$sf->getMessage(), 0, $sf);
+            throw new \Magelink\Exception\MagelinkException('Soap Fault - '.$soapFault->getMessage(), 0, $soapFault);
         }
         // $this->forceStdoutDebug(); // Uncomment for debugging
 
