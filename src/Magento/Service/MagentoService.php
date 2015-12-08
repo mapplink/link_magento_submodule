@@ -102,7 +102,7 @@ class MagentoService implements ServiceLocatorAwareInterface
      */
     public function mapProductData(array $productData, $storeId, $readFromMagento = TRUE)
     {
-        $mappedProductData = $this->getMappedData('product', $productData, $storeId, $readFromMagento);
+        $mappedProductData = $this->mapData('product', $productData, $storeId, $readFromMagento);
         return $mappedProductData;
     }
 
