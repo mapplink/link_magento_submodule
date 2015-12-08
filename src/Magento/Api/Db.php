@@ -1,7 +1,7 @@
 <?php
 /**
  * Implements DB access to Magento - loading and updating
- * @category Entity
+ * @category Magento
  * @package Magento\Api
  * @author Matt Johnston
  * @author Andreas Gerhards <andreas@lero9.co.nz>
@@ -33,14 +33,14 @@ class Db implements ServiceLocatorAwareInterface
     protected $_adapter;
     /** @var array $_tgCache */
     protected $_tgCache = array();
-    /** @var array Cache for getEntityType */
+    /** @var array $_entityTypeCache */
     protected $_entityTypeCache = array();
-    /** @var array Cache for getAttribute */
+    /** @var array $_attributeCache */
     protected $_attributeCache = array();
 
     /** @var bool $_enterprise */
     protected $_enterprise = FALSE;
-    /** @var array  */
+    /** @var array $columns */
     protected $columns = array(
         'entity_id',
         'status',
@@ -104,7 +104,7 @@ class Db implements ServiceLocatorAwareInterface
         'gift_message_id',
     );
 
-    /** @var ServiceLocatorInterface Local service locator instance */
+    /** @var ServiceLocatorInterface $_serviceLocator */
     protected $_serviceLocator;
 
     /**
@@ -385,7 +385,7 @@ class Db implements ServiceLocatorAwareInterface
     {
         // ToDo: Implement proper use of Zend functionality
         $sql = "SELECT entity_id FROM ".$this->getEntityPrefix($entityType)."_entity"
-            ." WHERE updated_at > = '".$changedSince."';";
+            ." WHERE updated_at >= '".$changedSince."';";
 
         $this->debugSql($sql);
         $localEntityIds = array();

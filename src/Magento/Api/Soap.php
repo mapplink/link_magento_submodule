@@ -1,4 +1,13 @@
 <?php
+/**
+ * Implements SOAP access to Magento
+ * @category Magento
+ * @package Magento\Api
+ * @author Matt Johnston
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Api;
 
@@ -8,10 +17,7 @@ use Zend\ServiceManager\ServiceLocatorAwareInterface;
 use Zend\ServiceManager\ServiceLocatorInterface;
 use Zend\Soap\Client;
 
-/**
- * Implements SOAP access to Magento
- * @package Magento\Api
- */
+
 class Soap implements ServiceLocatorAwareInterface
 {
 
