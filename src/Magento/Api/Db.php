@@ -31,6 +31,7 @@ class Db implements ServiceLocatorAwareInterface
 
     /** @var Adapter $_adapter */
     protected $_adapter;
+
     /** @var array $_tgCache */
     protected $_tgCache = array();
     /** @var array $_entityTypeCache */

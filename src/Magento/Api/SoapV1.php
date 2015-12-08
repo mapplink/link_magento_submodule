@@ -57,7 +57,7 @@ class SoapV1 extends Soap
      * @throws \SoapFault
      * @return array|mixed Response data
      */
-    public function call($call, array $data)
+    public function call($call, $data)
     {
         array_unshift($data, $call);
         array_unshift($data, $this->_sessionId);
@@ -65,14 +65,11 @@ class SoapV1 extends Soap
         try{
             $result = $this->_soapClient->call('call', $data);
         }catch (\SoapFault $soapFault) {
+            $logData = array('data'=>$data, 'code'=>$soapFault->getCode(), 'trace'=>$soapFault->getTraceAsString(),
+                'request'=>$this->_soapClient->getLastRequest(), 'response'=>$this->_soapClient->getLastResponse());
             $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_ERROR,
-                    'mag_soap1_fault',
-                    'SOAP v1 Fault with call '.$call.': '.$soapFault->getMessage(),
-                    array(
-                        'data'=>$data, 'code'=>$soapFault->getCode(), 'trace'=>$soapFault->getTraceAsString(),
-                        'request'=>$this->_soapClient->getLastRequest(), 'response'=>$this->_soapClient->getLastResponse())
-                );
+                ->log(LogService::LEVEL_ERROR, 'mag_soap1_fault',
+                    'SOAP v1 Fault with call '.$call.': '.$soapFault->getMessage(), $logData);
             throw new MagelinkException('Soap Fault - '.$soapFault->getMessage(), 0, $soapFault); //throw $soapFault;
         }
 
