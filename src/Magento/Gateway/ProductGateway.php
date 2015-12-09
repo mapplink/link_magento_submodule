@@ -172,7 +172,7 @@ class ProductGateway extends AbstractGateway
                             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
                                 'mag_p_db_uset',
                                 'Unknown attribute set ID '.$rawData['attribute_set_id'],
-                                array('set' => $rawData['attribute_set_id'], 'sku' => $rawData['sku'])
+                                array('set'=>$rawData['attribute_set_id'], 'sku'=>$rawData['sku'])
                             );
                         }
                         $parentId = NULL; // TODO: Calculate
@@ -787,14 +787,14 @@ class ProductGateway extends AbstractGateway
             }
         }elseif ($type == \Entity\Update::TYPE_CREATE) {
 
-            $attributeSet = null;
-            foreach ($this->_attributeSets as $setId => $set) {
+            $attributeSet = NULL;
+            foreach ($this->_attributeSets as $setId=>$set) {
                 if ($set['name'] == $entity->getData('product_class', 'default')) {
                     $attributeSet = $setId;
                     break;
                 }
             }
-            if ($attributeSet === null) {
+            if ($attributeSet === NULL) {
                 $message = 'Invalid product class '.$entity->getData('product_class', 'default');
                 throw new \Magelink\Exception\SyncException($message);
             }
@@ -814,9 +814,9 @@ class ProductGateway extends AbstractGateway
 
             try{
                 $soapResult = $this->_soap->call('catalogProductCreate', $request);
-                $soapFault = null;
+                $soapFault = NULL;
             }catch( \SoapFault $soapFault ){
-                $soapResult = false;
+                $soapResult = FALSE;
                 if ($soapFault->getMessage() == 'The value of attribute "SKU" must be unique') {
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_WARN,
@@ -826,24 +826,15 @@ class ProductGateway extends AbstractGateway
                             array('entity'=>$entity)
                         );
 
-                    $check = $this->_soap->call(
-                        'catalogProductInfo',
-                        array(
-                            $sku,
-                            0, // store ID
-                            array(),
-                            'sku'
-                        )
-                    );
-
+                    $check = $this->_soap->call('catalogProductInfo', array($sku, 0, array(), 'sku'));
                     if (!$check || !count($check)) {
                         throw new MagelinkException('Magento complained duplicate SKU but we cannot find a duplicate!');
 
                     }else {
-                        $found = false;
+                        $found = FALSE;
                         foreach ($check as $row) {
                             if ($row['sku'] == $sku) {
-                                $found = true;
+                                $found = TRUE;
 
                                 $this->_entityService->linkEntity($nodeId, $entity, $row['product_id']);
                                 $this->getServiceLocator()->get('logService')
