@@ -221,7 +221,7 @@ class CustomerGateway extends AbstractGateway
                     }elseif ($entityService->getLocalId($this->_node->getNodeId(), $existingEntity) != NULL) {
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_INFO,
-                                'mag_cu_rerelink',
+                                'mag_cu_relink',
                                 'Incorrectly linked customer '.$uniqueId,
                                 array('code'=>$uniqueId),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)
