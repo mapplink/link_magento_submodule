@@ -34,18 +34,30 @@ class MagentoConfigService extends ApplicationConfigService
      */
     public function getMap($entityType, $storeId, $readFromMagento)
     {
+        $map = array();
         $storeMap = $this->getStoreMap();
 
-        if (isset($storeMap[$storeId][$entityType])) {
-            $map = $storeMap[$storeId][$entityType];
-            $flippedMap = array_flip($map);
-            if (!is_array($map) || count($map) != count($flippedMap)) {
-                new GatewayException('There is no valid '.$entityType.' map for store '.$storeId.'.');
-            }elseif (!$readFromMagento) {
-                $map = $flippedMap;
-            }
+        if (!is_numeric($storeId) && $readFromMagento ) {
+            new GatewayException('That is not a valid call for store map with no store id and reading from Magento.');
         }else{
-            $map = array();
+            foreach ($storeMap as $id=>$mapPreStore) {
+                if ($storeId === FALSE || $storeId == $id && isset($storeMap[$id][$entityType])) {
+                    $mapPerStoreAndEntityType = $storeMap[$id][$entityType];
+                    $flippedMap = array_flip($mapPerStoreAndEntityType);
+
+                    if (!is_array($mapPerStoreAndEntityType) || count($mapPerStoreAndEntityType) != count($flippedMap)) {
+                        $message = 'There is no valid '.$entityType.' map';
+                        if ($storeId !== FALSE) {
+                            $message .= ' for store '.$storeId;
+                        }
+                        new GatewayException($message.'.');
+                    }elseif ($readFromMagento) {
+                        $map = array_replace_recursive($mapPerStoreAndEntityType, $map);
+                    }else{
+                        $map = array_replace_recursive($flippedMap, $map);
+                    }
+                }
+            }
         }
 
         return $map;

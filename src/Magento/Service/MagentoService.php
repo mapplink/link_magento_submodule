@@ -66,22 +66,45 @@ class MagentoService implements ServiceLocatorAwareInterface
 
     /**
      * @param string $entityType
+     * @param string $code
+     * @param bool $readFromMagento
+     * @return array $mappedCode
+     */
+    public function getMappedCode($entityType, $code, $readFromMagento)
+    {
+        /** @var \Magento\Service\MagentoConfigService $configService */
+        $configService = $this->getServiceLocator()->get('magentoConfigService');
+        $map = $configService->getMap($entityType, FALSE, $readFromMagento);
+
+        if (array_key_exists($map, $code)) {
+            $mappedCode = $map[$code];
+        }else{
+            $mappedCode = FALSE;
+            $logMessage = 'No code mapping existing for '.$code.' on entity type '.$entityType.'.';
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_ERROR, 'mag_svc_mapc_err', $logMessage, array('code'=>$code));
+        }
+
+        return $mappedCode;
+    }
+
+    /**
+     * @param string $entityType
      * @param array $data
      * @param int $storeId
      * @param bool $readFromMagento
-     * @throws GatewayException
+     * @param bool $override
      * @return array $mappedData
      * @throws GatewayException
      */
-    protected function mapData($entityType, array $data, $storeId, $readFromMagento)
+    protected function mapData($entityType, array $data, $storeId, $readFromMagento, $override)
     {
         /** @var \Magento\Service\MagentoConfigService $configService */
         $configService = $this->getServiceLocator()->get('magentoConfigService');
         $map = $configService->getMap($entityType, $storeId, $readFromMagento);
 
-        foreach ($map as $mapFrom=>$mapTo)
-        {
-            if (array_key_exists($mapTo, $data)) {
+        foreach ($map as $mapFrom=>$mapTo) {
+            if (array_key_exists($mapTo, $data) && !$override) {
                 $message = 'Re-mapping from '.$mapFrom.' to '.$mapTo.' failed because key is already existing in '
                     .$entityType.' data: '.implode(', ', array_keys($data)).'.';
                 throw new GatewayException($message);
@@ -98,11 +121,12 @@ class MagentoService implements ServiceLocatorAwareInterface
      * @param array $productData
      * @param int $storeId
      * @param bool|true $readFromMagento
+     * @param bool|false $override
      * @return array $mappedProductData
      */
-    public function mapProductData(array $productData, $storeId, $readFromMagento = TRUE)
+    public function mapProductData(array $productData, $storeId, $readFromMagento = TRUE, $override = FALSE)
     {
-        $mappedProductData = $this->mapData('product', $productData, $storeId, $readFromMagento);
+        $mappedProductData = $this->mapData('product', $productData, $storeId, $readFromMagento, $override);
         return $mappedProductData;
     }
 
