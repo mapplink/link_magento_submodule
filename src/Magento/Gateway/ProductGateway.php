@@ -185,7 +185,7 @@ class ProductGateway extends AbstractGateway
                                     LogService::LEVEL_WARN,
                                     'mag_p_db_uset',
                                     'Issue with attribute set id. Check $rawData[attribute_set_id].',
-                                    array('sku'=>$rawData['sku'], 'raw data'=>$rawData)
+                                    array('raw data'=>$rawData)
                                 );
                             }
                         }
