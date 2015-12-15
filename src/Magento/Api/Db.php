@@ -584,7 +584,7 @@ class Db implements ServiceLocatorAwareInterface
                     $type = $prefix.'_entity_int';
                     $doSourceTranslation = TRUE;
 
-                    foreach ($attributes as $code=>$attributeId) {
+                    foreach ($typeAttributes as $code=>$attributeId) {
                         $sourceTranslation[$attributeId] = $this->loadAttributeOptions($attributeId, $storeId);
                     }
                 }

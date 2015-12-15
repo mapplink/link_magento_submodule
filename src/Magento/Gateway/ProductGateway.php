@@ -87,7 +87,6 @@ class ProductGateway extends AbstractGateway
             $additional = array();
         }
 
-
         if ($this->_db) {
             try {
                 $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', $lastRetrieve);
@@ -138,11 +137,11 @@ class ProductGateway extends AbstractGateway
                 }
                 $attributes = array_merge($attributes, $additional);
 
-                foreach ($updatedProducts as $productId) {
+                foreach ($updatedProducts as $localId) {
                     $combinedProductData = array();
-                    $storeViews = array_merge(array(0), array_keys($this->_node->getStoreViews()));
+                    $storeIds = array_keys($this->_node->getStoreViews());
 
-                    foreach ($storeViews as $storeId) {
+                    foreach ($storeIds as $storeId) {
                         if ($storeId == 0) {
                             $storeId = FALSE;
                         }
@@ -158,7 +157,7 @@ class ProductGateway extends AbstractGateway
 
                         try{
                             $productsData = $this->_db
-                                ->loadEntitiesEav('catalog_product', array($productId), $storeId, $attributes);
+                                ->loadEntitiesEav('catalog_product', array($localId), $storeId, $attributes);
                         }catch(\Exception $exception) {
                             throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         }
@@ -176,7 +175,8 @@ class ProductGateway extends AbstractGateway
                                 }
                             }
 
-                            if (isset($this->_attributeSets[intval($rawData['attribute_set_id'])])) {
+                            if (isset($rawData['attribute_set_id'])
+                                    && isset($this->_attributeSets[intval($rawData['attribute_set_id'])])) {
                                 $productData['product_class'] = $this->_attributeSets[intval(
                                     $rawData['attribute_set_id']
                                 )]['name'];
@@ -185,7 +185,7 @@ class ProductGateway extends AbstractGateway
                                     LogService::LEVEL_WARN,
                                     'mag_p_db_uset',
                                     'Unknown attribute set ID '.$rawData['attribute_set_id'],
-                                    array('set'=>$rawData['attribute_set_id'], 'sku'=>$rawData['sku'])
+                                    array('sku'=>$rawData['sku'], 'raw data'=>$rawData)
                                 );
                             }
                         }
@@ -211,7 +211,7 @@ class ProductGateway extends AbstractGateway
                         'key'=>'updated_at',
                         'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
                    ))),
-                   $storeId, // storeView
+                   $storeId = NULL, // storeView
                 ));
             }catch (\Exception $exception) {
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
