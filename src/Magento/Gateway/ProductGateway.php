@@ -180,11 +180,11 @@ class ProductGateway extends AbstractGateway
                                 $productData['product_class'] = $this->_attributeSets[intval(
                                     $rawData['attribute_set_id']
                                 )]['name'];
-                            }else {
+                            }else{
                                 $this->getServiceLocator()->get('logService')->log(
                                     LogService::LEVEL_WARN,
                                     'mag_p_db_uset',
-                                    'Unknown attribute set ID '.$rawData['attribute_set_id'],
+                                    'Issue with attribute set id. Check $rawData[attribute_set_id].',
                                     array('sku'=>$rawData['sku'], 'raw data'=>$rawData)
                                 );
                             }
