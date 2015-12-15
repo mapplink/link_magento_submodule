@@ -90,6 +90,21 @@ class MagentoService implements ServiceLocatorAwareInterface
 
     /**
      * @param string $entityType
+     * @param int $storeId
+     * @param bool $readFromMagento
+     * @return array $storeMap
+     */
+    protected function getStoreMap($entityType, $storeId, $readFromMagento)
+    {
+        /** @var \Magento\Service\MagentoConfigService $configService */
+        $configService = $this->getServiceLocator()->get('magentoConfigService');
+        $map = $configService->getMap($entityType, $storeId, $readFromMagento);
+
+        return $map;
+    }
+
+    /**
+     * @param string $entityType
      * @param array $data
      * @param int $storeId
      * @param bool $readFromMagento
@@ -99,10 +114,7 @@ class MagentoService implements ServiceLocatorAwareInterface
      */
     protected function mapData($entityType, array $data, $storeId, $readFromMagento, $override)
     {
-        /** @var \Magento\Service\MagentoConfigService $configService */
-        $configService = $this->getServiceLocator()->get('magentoConfigService');
-        $map = $configService->getMap($entityType, $storeId, $readFromMagento);
-
+        $map = $this->getStoreMap($entityType, $storeId, $readFromMagento);
         foreach ($map as $mapFrom=>$mapTo) {
             if (array_key_exists($mapTo, $data) && !$override) {
                 $message = 'Re-mapping from '.$mapFrom.' to '.$mapTo.' failed because key is already existing in '
@@ -128,6 +140,31 @@ class MagentoService implements ServiceLocatorAwareInterface
     {
         $mappedProductData = $this->mapData('product', $productData, $storeId, $readFromMagento, $override);
         return $mappedProductData;
+    }
+
+    /**
+     * @param string $entityType
+     * @param array $productData
+     * @return array $cleanProductData
+     */
+    public function getCleanData($entityType, array $productData)
+    {
+        $map = $this->getStoreMap($entityType, FALSE, FALSE);
+
+        foreach ($map as $toRemove=>$toKeep) {
+            unset($productData[$toRemove]);
+        }
+
+        return $productData;
+    }
+
+    /**
+     * @param array $productData
+     * @return array $cleanProductData
+     */
+    public function getCleanProductData(array $productData)
+    {
+
     }
 
 }
