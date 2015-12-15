@@ -138,7 +138,7 @@ class ProductGateway extends AbstractGateway
                 $attributes = array_merge($attributes, $additional);
 
                 foreach ($updatedProducts as $localId) {
-                    $combinedProductData = array();
+                    $combinedData = array();
                     $storeIds = array_keys($this->_node->getStoreViews());
 
                     foreach ($storeIds as $storeId) {
@@ -190,11 +190,21 @@ class ProductGateway extends AbstractGateway
                             }
                         }
 
-                        $combinedProductData = array_replace_recursive($productData, $combinedProductData);
+                        if (count($combinedData) == 0) {
+                            $combinedData = $productData;
+                        }else {
+                            $combinedData = array_replace_recursive($combinedData, $productData, $combinedData);
+                        }
                     }
 
+                    $this->getServiceLocator()->get('logService')
+                        ->log(LogService::LEVEL_DEBUGEXTRA, 'mag_p_db_comb',
+                            'Combined data for Magento product id '.$localId.'.',
+                            array('combined data'=>$combinedData)
+                        );
+
                     $parentId = NULL; // TODO: Calculate
-                    $sku = $rawData['sku'];
+                    $sku = $combinedData['sku'];
 
                     try{
                         $this->processUpdate($productId, $sku, $storeId, $parentId, $productData);
