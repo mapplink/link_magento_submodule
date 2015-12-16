@@ -151,6 +151,14 @@ class ProductGateway extends AbstractGateway
                         if (in_array('brand', $attributes)) {
                             try{
                                 $brands = $this->_db->loadEntitiesEav('brand', NULL, $storeId, array('name'));
+                                if (!is_array($brands) || count($brands) == 0) {
+                                    $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
+                                        'mag_p_db_nobrnds',
+                                        'Something is wrong with the brands retrieval.',
+                                        array('brands'=>$brands)
+                                    );
+                                    $brands = FALSE;
+                                }
                             }catch( \Exception $exception ){
                                 $brands = FALSE;
                             }
@@ -169,11 +177,16 @@ class ProductGateway extends AbstractGateway
                             $productData = $this->getServiceLocator()->get('magentoService')
                                 ->mapProductData($productData, $storeId);
 
-                            if ($brands && isset($rawData['brand']) && is_numeric($rawData['brand'])) {
+                            if (is_array($brands) && isset($rawData['brand']) && is_numeric($rawData['brand'])) {
                                 if (isset($brands[intval($rawData['brand'])])) {
                                     $productData['brand'] = $brands[intval($rawData['brand'])]['name'];
-                                }else {
+                                }else{
                                     $productData['brand'] = NULL;
+                                    $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
+                                        'mag_p_db_nomabra',
+                                        'Could not find matching brand for product '.$sku.'.',
+                                        array('brand (key)'=>$rawData['brand'], 'brands'=>$brands)
+                                    );
                                 }
                             }
 
@@ -183,10 +196,9 @@ class ProductGateway extends AbstractGateway
                                     $rawData['attribute_set_id']
                                 )]['name'];
                             }else{
-                                $this->getServiceLocator()->get('logService')->log(
-                                    LogService::LEVEL_WARN,
-                                    'mag_p_db_uset',
-                                    'Issue with attribute set id. Check $rawData[attribute_set_id].',
+                                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
+                                    'mag_p_db_noset',
+                                    'Issue with attribute set id on product '.$sku.'. Check $rawData[attribute_set_id].',
                                     array('raw data'=>$rawData)
                                 );
                             }
