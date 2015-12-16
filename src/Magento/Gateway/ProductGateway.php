@@ -169,9 +169,9 @@ class ProductGateway extends AbstractGateway
                             $productData = $this->getServiceLocator()->get('magentoService')
                                 ->mapProductData($productData, $storeId);
 
-                            if ($brands && isset($productData['brand']) && is_numeric($productData['brand'])) {
-                                if (isset($brands[intval($productData['brand'])])) {
-                                    $productData['brand'] = $brands[intval($productData['brand'])]['name'];
+                            if ($brands && isset($rawData['brand']) && is_numeric($rawData['brand'])) {
+                                if (isset($brands[intval($rawData['brand'])])) {
+                                    $productData['brand'] = $brands[intval($rawData['brand'])]['name'];
                                 }else {
                                     $productData['brand'] = NULL;
                                 }
