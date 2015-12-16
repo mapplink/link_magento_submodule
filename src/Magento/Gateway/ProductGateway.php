@@ -164,9 +164,10 @@ class ProductGateway extends AbstractGateway
                         }
 
                         foreach ($productsData as $productId=>$rawData) {
+                            // ToDo: Combine this two methods into one
                             $productData = $this->convertFromMagento($rawData, $additional);
                             $productData = $this->getServiceLocator()->get('magentoService')
-                                ->mapProductData($rawData, $storeId);
+                                ->mapProductData($productData, $storeId);
 
                             if ($brands && isset($productData['brand']) && is_numeric($productData['brand'])) {
                                 if (isset($brands[intval($productData['brand'])])) {
