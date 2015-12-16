@@ -221,7 +221,7 @@ class ProductGateway extends AbstractGateway
                     $parentId = NULL; // TODO: Calculate
 
                     try{
-                        $this->processUpdate($productId, $sku, $storeId, $parentId, $productData);
+                        $this->processUpdate($productId, $sku, $storeId, $parentId, $combinedData);
                     }catch( \Exception $exception ){
                         // store as sync issue
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
