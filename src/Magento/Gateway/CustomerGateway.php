@@ -73,7 +73,7 @@ class CustomerGateway extends AbstractGateway
 
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
-                'mag_cu_rtr_time',
+                'mag_cu_re_time',
                 'Retrieving customers updated since '.$lastRetrieve,
                 array('type'=>'customer', 'timestamp'=>$lastRetrieve)
             );
@@ -92,7 +92,7 @@ class CustomerGateway extends AbstractGateway
 
             if (!is_array($results)) {
                 $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
-                    'mag_cu_rtr_soap',
+                    'mag_cu_re_soap',
                     'SOAP (customerCustomerList) did not return an array but '.gettype($results).' instead.',
                     array('type'=>gettype($results), 'class'=>(is_object($results) ? get_class($results) : 'no object')),
                     array('soap result'=>$results)
