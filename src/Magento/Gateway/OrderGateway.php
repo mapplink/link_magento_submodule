@@ -160,6 +160,48 @@ class OrderGateway extends AbstractGateway
     }
 
     /**
+     * @param Order|int $orderOrStoreId
+     * @return int $storeId
+     */
+    protected function getEntityStoreId($orderOrStoreId, $global)
+    {
+        if (is_int($orderOrStoreId)) {
+            $storeId = $orderOrStoreId;
+        }elseif (is_object($orderOrStoreId) && substr(strrchr(get_class($orderOrStoreId), '\\'), 1) == 'Order') {
+            $order = $orderOrStoreId;
+            $storeId = $order->getStoreId();
+        }else{
+            $storeId = NULL;
+        }
+
+        if ($global || !$this->_node->isMultiStore()) {
+            $storeId = 0;
+        }
+
+        return $storeId;
+    }
+
+    /**
+     * @param Order|int $orderOrStoreId
+     * @return int $storeId
+     */
+    protected function getCustomerStoreId($orderOrStoreId)
+    {
+        $globalCustomer = TRUE;
+        return $this->getEntityStoreId($orderOrStoreId, $globalCustomer);
+    }
+
+    /**
+     * @param Order|int $orderOrStoreId
+     * @return int $storeId
+     */
+    protected function getStockStoreId($orderOrStoreId)
+    {
+        $globalStock = TRUE;
+        return $this->getEntityStoreId($orderOrStoreId, $globalStock);
+    }
+
+    /**
      * @param Order $order
      * @param Orderitem $orderitem
      * @return bool|NULL
@@ -177,7 +219,8 @@ class OrderGateway extends AbstractGateway
         $logEntities = array('node'=>$this->_node, 'order'=>$order, 'orderitem'=>$orderitem);
 
         if ($isOrderPending || $isOrderProcessing || $isOrderCancelled) {
-            $storeId = ($this->_node->isMultiStore() ? $order->getStoreId() : 0);
+            $storeId = $this->getStockStoreId($order);
+            $logData['store_id'] = $storeId;
 
             $stockitem = $this->_entityService->loadEntity(
                 $this->_node->getNodeId(),
@@ -336,10 +379,11 @@ class OrderGateway extends AbstractGateway
             $data['payment_method'] = $payments;
         }
 
-        if (isset($orderData['customer_id']) && $orderData['customer_id'] ){
+        if (isset($orderData['customer_id']) && $orderData['customer_id']) {
+            $nodeId = $this->_node->getNodeId();
             $customer = $this->_entityService
-                ->loadEntityLocal($this->_node->getNodeId(), 'customer', 0, $orderData['customer_id']);
-            // $customer = $this->_entityService->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $orderData['customer_email']);
+                ->loadEntityLocal($nodeId, 'customer', $this->getCustomerStoreId($storeId), $orderData['customer_id']);
+                //->loadEntity($nodeId, 'customer', $this->getCustomerStoreId($storeId), $orderData['customer_email']);
             if ($customer && $customer->getId()) {
                 $data['customer'] = $customer;
             }else{
@@ -504,7 +548,7 @@ class OrderGateway extends AbstractGateway
         if (FALSE && $this->_db) {
             try{
                 // ToDo (maybe): Implement
-                $storeId = $orderIds = false;
+                $storeId = $orderIds = FALSE;
                 $results = $this->_db->getOrders($storeId, $orderIds, $lastRetrieve);
                 foreach ($results as $orderData) {
                     $orderData = (array) $orderData;
@@ -836,13 +880,12 @@ class OrderGateway extends AbstractGateway
                     );
 
                 $storeId = ($this->_node->isMultiStore() ? $orderData['store_id'] : 0);
-
-                $entity = $this->_entityService
+                $orderitem = $this->_entityService
                     ->createEntity($nodeId, 'orderitem', $storeId, $uniqueId, $data, $parentId);
                 $this->_entityService
-                    ->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                    ->linkEntity($this->_node->getNodeId(), $orderitem, $localId);
 
-                $this->updateStockQuantities($order, $entity);
+                $this->updateStockQuantities($order, $orderitem);
             }
         }
 
