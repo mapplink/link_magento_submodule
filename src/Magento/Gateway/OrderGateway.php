@@ -558,6 +558,13 @@ class OrderGateway extends AbstractGateway
         }
 
         $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $timestamp);
+        $seconds = ceil($this->getNewRetrieveTimestamp() - $timestamp);
+        $this->getServiceLocator()->get('logService')
+            ->log(LogService::LEVEL_INFO,
+                'mag_o_re_no',
+                'Retrieved '.count($results).' orders in '.$seconds.'s',
+                array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds)
+            );
 
         try{
             $this->forceSynchronisation();
@@ -658,14 +665,17 @@ class OrderGateway extends AbstractGateway
     public function forceSynchronisation()
     {
         $success = TRUE;
+
         if (!$this->areOrdersInSync()) {
+            $logCode = 'mag_o_re_frc';
+            $start = microtime(TRUE);
+            $forcedOrders = count($this->notRetrievedOrderIncrementIds);
+
             $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
             $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_WARN,
-                    'mag_o_rtr_frc',
+                ->log(LogService::LEVEL_WARN, $logCode,
                     'Retrieving orders: '.$orderOutOfSyncList,
-                    array(),
-                    array('order increment ids out of sync'=>$orderOutOfSyncList)
+                    array(), array('order increment ids out of sync'=>$orderOutOfSyncList)
                 );
 
             foreach ($this->notRetrievedOrderIncrementIds as $orderIncrementId) {
@@ -715,17 +725,25 @@ class OrderGateway extends AbstractGateway
                 }
             }
 
-            if (count($this->notRetrievedOrderIncrementIds)) {
+            $forcedOrders -= count($this->notRetrievedOrderIncrementIds);
+            $seconds = ceil(microtime(TRUE) - $start);
+            $logData = array('type'=>'order', 'forced orders'=>$forcedOrders, 'period [s]'=>$seconds);
+
+            if (count($this->notRetrievedOrderIncrementIds) > 0) {
                 $success = FALSE;
                 $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
-                $this->getServiceLocator()->get('logService')
-                    ->log(LogService::LEVEL_ERROR,
-                        'mag_o_rtr_frcerr',
-                        'Retrieval failed for orders: '.$orderOutOfSyncList,
-                        array(),
-                        array('order increment ids still out of sync'=>$orderOutOfSyncList)
-                    );
+
+                $logLevel = LogService::LEVEL_ERROR;
+                $logCode .= 'err';
+                $logMessage = 'Forced retrieval failed for orders: '.$orderOutOfSyncList;
+                $logData['order increment ids still out of sync'] = $orderOutOfSyncList;
+            }else{
+                $logLevel = LogService::LEVEL_INFO;
+                $logCode .= 'no';
+                $logMessage = 'Forced retrieval on '.$forcedOrders.' orders in '.$seconds.'s';
             }
+
+            $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
         }
 
         return $success;
