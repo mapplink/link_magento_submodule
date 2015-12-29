@@ -73,10 +73,9 @@ class ProductGateway extends AbstractGateway
         $lastRetrieve = $this->getLastRetrieveDate();
 
         foreach ($this->_node->getStoreViews() as $storeId=>$storeView) {
-
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
-                    'mag_p_rtr_time',
+                    'mag_p_re_time',
                     'Retrieving products updated since '.$lastRetrieve,
                    array('type'=>'product', 'timestamp'=>$lastRetrieve)
                 );
