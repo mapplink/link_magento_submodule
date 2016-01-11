@@ -78,6 +78,8 @@ class MagentoService implements ServiceLocatorAwareInterface
 
         if (array_key_exists($code, $map)) {
             $mappedCode = $map[$code];
+        }elseif (in_array($code, $map)) {
+            $mappedCode = $code;
         }else{
             $mappedCode = FALSE;
             $logMessage = 'No code mapping existing for '.$code.' on entity type '.$entityType.'.';
