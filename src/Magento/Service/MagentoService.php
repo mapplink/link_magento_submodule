@@ -82,7 +82,7 @@ class MagentoService implements ServiceLocatorAwareInterface
             $mappedCode = FALSE;
             $logMessage = 'No code mapping existing for '.$code.' on entity type '.$entityType.'.';
             $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_ERROR, 'mag_svc_mapc_err', $logMessage, array('code'=>$code));
+                ->log(LogService::LEVEL_ERROR, 'mag_svc_mapc_err', $logMessage, array('code'=>$code, 'map'=>$map));
         }
 
         return $mappedCode;
