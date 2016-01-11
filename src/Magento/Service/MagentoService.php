@@ -76,7 +76,7 @@ class MagentoService implements ServiceLocatorAwareInterface
         $configService = $this->getServiceLocator()->get('magentoConfigService');
         $map = $configService->getMap($entityType, FALSE, $readFromMagento);
 
-        if (array_key_exists($map, $code)) {
+        if (array_key_exists($code, $map)) {
             $mappedCode = $map[$code];
         }else{
             $mappedCode = FALSE;
