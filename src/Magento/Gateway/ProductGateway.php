@@ -744,7 +744,7 @@ class ProductGateway extends AbstractGateway
 
                     $productData['website_ids'] = array_keys($storeViewsById);
 
-                    $soapData = $this->getUpdateDataForSoapCall($data, $customAttributes);
+                    $soapData = $this->getUpdateDataForSoapCall($productData, $customAttributes);
                     $logData = array(
                         'type'=>$entity->getData('type'),
                         'websites'=>$productData['website_ids'],
@@ -764,7 +764,8 @@ class ProductGateway extends AbstractGateway
                             $message = 'SOAP';
                         }
 
-                        $message = 'Updating product('.$message.') : '.$sku.' with '.implode(', ', array_keys($data));
+                        $message = 'Updating product('.$message.') : '.$sku
+                            .' with '.implode(', ', array_keys($productData));
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_INFO, 'mag_p_wr_upd', $message, $logData);
 
@@ -775,7 +776,7 @@ class ProductGateway extends AbstractGateway
                                     $tablePrefix,
                                     $localId,
                                     $entity->getStoreId(),
-                                    $data
+                                    $productData
                                 );
 
                                 if ($rowsAffected = !1) {
