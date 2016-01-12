@@ -42,7 +42,7 @@ class MagentoConfigService extends ApplicationConfigService
             );
         }
 
-        if (!is_array($storeCurrencies) && array_key_exists($storeId, $storeCurrencies) && $storeCurrencies[$storeId]) {
+        if (is_array($storeCurrencies) && array_key_exists($storeId, $storeCurrencies) && $storeCurrencies[$storeId]) {
             $baseCurrencyString = $storeCurrencies[$storeId];
         }elseif (is_array($storeCurrencies) && array_key_exists(0, $storeCurrencies) && $storeCurrencies[0]) {
             $baseCurrencyString = $storeCurrencies[0];
