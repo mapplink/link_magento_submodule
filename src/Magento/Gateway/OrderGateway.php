@@ -244,7 +244,7 @@ class OrderGateway extends AbstractGateway
                     $itemQuantity *= -1;
                 }
 
-                $updateData = array($attributeCode =>($attributeValue + $itemQuantity));
+                $updateData = array($attributeCode=>($attributeValue + $itemQuantity));
                 $logData = array_merge($logData, array('quantity'=>$itemQuantity), $updateData);
 
                 try{
