@@ -1,5 +1,9 @@
 <?php
+
 return array(
+    'store_currencies'=>array(
+        // <store id: 0 for default> => array(<currency identifier>, ...)
+    ),
     'store_map'=>array(
         // <store id> => array(<magento code> => <magelink code>, ...)
     )

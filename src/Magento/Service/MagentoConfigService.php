@@ -19,6 +19,42 @@ class MagentoConfigService extends ApplicationConfigService
 {
 
     /**
+     * @return array $storeBaseCurrencies
+     */
+    protected function getStoreCurrencies()
+    {
+        return $this->getConfigData('store_currencies');
+    }
+
+    /**
+     * @param int $storeId
+     * @return string $baseCurrencyString
+     */
+    public function getBaseCurrency($storeId)
+    {
+        $storeCurrencies = $this->getStoreCurrencies();
+
+        if (!is_int($storeId)) {
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
+                'mag_csvc_bc_stid',
+                'Invalid call of getBaseCurrency.',
+                array('store id'=>$storeId, 'store currencies'=>$storeCurrencies)
+            );
+        }
+
+        if (!is_array($storeCurrencies) && array_key_exists($storeId, $storeCurrencies) && $storeCurrencies[$storeId]) {
+            $baseCurrencyString = $storeCurrencies[$storeId];
+        }elseif (is_array($storeCurrencies) && array_key_exists(0, $storeCurrencies) && $storeCurrencies[0]) {
+            $baseCurrencyString = $storeCurrencies[0];
+        }else{
+            $baseCurrencyString = NULL;
+            new GatewayException('The store currency configuration is not valid. (Called with storeId '.$storeId.'.)');
+        }
+
+        return $baseCurrencyString;
+    }
+
+    /**
      * @return array $storeMap
      */
     protected function getStoreMap()
