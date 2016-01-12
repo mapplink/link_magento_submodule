@@ -779,7 +779,7 @@ class ProductGateway extends AbstractGateway
                                     $productData
                                 );
 
-                                if ($rowsAffected = !1) {
+                                if ($rowsAffected != 1) {
                                     throw new MagelinkException($rowsAffected.' rows affected.');
                                 }
                             }catch( \Exception $exception ){
