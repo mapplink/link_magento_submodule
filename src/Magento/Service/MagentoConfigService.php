@@ -34,7 +34,7 @@ class MagentoConfigService extends ApplicationConfigService
     {
         $storeCurrencies = $this->getStoreCurrencies();
 
-        if (!is_int($storeId)) {
+        if ($storeId != (int) $storeId) {
             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
                 'mag_csvc_bc_stid',
                 'Invalid call of getBaseCurrency.',
