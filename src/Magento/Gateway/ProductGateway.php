@@ -715,9 +715,6 @@ class ProductGateway extends AbstractGateway
                             );
                         // Warn unsupported attribute
                 }
-
-                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_updmal',
-                    'Mapped '.$code.' ('.var_export($value, TRUE).') to '.$mappedCode.': '.json_encode($data).'.', array());
             }
 
             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_updmap',
@@ -750,10 +747,8 @@ class ProductGateway extends AbstractGateway
                     $soapData = $this->getUpdateDataForSoapCall($productData, $customAttributes);
                     $logData = array(
                         'type'=>$entity->getData('type'),
-                        'websites'=>$productData['website_ids'],
-                        'product data keys'=>array_keys($productData),
+                        'store id'=>$storeId,
                         'product data'=>$productData,
-                        'soap data keys'=>array_keys($soapData),
                         'soap data'=>$soapData
                     );
                     $soapResult = NULL;
