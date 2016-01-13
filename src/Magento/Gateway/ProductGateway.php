@@ -725,10 +725,12 @@ class ProductGateway extends AbstractGateway
 
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != \Entity\Update::TYPE_DELETE) {
-                $data['website_ids'] = array();
-
                 $dataPerStore[0] = $data;
-                unset($data['price'], $data['msrp']);
+                foreach (array('price', 'msrp') as $code) {
+                    $data[$code.'_default'] = $data[$code];
+                    unset($data[$code]);
+                }
+
                 foreach ($storeDataByStoreId as $storeId=>$storeData) {
                     $dataPerStore[$storeId] = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
                     if (!isset($dataPerStore[$storeId]['price'])) {

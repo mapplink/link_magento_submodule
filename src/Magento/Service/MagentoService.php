@@ -127,8 +127,6 @@ class MagentoService implements ServiceLocatorAwareInterface
             }elseif (array_key_exists($mapFrom, $data)) {
                 $data[$mapTo] = $data[$mapFrom];
                 unset($data[$mapFrom]);
-//           }else{
-//                unset($data[$mapTo]);
             }
         }
 
