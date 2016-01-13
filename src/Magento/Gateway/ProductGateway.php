@@ -762,8 +762,8 @@ class ProductGateway extends AbstractGateway
                             $message = 'SOAP';
                         }
 
-                        $message = 'Updating product('.$message.') : '.$sku
-                            .' with '.implode(', ', array_keys($productData));
+                        $message = 'Updating product on store '.$storeId.' via '.$message.': '
+                            .$sku.' with '.implode(', ', array_keys($productData));
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_INFO, 'mag_p_wr_upd', $message, $logData);
 
