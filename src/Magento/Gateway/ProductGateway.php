@@ -638,20 +638,21 @@ class ProductGateway extends AbstractGateway
                array('entity'=>$entity) 
             );
 
-        $data = $entity->getFullArrayCopy();
+        $originalData = $entity->getFullArrayCopy();
         $attributeCodes = array_unique(array_merge(
             //array('special_price', 'special_from_date', 'special_to_date'), // force update off these attributes
             //$customAttributes,
             $attributes
         ));
 
-        foreach ($data as $attributeCode=>$attributeValue) {
+        foreach ($originalData as $attributeCode=>$attributeValue) {
             if (!in_array($attributeCode, $attributeCodes)) {
-                unset($data[$attributeCode]);
+                unset($originalData[$attributeCode]);
             }
         }
 
-        if (count($data) == 0) {
+        $data = array();
+        if (count($originalData) == 0) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
                     'mag_p_wr_upd_non',
@@ -662,7 +663,7 @@ class ProductGateway extends AbstractGateway
         }else{
             /** @var MagentoService $magentoService */
             $magentoService = $this->getServiceLocator()->get('magentoService');
-            foreach ($data as $code=>$value) {
+            foreach ($originalData as $code=>$value) {
                 $mappedCode = $magentoService->getMappedCode('product', $code, FALSE);
                 switch($mappedCode) {
                     // Normal attributes
@@ -682,7 +683,6 @@ class ProductGateway extends AbstractGateway
                         // Same name in both systems
                         $data[$code] = $value;
                         break;
-
                     case 'enabled':
                         $data['status'] =($value == 1 ? 2 : 1);
                         break;
@@ -692,13 +692,11 @@ class ProductGateway extends AbstractGateway
                     case 'taxable':
                         $data['tax_class_id'] = ($value == 1 ? 2 : 1);
                         break;
-
                     // ToDo (maybe) : Add logic for this custom attributes
                     case 'brand':
                     case 'size':
                         // Ignore attributes
                         break;
-
                     case 'product_class':
                     case 'type':
                         if ($type != \Entity\Update::TYPE_CREATE) {
@@ -716,9 +714,14 @@ class ProductGateway extends AbstractGateway
                                array('entity'=>$entity)
                             );
                         // Warn unsupported attribute
-                        break;
                 }
+
+                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_updmal',
+                    'Mapped '.$code.' ('.var_export($value, TRUE).') to '.$mappedCode.': '.json_encode($data).'.', array());
             }
+
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_updmap',
+                'Mapped '.json_encode($originalData).' to '.json_encode($data).'.', array());
 
             $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
             $data['website_ids'] = array();
@@ -748,8 +751,8 @@ class ProductGateway extends AbstractGateway
                     $logData = array(
                         'type'=>$entity->getData('type'),
                         'websites'=>$productData['website_ids'],
-                        'data keys'=>array_keys($productData),
-                        'data'=>$productData,
+                        'product data keys'=>array_keys($productData),
+                        'product data'=>$productData,
                         'soap data keys'=>array_keys($soapData),
                         'soap data'=>$soapData
                     );
