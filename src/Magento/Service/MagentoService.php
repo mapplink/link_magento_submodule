@@ -118,6 +118,7 @@ class MagentoService implements ServiceLocatorAwareInterface
     {
         $originalData = $data;
         $map = $this->getStoreMap($entityType, $storeId, $readFromMagento);
+
         foreach ($map as $mapFrom=>$mapTo) {
             if (array_key_exists($mapTo, $data) && !$override) {
                 $message = 'Re-mapping from '.$mapFrom.' to '.$mapTo.' failed because key is already existing in '
@@ -130,7 +131,7 @@ class MagentoService implements ServiceLocatorAwareInterface
         }
 
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_svc_mapData',
-            'Mapped '.json_encode($originalData).' to '.json_encode($data).'.', array());
+            'Mapped '.json_encode($originalData).' to '.json_encode($data).'.', array('map from=>to'=>$map));
 
         return $data;
     }
