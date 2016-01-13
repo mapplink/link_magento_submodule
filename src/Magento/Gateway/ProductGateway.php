@@ -730,6 +730,9 @@ class ProductGateway extends AbstractGateway
 
 /**/
             $storeViewsById = $this->_node->getStoreViews();
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_stviews',
+                'Retrieved store views by id '.json_encode($storeViewsById).' ('.$type.').', array());
+
             if (count($storeViewsById) > 0 && $type != \Entity\Update::TYPE_DELETE) {
                 $productData = array();
                 $storeIds = array_merge(array(0), array_keys($storeViewsById));
@@ -791,12 +794,13 @@ class ProductGateway extends AbstractGateway
                             $request = array($sku, $soapData, $entity->getStoreId(), 'sku');
                             $soapResult = $this->_soap->call('catalogProductUpdate', $request);
 
+                            $logLevel = ($soapResult ? LogService::LEVEL_INFO : LogService::LEVEL_ERROR);
                             $logMessage = 'Product update failed! Removed local id '.$localId
-                                .' ('.$nodeId.'). Retried update via SOAP API.';
+                                .' ('.$nodeId.'). Retried update via SOAP API '
+                                .($soapResult ? 'successfully' : 'without success').'.';
                             $logData['db error'] = $exception->getMessage();
-                            $logData['soap result'] = $soapResult;
                             $this->getServiceLocator()->get('logService')
-                                ->log(LogService::LEVEL_INFO, 'mag_p_wr_updsoap', $logMessage, $logData);
+                                ->log($logLevel, 'mag_p_wr_updsoap', $logMessage, $logData);
                         }
                     }elseif ($type == \Entity\Update::TYPE_CREATE) {
 
