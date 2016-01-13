@@ -777,9 +777,9 @@ class ProductGateway extends AbstractGateway
                                     throw new MagelinkException($rowsAffected.' rows affected.');
                                 }
                             }catch(\Exception $exception){
-//                                $this->_entityService->unlinkEntity($nodeId, $entity);
-//                                $localId = NULL;
-                                $updateViaDbApi = FALSE;
+/*                                $this->_entityService->unlinkEntity($nodeId, $entity);
+                                $localId = NULL;
+*/                                $updateViaDbApi = FALSE;
                             }
                         }
 
@@ -793,10 +793,15 @@ class ProductGateway extends AbstractGateway
                             $soapResult = $this->_soap->call('catalogProductUpdate', $request);
 
                             $logLevel = ($soapResult ? LogService::LEVEL_INFO : LogService::LEVEL_ERROR);
-                            $logMessage = 'Product update failed.'
-//                                .' Removed local id '.$localId.' on node '.$nodeId.'.'
-                                .' Retried update via SOAP API '.($soapResult ? 'successfully' : 'without success').'.';
-                            $logData['db error'] = $exception->getMessage();
+                            if (isset($exception)) {
+                                $logMessage = 'DB update failed.'
+//                                .' Removed local id '.$localId.' on node '.$nodeId.'.';
+                                    .' Retried';
+                                $logData['db error'] = $exception->getMessage();
+                            }else {
+                                $logMessage = 'Updated';
+                            }
+                            $logMessage .= ' via SOAP API '.($soapResult ? 'successfully' : 'without success').'.';
                             $logData['soap data'] = $soapData;
 
                             $this->getServiceLocator()->get('logService')
