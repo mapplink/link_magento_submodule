@@ -730,12 +730,11 @@ class ProductGateway extends AbstractGateway
 
 /**/
             $storeViewsById = $this->_node->getStoreViews();
-            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_stviews',
-                'Retrieved store views by id '.json_encode($storeViewsById).' ('.$type.').', array());
-
             if (count($storeViewsById) > 0 && $type != \Entity\Update::TYPE_DELETE) {
                 $productData = array();
                 $storeIds = array_merge(array(0), array_keys($storeViewsById));
+                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_stores',
+                    'Store ids '.json_encode($storeIds).' (type: '.$type.').', array('store views'=>$storeViewsById));
 
                 foreach ($storeIds as $storeId) {
                     if ($storeId == 0) {
@@ -761,7 +760,7 @@ class ProductGateway extends AbstractGateway
 
                         if ($updateViaDbApi) {
                             $message = 'DB';
-                        }else {
+                        }else{
                             $message = 'SOAP';
                         }
 
@@ -783,7 +782,7 @@ class ProductGateway extends AbstractGateway
                                 if ($rowsAffected != 1) {
                                     throw new MagelinkException($rowsAffected.' rows affected.');
                                 }
-                            }catch( \Exception $exception ){
+                            }catch(\Exception $exception){
                                 $this->_entityService->unlinkEntity($nodeId, $entity);
                                 $localId = NULL;
                                 $updateViaDbApi = FALSE;
@@ -832,12 +831,11 @@ class ProductGateway extends AbstractGateway
                         try{
                             $soapResult = $this->_soap->call('catalogProductCreate', $request);
                             $soapFault = NULL;
-                        }catch( \SoapFault $soapFault ){
+                        }catch(\SoapFault $soapFault){
                             $soapResult = FALSE;
                             if ($soapFault->getMessage() == 'The value of attribute "SKU" must be unique') {
                                 $this->getServiceLocator()->get('logService')
-                                    ->log(
-                                        LogService::LEVEL_WARN,
+                                    ->log(LogService::LEVEL_WARN,
                                         'mag_p_wr_duperr',
                                         'Creating product '.$sku.' hit SKU duplicate fault',
                                         array(),
@@ -850,7 +848,7 @@ class ProductGateway extends AbstractGateway
                                         'Magento complained duplicate SKU but we cannot find a duplicate!'
                                     );
 
-                                }else {
+                                }else{
                                     $found = FALSE;
                                     foreach ($check as $row) {
                                         if ($row['sku'] == $sku) {
@@ -858,8 +856,7 @@ class ProductGateway extends AbstractGateway
 
                                             $this->_entityService->linkEntity($nodeId, $entity, $row['product_id']);
                                             $this->getServiceLocator()->get('logService')
-                                                ->log(
-                                                    LogService::LEVEL_INFO,
+                                                ->log(LogService::LEVEL_INFO,
                                                     'mag_p_wr_dupres',
                                                     'Creating product '.$sku.' resolved SKU duplicate fault',
                                                     array('local_id'=>$row['product_id']),
@@ -876,20 +873,18 @@ class ProductGateway extends AbstractGateway
                             }
                         }
 
-                        if (!$soapResult) {
+                        if ($soapResult) {
+                            $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
+                            $this->getServiceLocator()->get('logService')->log(
+                                LogService::LEVEL_INFO,
+                                'mag_p_wr_loc_id',
+                                'Added product local id for '.$sku.' ('.$nodeId.')',
+                                $logData
+                            );
+                        }else{
                             $message = 'Error creating product '.$sku.' in Magento!';
                             throw new MagelinkException($message, 0, $soapFault);
                         }
-                    }
-
-                    if ($soapResult) {
-                        $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
-                        $this->getServiceLocator()->get('logService')->log(
-                            LogService::LEVEL_INFO,
-                            'mag_p_wr_loc_id',
-                            'Added product local id for '.$sku.' ('.$nodeId.')',
-                            $logData
-                        );
                     }
                 }
             }
