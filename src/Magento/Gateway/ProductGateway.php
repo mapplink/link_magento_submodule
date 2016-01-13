@@ -718,7 +718,7 @@ class ProductGateway extends AbstractGateway
             }
 
             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_updmap',
-                'Mapped '.json_encode($originalData).' to '.json_encode($data).'.', array());
+                'Mapped, filtered, prepared: '.json_encode($originalData).' to '.json_encode($data).'.', array());
 
             $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
             $data['website_ids'] = array();
@@ -784,17 +784,19 @@ class ProductGateway extends AbstractGateway
                                 $this->_entityService->unlinkEntity($nodeId, $entity);
                                 $localId = NULL;
                                 $updateViaDbApi = FALSE;
-
-                                $logMessage = 'Product update on '.$sku.' via API failed! Removed local id '.$localId
-                                    .' ('.$nodeId.'). Retry update via SOAP API. '.$exception->getMessage();
-                                $this->getServiceLocator()->get('logService')
-                                    ->log(LogService::LEVEL_ERROR, 'mag_p_wr_updfail', $logMessage, $logData);
                             }
                         }
 
                         if (!$updateViaDbApi) {
                             $request = array($sku, $soapData, $entity->getStoreId(), 'sku');
                             $soapResult = $this->_soap->call('catalogProductUpdate', $request);
+
+                            $logMessage = 'Product update failed! Removed local id '.$localId
+                                .' ('.$nodeId.'). Retried update via SOAP API.';
+                            $logData['db error'] = $exception->getMessage();
+                            $logData['soap result'] = $soapResult;
+                            $this->getServiceLocator()->get('logService')
+                                ->log(LogService::LEVEL_INFO, 'mag_p_wr_updsoap', $logMessage, $logData);
                         }
                     }elseif ($type == \Entity\Update::TYPE_CREATE) {
 

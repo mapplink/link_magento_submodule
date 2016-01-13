@@ -116,6 +116,7 @@ class MagentoService implements ServiceLocatorAwareInterface
      */
     protected function mapData($entityType, array $data, $storeId, $readFromMagento, $override)
     {
+        $originalData = $data;
         $map = $this->getStoreMap($entityType, $storeId, $readFromMagento);
         foreach ($map as $mapFrom=>$mapTo) {
             if (array_key_exists($mapTo, $data) && !$override) {
@@ -124,9 +125,12 @@ class MagentoService implements ServiceLocatorAwareInterface
                 throw new GatewayException($message);
             }elseif (array_key_exists($mapFrom, $data)) {
                 $data[$mapTo] = $data[$mapFrom];
-                unset($mapFrom);
+                unset($data[$mapFrom]);
             }
         }
+
+        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_svc_mapData',
+            'Mapped '.json_encode($originalData).' to '.json_encode($data).'.', array());
 
         return $data;
     }
