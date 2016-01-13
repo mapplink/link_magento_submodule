@@ -739,9 +739,9 @@ class ProductGateway extends AbstractGateway
                 foreach ($storeIds as $storeId) {
                     if ($storeId == 0) {
                         $productData = $data;
-                    }else {
+                    }else{
                         $productData = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
-                        $productData['storeView'] = $storeViewsById[$storeId];
+                        $productData['storeView'] = $storeId;
                     }
 
                     $productData['website_ids'] = array_keys($storeViewsById);
@@ -751,7 +751,6 @@ class ProductGateway extends AbstractGateway
                         'type'=>$entity->getData('type'),
                         'store id'=>$storeId,
                         'product data'=>$productData,
-                        'soap data'=>$soapData
                     );
                     $soapResult = NULL;
 
@@ -763,11 +762,6 @@ class ProductGateway extends AbstractGateway
                         }else{
                             $message = 'SOAP';
                         }
-
-                        $message = 'Updating product on store '.$storeId.' via '.$message.': '
-                            .$sku.' with '.implode(', ', array_keys($productData));
-                        $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_INFO, 'mag_p_wr_upd', $message, $logData);
 
                         if ($updateViaDbApi) {
                             try{
@@ -783,21 +777,28 @@ class ProductGateway extends AbstractGateway
                                     throw new MagelinkException($rowsAffected.' rows affected.');
                                 }
                             }catch(\Exception $exception){
-                                $this->_entityService->unlinkEntity($nodeId, $entity);
-                                $localId = NULL;
+//                                $this->_entityService->unlinkEntity($nodeId, $entity);
+//                                $localId = NULL;
                                 $updateViaDbApi = FALSE;
                             }
                         }
 
-                        if (!$updateViaDbApi) {
-                            $request = array($sku, $soapData, $entity->getStoreId(), 'sku');
+                        if ($updateViaDbApi) {
+                            $message = 'Updated product on store '.$storeId.' via '.$message.': '
+                                .$sku.' with '.implode(', ', array_keys($productData));
+                            $this->getServiceLocator()->get('logService')
+                                ->log(LogService::LEVEL_INFO, 'mag_p_wr_upd', $message, $logData);
+                        }else{
+                            $request = array($sku, $soapData, $storeId, 'sku');
                             $soapResult = $this->_soap->call('catalogProductUpdate', $request);
 
                             $logLevel = ($soapResult ? LogService::LEVEL_INFO : LogService::LEVEL_ERROR);
-                            $logMessage = 'Product update failed! Removed local id '.$localId
-                                .' ('.$nodeId.'). Retried update via SOAP API '
-                                .($soapResult ? 'successfully' : 'without success').'.';
+                            $logMessage = 'Product update failed.'
+//                                .' Removed local id '.$localId.' on node '.$nodeId.'.'
+                                .' Retried update via SOAP API '.($soapResult ? 'successfully' : 'without success').'.';
                             $logData['db error'] = $exception->getMessage();
+                            $logData['soap data'] = $soapData;
+
                             $this->getServiceLocator()->get('logService')
                                 ->log($logLevel, 'mag_p_wr_updsoap', $logMessage, $logData);
                         }
