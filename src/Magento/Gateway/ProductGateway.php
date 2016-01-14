@@ -731,10 +731,11 @@ class ProductGateway extends AbstractGateway
                     unset($data[$code]);
                 }
 
+                $websiteIds = array();
                 foreach ($storeDataByStoreId as $storeId=>$storeData) {
                     $dataPerStore[$storeId] = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
                     if (!isset($dataPerStore[$storeId]['price'])) {
-                        $websiteIds = $storeData['website_id'];
+                        $websiteIds[] = $storeData['website_id'];
                     }
                 }
 
