@@ -722,10 +722,11 @@ class ProductGateway extends AbstractGateway
             unset($originalData);
 
             $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
+            $updateViaDbApi = ($this->_db && $localId);
 
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != \Entity\Update::TYPE_DELETE) {
-                if ($updateViaDbApi = $this->_db && $localId) {
+                if ($updateViaDbApi) {
                     $api = 'DB';
                 }else{
                     $api = 'SOAP';

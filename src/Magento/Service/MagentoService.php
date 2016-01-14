@@ -179,29 +179,4 @@ class MagentoService implements ServiceLocatorAwareInterface
         return $mappedProductData;
     }
 
-    /**
-     * @param string $entityType
-     * @param array $productData
-     * @return array $cleanProductData
-     */
-    public function getCleanData($entityType, array $productData)
-    {
-        $map = $this->getStoreMapById($entityType, FALSE, FALSE);
-
-        foreach ($map as $toRemove=>$toKeep) {
-            unset($productData[$toRemove]);
-        }
-
-        return $productData;
-    }
-
-    /**
-     * @param array $productData
-     * @return array $cleanProductData
-     */
-    public function getCleanProductData(array $productData)
-    {
-
-    }
-
 }

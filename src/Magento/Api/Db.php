@@ -488,14 +488,20 @@ class Db implements ServiceLocatorAwareInterface
 
                         if (!$resultsDefault || !count($resultsDefault)) {
                             $affectedRows += $this->getTableGateway($type)->insert($insertForStore0);
+//                            $this->getServiceLocator()->get('logService')
+//                                ->log(LogService::LEVEL_INFO, 'mag_db_insert0', $logMessage, $logData);
                         }
                     }
 
                     $resultsStore = $this->getTableGateway($type)->select($where);
                     if (!$resultsStore || !count($resultsStore)) {
                         $affectedRows += $this->getTableGateway($type)->insert($insertSet);
+//                        $this->getServiceLocator()->get('logService')
+//                            ->log(LogService::LEVEL_INFO, 'mag_db_insert', $logMessage, $logData);
                     }else{
                         $affectedRows += $this->getTableGateway($type)->update($updateSet, $where);
+//                        $this->getServiceLocator()->get('logService')
+//                            ->log(LogService::LEVEL_INFO, 'mag_db_update', $logMessage, $logData);
                     }
                 }
             }
@@ -509,6 +515,7 @@ class Db implements ServiceLocatorAwareInterface
         }
 
         return ($affectedRows > 0);
+//        return $affectedRows;
     }
 
     /**
