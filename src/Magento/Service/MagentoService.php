@@ -74,7 +74,7 @@ class MagentoService implements ServiceLocatorAwareInterface
     {
         /** @var \Magento\Service\MagentoConfigService $configService */
         $configService = $this->getServiceLocator()->get('magentoConfigService');
-        $map = $configService->getMap($entityType, FALSE, $readFromMagento);
+        $map = $configService->getMapByStoreId($entityType, FALSE, $readFromMagento);
 
         if (array_key_exists($code, $map)) {
             $mappedCode = $map[$code];
@@ -96,13 +96,39 @@ class MagentoService implements ServiceLocatorAwareInterface
      * @param bool $readFromMagento
      * @return array $storeMap
      */
-    protected function getStoreMap($entityType, $storeId, $readFromMagento)
+    protected function getStoreMapById($entityType, $storeId, $readFromMagento)
     {
         /** @var \Magento\Service\MagentoConfigService $configService */
         $configService = $this->getServiceLocator()->get('magentoConfigService');
-        $map = $configService->getMap($entityType, $storeId, $readFromMagento);
+        $map = $configService->getMapByStoreId($entityType, $storeId, $readFromMagento);
 
         return $map;
+    }
+
+    /**
+     * @param string $entityType
+     * @param array $data
+     * @return array $cleanData
+     * @throws GatewayException
+     */
+    protected function cleanData($entityType, array $data)
+    {
+        /** @var \Magento\Service\MagentoConfigService $configService */
+        $configService = $this->getServiceLocator()->get('magentoConfigService');
+
+        $originalData = $data;
+        $attributesToMap = $configService->getAttributesToMap($entityType);
+
+        foreach ($attributesToMap as $attributeToRemove) {
+            if (array_key_exists($attributeToRemove, $data)) {
+                unset($data[$attributeToRemove]);
+            }
+        }
+
+        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_svc_cleanDat',
+            'Cleaned '.json_encode($originalData).' to '.json_encode($data).'.', array('removed'=>$attributeToRemove));
+
+        return $data;
     }
 
     /**
@@ -117,7 +143,7 @@ class MagentoService implements ServiceLocatorAwareInterface
     protected function mapData($entityType, array $data, $storeId, $readFromMagento, $override)
     {
         $originalData = $data;
-        $map = $this->getStoreMap($entityType, $storeId, $readFromMagento);
+        $map = $this->getStoreMapById($entityType, $storeId, $readFromMagento);
 
         foreach ($map as $mapFrom=>$mapTo) {
             if (array_key_exists($mapTo, $data) && !$override) {
@@ -128,6 +154,10 @@ class MagentoService implements ServiceLocatorAwareInterface
                 $data[$mapTo] = $data[$mapFrom];
                 unset($data[$mapFrom]);
             }
+        }
+
+        if (!$readFromMagento) {
+            $data = $this->cleanData($entityType, $data);
         }
 
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_svc_mapData',
@@ -156,7 +186,7 @@ class MagentoService implements ServiceLocatorAwareInterface
      */
     public function getCleanData($entityType, array $productData)
     {
-        $map = $this->getStoreMap($entityType, FALSE, FALSE);
+        $map = $this->getStoreMapById($entityType, FALSE, FALSE);
 
         foreach ($map as $toRemove=>$toKeep) {
             unset($productData[$toRemove]);
