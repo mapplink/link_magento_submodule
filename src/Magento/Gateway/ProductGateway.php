@@ -632,7 +632,7 @@ class ProductGateway extends AbstractGateway
 
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_DEBUGEXTRA,
-                'mag_p_wr_upd',
+                'mag_p_wrupd',
                 'Attributes for update of product '.$sku.': '.var_export($attributes, TRUE),
                array('attributes'=>$attributes, 'custom'=>$customAttributes),
                array('entity'=>$entity) 
@@ -655,7 +655,7 @@ class ProductGateway extends AbstractGateway
         if (count($originalData) == 0) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_INFO,
-                    'mag_p_wr_upd_non',
+                    'mag_p_wrupd_non',
                     'No update required for '.$sku.' but requested was '.implode(', ', $attributes),
                     array('attributes'=>$attributes),
                     array('entity'=>$entity)
@@ -717,7 +717,7 @@ class ProductGateway extends AbstractGateway
                 }
             }
 
-            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_updmap',
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wrupdmap',
                 'Mapped, filtered, prepared: '.json_encode($originalData).' to '.json_encode($data).'.', array());
             unset($originalData);
 
@@ -725,7 +725,11 @@ class ProductGateway extends AbstractGateway
 
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != \Entity\Update::TYPE_DELETE) {
-                $updateViaDbApi = $this->_db && $localId;
+                if ($updateViaDbApi = $this->_db && $localId) {
+                    $api = 'DB';
+                }else{
+                    $api = 'SOAP';
+                }
 
                 $dataPerStore[0] = $data;
                 foreach (array('price', 'msrp') as $code) {
@@ -738,11 +742,11 @@ class ProductGateway extends AbstractGateway
                     $dataPerStore[$storeId] = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
                     if (isset($dataPerStore[$storeId]['price'])) {
                         $websiteIds[] = $storeData['website_id'];
-                        $logCode = 'mag_p_wr_weben';
+                        $logCode = 'mag_p_wrupd_wen';
                         $logMessage = 'enabled';
                         $logData = array('store id'=>$storeId, 'data'=>$dataPerStore[$storeId]);
                     }else{
-                        $logCode = 'mag_p_wr_webdis';
+                        $logCode = 'mag_p_wrupd_wdis';
                         $logMessage = 'disabled';
                         $logData = array();
                     }
@@ -752,8 +756,11 @@ class ProductGateway extends AbstractGateway
                 }
 
                 $storeIds = array_merge(array(0), array_keys($storeDataByStoreId));
-                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wr_stores',
-                    'StoreIds '.json_encode($storeIds).' (type: '.$type.').', array('store data'=>$storeDataByStoreId));
+                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL,
+                    'mag_p_wrupd_stor',
+                    'StoreIds '.json_encode($storeIds).' (type: '.$type.'), websiteIds '.json_encode($websiteIds).'.',
+                    array('store data'=>$storeDataByStoreId)
+                );
 
                 foreach ($storeIds as $storeId) {
                     $productData = $dataPerStore[$storeId];
@@ -791,19 +798,21 @@ class ProductGateway extends AbstractGateway
                         $logMessage = 'Updated product '.$sku.' on store '.$storeId.' ';
                         if ($updateViaDbApi) {
                             $logLevel = LogService::LEVEL_INFO;
-                            $logCode = 'mag_p_wr_upddb';
+                            $logCode = 'mag_p_wrupddb';
                             $logMessage .= 'successfully via DB api with '.implode(', ', array_keys($productData));
                         }else{
                             $request = array($sku, $soapData, $storeId, 'sku');
                             $soapResult = $this->_soap->call('catalogProductUpdate', $request);
 
                             $logLevel = ($soapResult ? LogService::LEVEL_INFO : LogService::LEVEL_ERROR);
-                            $logCode = 'mag_p_wr_updsoap';
-                            if (isset($exception)) {
-                                $logMessage = 'DB update failed. '
+                            $logCode = 'mag_p_wrupdsoap';
+                            if ($api != 'SOAP') {
+                                $logMessage = $api.' update failed. '
 //                                .'Removed local id '.$localId.' on node '.$nodeId.'. ';
                                     .$logMessage;
-                                $logData['db error'] = $exception->getMessage();
+                                if (isset($exception)) {
+                                    $logData['db error'] = $exception->getMessage();
+                                }
                             }
 
                             $logMessage .= ($soapResult ? 'successfully' : 'without success').' via SOAP api.';
