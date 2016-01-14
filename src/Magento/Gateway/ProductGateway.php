@@ -725,6 +725,8 @@ class ProductGateway extends AbstractGateway
 
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != \Entity\Update::TYPE_DELETE) {
+                $updateViaDbApi = $this->_db && $localId;
+
                 $dataPerStore[0] = $data;
                 foreach (array('price', 'msrp') as $code) {
                     $data[$code.'_default'] = $data[$code];
@@ -736,11 +738,17 @@ class ProductGateway extends AbstractGateway
                     $dataPerStore[$storeId] = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
                     if (isset($dataPerStore[$storeId]['price'])) {
                         $websiteIds[] = $storeData['website_id'];
+                        $logCode = 'mag_p_wr_weben';
+                        $logMessage = 'enabled';
+                        $logData = array('store id'=>$storeId, 'data'=>$dataPerStore[$storeId]);
                     }else{
-                        $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_DEBUGINTERNAL,'mag_p_wr_webids',
-                                'Product '.$sku.' is disabled on website '.$storeData['website_id'].'.', array());
+                        $logCode = 'mag_p_wr_webdis';
+                        $logMessage = 'disabled';
+                        $logData = array();
                     }
+                    $logMessage = 'Product '.$sku.' is '.$logMessage.' on website '.$storeData['website_id'].'.';
+                    $this->getServiceLocator()->get('logService')
+                        ->log(LogService::LEVEL_DEBUGINTERNAL, $logCode, $logMessage, $logData);
                 }
 
                 $storeIds = array_merge(array(0), array_keys($storeDataByStoreId));
@@ -760,8 +768,6 @@ class ProductGateway extends AbstractGateway
                     $soapResult = NULL;
 
                     if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
-                        $updateViaDbApi = $this->_db && $localId;
-
                         if ($updateViaDbApi) {
                             try{
                                 $tablePrefix = 'catalog_product';
