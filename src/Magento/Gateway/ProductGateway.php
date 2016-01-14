@@ -734,8 +734,12 @@ class ProductGateway extends AbstractGateway
                 $websiteIds = array();
                 foreach ($storeDataByStoreId as $storeId=>$storeData) {
                     $dataPerStore[$storeId] = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
-                    if (!isset($dataPerStore[$storeId]['price'])) {
+                    if (isset($dataPerStore[$storeId]['price'])) {
                         $websiteIds[] = $storeData['website_id'];
+                    }else{
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_DEBUGINTERNAL,'mag_p_wr_webids',
+                                'Product '.$sku.' is disabled on website '.$storeData['website_id'].'.', array());
                     }
                 }
 
