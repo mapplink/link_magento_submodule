@@ -722,16 +722,9 @@ class ProductGateway extends AbstractGateway
             unset($originalData);
 
             $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
-            $updateViaDbApi = ($this->_db && $localId);
 
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != \Entity\Update::TYPE_DELETE) {
-                if ($updateViaDbApi) {
-                    $api = 'DB';
-                }else{
-                    $api = 'SOAP';
-                }
-
                 $dataPerStore[0] = $data;
                 foreach (array('price', 'msrp') as $code) {
                     $data[$code.'_default'] = $data[$code];
@@ -775,6 +768,13 @@ class ProductGateway extends AbstractGateway
                     );
                     $soapResult = NULL;
 
+                    $updateViaDbApi = ($this->_db && $localId && $storeId == 0);
+                    if ($updateViaDbApi) {
+                        $api = 'DB';
+                    }else{
+                        $api = 'SOAP';
+                    }
+
                     if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
                         if ($updateViaDbApi) {
                             try{
@@ -789,10 +789,10 @@ class ProductGateway extends AbstractGateway
                                 if ($rowsAffected != 1) {
                                     throw new MagelinkException($rowsAffected.' rows affected.');
                                 }
-                            }catch(\Exception $exception){
-/*                                $this->_entityService->unlinkEntity($nodeId, $entity);
+                            }catch(\Exception $exception) {
+                                $this->_entityService->unlinkEntity($nodeId, $entity);
                                 $localId = NULL;
-*/                                $updateViaDbApi = FALSE;
+                                $updateViaDbApi = FALSE;
                             }
                         }
 
@@ -808,11 +808,10 @@ class ProductGateway extends AbstractGateway
                             $logLevel = ($soapResult ? LogService::LEVEL_INFO : LogService::LEVEL_ERROR);
                             $logCode = 'mag_p_wrupdsoap';
                             if ($api != 'SOAP') {
-                                $logMessage = $api.' update failed. '
-//                                .'Removed local id '.$localId.' on node '.$nodeId.'. ';
-                                    .$logMessage;
+                                $logMessage = $api.' update failed. Removed local id '.$localId
+                                    .' from node '.$nodeId.'. '.$logMessage;
                                 if (isset($exception)) {
-                                    $logData['db error'] = $exception->getMessage();
+                                    $logData[strtolower($api.' error')] = $exception->getMessage();
                                 }
                             }
 
