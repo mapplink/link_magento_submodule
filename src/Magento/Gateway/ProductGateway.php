@@ -727,8 +727,10 @@ class ProductGateway extends AbstractGateway
             if (count($storeDataByStoreId) > 0 && $type != \Entity\Update::TYPE_DELETE) {
                 $dataPerStore[0] = $data;
                 foreach (array('price', 'msrp') as $code) {
-                    $data[$code.'_default'] = $data[$code];
-                    unset($data[$code]);
+                    if (array_key_exists($code, $data)) {
+                        $data[$code.'_default'] = $data[$code];
+                        unset($data[$code]);
+                    }
                 }
 
                 $websiteIds = array();

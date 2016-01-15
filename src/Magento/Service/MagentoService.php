@@ -126,7 +126,7 @@ class MagentoService implements ServiceLocatorAwareInterface
         }
 
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_svc_cleanDat',
-            'Cleaned '.json_encode($originalData).' to '.json_encode($data).'.', array('removed'=>$attributeToRemove));
+            'Cleaned '.json_encode($originalData).' to '.json_encode($data).'.', array('removed'=>$attributesToMap));
 
         return $data;
     }
