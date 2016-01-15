@@ -2,11 +2,11 @@
 
 return array(
     'store_currencies'=>array(
-        // <store id: 0 for default> => array(<currency identifier>, ...)
+//        <store id: 0 for default> => array(<currency identifier>, ...)
     ),
     'store_map'=>array(
-        // <store id> => array(<magento code> => <magelink code>, ...)
-        // <-store id> => array(<magelink code>, ...) // for clean up purpose only
+//         <store id> => array(<entity type> => array(<magento code> => <magelink code>, ...))
+//         <-store id> => array(<entity type> => array(<magento code> => <magento code>_default, ...)) // for write and clean up purpose only
     )
 );
 

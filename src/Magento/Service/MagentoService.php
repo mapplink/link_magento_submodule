@@ -70,11 +70,11 @@ class MagentoService implements ServiceLocatorAwareInterface
      * @param bool $readFromMagento
      * @return array $mappedCode
      */
-    public function getMappedCode($entityType, $code, $readFromMagento)
+    public function getMappedCode($entityType, $code)
     {
         /** @var \Magento\Service\MagentoConfigService $configService */
         $configService = $this->getServiceLocator()->get('magentoConfigService');
-        $map = $configService->getMapByStoreId($entityType, FALSE, $readFromMagento);
+        $map = $configService->getMapByStoreId($entityType, FALSE, FALSE);
 
         if (array_key_exists($code, $map)) {
             $mappedCode = $map[$code];
@@ -112,16 +112,16 @@ class MagentoService implements ServiceLocatorAwareInterface
         $configService = $this->getServiceLocator()->get('magentoConfigService');
 
         $originalData = $data;
-        $attributesToMap = $configService->getAttributesToMap($entityType);
+        $map = $configService->getMapByStoreId($entityType, FALSE, FALSE);
 
-        foreach ($attributesToMap as $attributeToRemove) {
-            if (array_key_exists($attributeToRemove, $data)) {
-                unset($data[$attributeToRemove]);
+        foreach ($map as $toRemove=>$toKeep) {
+            if (array_key_exists($toRemove, $data)) {
+                unset($data[$toRemove]);
             }
         }
 
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_svc_cleanDat',
-            'Cleaned '.json_encode($originalData).' to '.json_encode($data).'.', array('removed'=>$attributesToMap));
+            'Cleaned '.json_encode($originalData).' to '.json_encode($data).'.', array('to remove'=>array_keys($map)));
 
         return $data;
     }

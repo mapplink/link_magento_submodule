@@ -11,6 +11,8 @@
 
 namespace Magento\Gateway;
 
+use Entity\Update;
+use Entity\Action;
 use Magento\Service\MagentoService;
 use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
@@ -617,7 +619,7 @@ class ProductGateway extends AbstractGateway
      * @param string[] $attributes
      * @param int $type
      */
-    public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE) 
+    public function writeUpdates(\Entity\Entity $entity, $attributes, $type = Update::TYPE_UPDATE)
     {
         $nodeId = $this->_node->getNodeId();
         $sku = $entity->getUniqueId();
@@ -664,7 +666,7 @@ class ProductGateway extends AbstractGateway
             /** @var MagentoService $magentoService */
             $magentoService = $this->getServiceLocator()->get('magentoService');
             foreach ($originalData as $code=>$value) {
-                $mappedCode = $magentoService->getMappedCode('product', $code, FALSE);
+                $mappedCode = $magentoService->getMappedCode('product', $code);
                 switch ($mappedCode) {
                     // Normal attributes
                     case 'price':
@@ -699,7 +701,7 @@ class ProductGateway extends AbstractGateway
                         break;
                     case 'product_class':
                     case 'type':
-                        if ($type != \Entity\Update::TYPE_CREATE) {
+                        if ($type != Update::TYPE_CREATE) {
                             // ToDo: Log error(but no exception)
                         }else{
                             // Ignore attributes
@@ -724,7 +726,7 @@ class ProductGateway extends AbstractGateway
             $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
 
             $storeDataByStoreId = $this->_node->getStoreViews();
-            if (count($storeDataByStoreId) > 0 && $type != \Entity\Update::TYPE_DELETE) {
+            if (count($storeDataByStoreId) > 0 && $type != Update::TYPE_DELETE) {
                 $dataPerStore[0] = $data;
                 foreach (array('price', 'msrp') as $code) {
                     if (array_key_exists($code, $data)) {
@@ -777,7 +779,7 @@ class ProductGateway extends AbstractGateway
                         $api = 'SOAP';
                     }
 
-                    if ($type == \Entity\Update::TYPE_UPDATE || $localId) {
+                    if ($type == Update::TYPE_UPDATE || $localId) {
                         if ($updateViaDbApi) {
                             try{
                                 $tablePrefix = 'catalog_product';
@@ -821,7 +823,7 @@ class ProductGateway extends AbstractGateway
                             $logData['soap data'] = $soapData;
                         }
                         $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
-                    }elseif ($type == \Entity\Update::TYPE_CREATE) {
+                    }elseif ($type == Update::TYPE_CREATE) {
 
                         $attributeSet = NULL;
                         foreach ($this->_attributeSets as $setId=>$set) {
@@ -886,7 +888,8 @@ class ProductGateway extends AbstractGateway
                                     }
 
                                     if (!$found) {
-                                        $message = 'Magento found duplicate SKU '.$sku.' but we could not replicate. Database fault?';
+                                        $message = 'Magento found duplicate SKU '.$sku
+                                            .' but we could not replicate. Database fault?';
                                         throw new MagelinkException($message);
                                     }
                                 }
@@ -895,6 +898,7 @@ class ProductGateway extends AbstractGateway
 
                         if ($soapResult) {
                             $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
+                            $type == Update::TYPE_UPDATE;
 
                             $logData['soap data'] = $soapData;
                             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO,
@@ -915,10 +919,10 @@ class ProductGateway extends AbstractGateway
 
     /**
      * Write out the given action.
-     * @param \Entity\Action $action
+     * @param Action $action
      * @throws MagelinkException
      */
-    public function writeAction(\Entity\Action $action) 
+    public function writeAction(Action $action) 
     {
         $entity = $action->getEntity();
         switch($action->getType()) {

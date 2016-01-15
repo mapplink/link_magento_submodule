@@ -64,24 +64,6 @@ class MagentoConfigService extends ApplicationConfigService
 
     /**
      * @param string $entityType
-     * @return array $attributesToMap
-     */
-    public function getAttributesToMap($entityType)
-    {
-        $attributesToMap = array();
-        $storeMap = $this->getStoreMap();
-
-        foreach ($storeMap as $id=>$mapPreStore) {
-            if (isset($mapPreStore[$entityType])) {
-                $attributesToMap = array_merge($attributesToMap, array_values($mapPreStore[$entityType]));
-            }
-        }
-
-        return array_unique($attributesToMap);
-    }
-
-    /**
-     * @param string $entityType
      * @param int $storeId
      * @param bool $readFromManento
      * @return array $productMap
@@ -95,6 +77,9 @@ class MagentoConfigService extends ApplicationConfigService
             new GatewayException('That is not a valid call for store map with no store id and reading from Magento.');
         }else{
             foreach ($storeMap as $id=>$mapPreStore) {
+                if (!$readFromMagento) {
+                    $id = abs($id);
+                }
                 if ($storeId === FALSE || $storeId == $id && isset($mapPreStore[$entityType])) {
                     $mapPerStoreAndEntityType = $mapPreStore[$entityType];
                     $flippedMap = array_flip($mapPerStoreAndEntityType);
