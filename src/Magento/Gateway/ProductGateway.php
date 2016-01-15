@@ -340,7 +340,7 @@ class ProductGateway extends AbstractGateway
                     );
                 try{
                     $stockEntity = $this->_entityService
-                        ->createEntity($this->_node->getNodeId(), 'stockitem',0, $sku, array(), $existingEntity);
+                        ->createEntity($this->_node->getNodeId(), 'stockitem', 0, $sku, array(), $existingEntity);
                     $this->_entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
                 }catch (\Exception $exception) {
                     $this->getServiceLocator() ->get('logService') 
@@ -356,7 +356,7 @@ class ProductGateway extends AbstractGateway
                 $this->_entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
 
-                $stockEntity = $this->_entityService->loadEntity($this->_node->getNodeId(), 'stockitem', $storeId, $sku);
+                $stockEntity = $this->_entityService->loadEntity($this->_node->getNodeId(), 'stockitem', 0, $sku);
                 if ($this->_entityService->getLocalId($this->_node->getNodeId(), $stockEntity) != NULL) {
                     $this->_entityService->unlinkEntity($this->_node->getNodeId(), $stockEntity);
                 }
