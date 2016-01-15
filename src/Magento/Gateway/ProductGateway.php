@@ -895,10 +895,11 @@ class ProductGateway extends AbstractGateway
 
                         if ($soapResult) {
                             $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
-                            $this->getServiceLocator()->get('logService')->log(
-                                LogService::LEVEL_INFO,
+
+                            $logData['soap data'] = $soapData;
+                            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO,
                                 'mag_p_wr_loc_id',
-                                'Added product local id for '.$sku.' ('.$nodeId.')',
+                                'Added product local id '.$soapResult.' for '.$sku.' ('.$nodeId.')',
                                 $logData
                             );
                         }else{
