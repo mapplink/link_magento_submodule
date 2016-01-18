@@ -861,7 +861,7 @@ class ProductGateway extends AbstractGateway
                                         'mag_p_wr_duperr',
                                         'Creating product '.$sku.' hit SKU duplicate fault',
                                         array(),
-                                        array('entity'=>$entity)
+                                        array('entity'=>$entity, 'soap fault'=>$soapFault)
                                     );
 
                                 $check = $this->_soap->call('catalogProductInfo', array($sku, 0, array(), 'sku'));
