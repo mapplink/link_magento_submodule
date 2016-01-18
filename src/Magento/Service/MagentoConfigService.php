@@ -19,6 +19,14 @@ class MagentoConfigService extends ApplicationConfigService
 {
 
     /**
+     * @return array $defaultStores
+     */
+    public function getDefaultStores()
+    {
+        return $this->getConfigData('default_stores');
+    }
+
+    /**
      * @return array $storeBaseCurrencies
      */
     protected function getStoreCurrencies()

@@ -719,10 +719,6 @@ class ProductGateway extends AbstractGateway
                 }
             }
 
-            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL, 'mag_p_wrupdmap',
-                'Mapped, filtered, prepared: '.json_encode($originalData).' to '.json_encode($data).'.', array());
-            unset($originalData);
-
             $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
 
             $storeDataByStoreId = $this->_node->getStoreViews();
@@ -730,28 +726,36 @@ class ProductGateway extends AbstractGateway
                 $dataPerStore[0] = $data;
                 foreach (array('price', 'msrp') as $code) {
                     if (array_key_exists($code, $data)) {
-                        $data[$code.'_default'] = $data[$code];
                         unset($data[$code]);
                     }
                 }
 
                 $websiteIds = array();
                 foreach ($storeDataByStoreId as $storeId=>$storeData) {
-                    $dataPerStore[$storeId] = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
-                    if (isset($dataPerStore[$storeId]['price'])) {
+                    $dataToMap = $magentoService->mapProductData($data, $storeId, FALSE, TRUE);
+                    if ($magentoService->isStoreUsingDefaults($storeId)) {
+                        $dataToCheck = $dataPerStore[0];
+                    }else{
+                        $dataToCheck = $dataToMap;
+                    }
+                    $logData = array('store id'=>$storeId, 'data'=>$dataToMap);
+
+                    $isEnabled = isset($dataToCheck['price']);
+                    if ($isEnabled) {
                         $websiteIds[] = $storeData['website_id'];
                         $logCode = 'mag_p_wrupd_wen';
                         $logMessage = 'enabled';
-                        $logData = array('store id'=>$storeId, 'data'=>$dataPerStore[$storeId]);
                     }else{
                         $logCode = 'mag_p_wrupd_wdis';
                         $logMessage = 'disabled';
-                        $logData = array();
                     }
                     $logMessage = 'Product '.$sku.' is '.$logMessage.' on website '.$storeData['website_id'].'.';
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_DEBUGINTERNAL, $logCode, $logMessage, $logData);
+
+                    $storeDataByStoreId[$storeId] = $dataToMap;
                 }
+                unset($data, $dataToMap, $dataToCheck);
 
                 $storeIds = array_merge(array(0), array_keys($storeDataByStoreId));
                 $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGINTERNAL,

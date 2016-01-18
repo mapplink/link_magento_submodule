@@ -65,6 +65,16 @@ class MagentoService implements ServiceLocatorAwareInterface
     }
 
     /**
+     * @param int $storeId
+     * @return array $cleanData
+     */
+    public function isStoreUsingDefaults($storeId)
+    {
+        $defaultStores = $this->getServiceLocator()->get('magentoConfigService')->getDefaultStores();
+        return in_array($storeId, $defaultStores);
+    }
+
+    /**
      * @param string $entityType
      * @param string $code
      * @param bool $readFromMagento
