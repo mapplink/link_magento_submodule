@@ -814,7 +814,15 @@ class ProductGateway extends AbstractGateway
                             $logMessage .= 'successfully via DB api with '.implode(', ', array_keys($productData));
                         }else{
                             $request = array($sku, $soapData, $storeId, 'sku');
-                            $soapResult = $this->_soap->call('catalogProductUpdate', $request);
+                            try{
+                                $soapResult = $this->_soap->call('catalogProductUpdate', $request);
+                            }catch(\Exception $exception) {
+                                $soapResult = FALSE;
+                                $soapFaultMessage = $exception->getPrevious()->getMessage();
+                                if (strpos($soapFaultMessage, 'Product not exists') !== FALSE) {
+                                    $type = Update::TYPE_CREATE;
+                                }
+                            }
 
                             $logLevel = ($soapResult ? LogService::LEVEL_INFO : LogService::LEVEL_ERROR);
                             $logCode = 'mag_p_wrupdsoap';
@@ -826,11 +834,14 @@ class ProductGateway extends AbstractGateway
                                 }
                             }
 
-                            $logMessage .= ($soapResult ? 'successfully' : 'without success').' via SOAP api.';
+                            $logMessage .= ($soapResult ? 'successfully' : 'without success').' via SOAP api.'
+                                .($type == Update::TYPE_CREATE ? ' Try to create now.' : '');
                             $logData['soap data'] = $soapData;
                         }
                         $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
-                    }elseif ($type == Update::TYPE_CREATE) {
+                    }
+
+                    if ($type == Update::TYPE_CREATE) {
 
                         $attributeSet = NULL;
                         foreach ($this->_attributeSets as $setId=>$set) {
@@ -860,9 +871,11 @@ class ProductGateway extends AbstractGateway
                         try{
                             $soapResult = $this->_soap->call('catalogProductCreate', $request);
                             $soapFault = NULL;
-                        }catch(\SoapFault $soapFault){
+                        }catch(\Exception $exception) {
                             $soapResult = FALSE;
-                            if ($soapFault->getMessage() == 'The value of attribute "SKU" must be unique') {
+                            $soapFault = $exception->getPrevious();
+                            $soapFaultMessage = $soapFault->getMessage();
+                            if ($soapFaultMessage == 'The value of attribute "SKU" must be unique') {
                                 $this->getServiceLocator()->get('logService')
                                     ->log(LogService::LEVEL_WARN,
                                         'mag_p_wr_duperr',
