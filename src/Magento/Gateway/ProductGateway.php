@@ -687,7 +687,7 @@ class ProductGateway extends AbstractGateway
                         $data[$code] = $value;
                         break;
                     case 'enabled':
-                        $data['status'] =($value == 1 ? 2 : 1);
+                        $data['status'] = ($value == 1 ? 1 : 2);
                         break;
                     case 'visible':
                         $data['visibility'] = ($value == 1 ? 4 : 1);
