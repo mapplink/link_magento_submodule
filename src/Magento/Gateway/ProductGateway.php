@@ -756,7 +756,7 @@ class ProductGateway extends AbstractGateway
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_DEBUGINTERNAL, $logCode, $logMessage, $logData);
 
-                    $storeDataByStoreId[$storeId] = $dataToMap;
+                    $dataPerStore[$storeId] = $dataToMap;
                 }
                 unset($data, $dataToMap, $dataToCheck);
 
