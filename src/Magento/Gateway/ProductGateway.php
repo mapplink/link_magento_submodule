@@ -665,6 +665,7 @@ class ProductGateway extends AbstractGateway
         }else{
             /** @var MagentoService $magentoService */
             $magentoService = $this->getServiceLocator()->get('magentoService');
+
             foreach ($originalData as $code=>$value) {
                 $mappedCode = $magentoService->getMappedCode('product', $code);
                 switch ($mappedCode) {
@@ -738,7 +739,6 @@ class ProductGateway extends AbstractGateway
                     }else{
                         $dataToCheck = $dataToMap;
                     }
-                    $logData = array('store id'=>$storeId, 'data'=>$dataToMap);
 
                     $isEnabled = isset($dataToCheck['price']);
                     if ($isEnabled) {
@@ -749,7 +749,10 @@ class ProductGateway extends AbstractGateway
                         $logCode = 'mag_p_wrupd_wdis';
                         $logMessage = 'disabled';
                     }
-                    $logMessage = 'Product '.$sku.' is '.$logMessage.' on website '.$storeData['website_id'].'.';
+
+                    $logMessage = 'Product '.$sku.' will be '.$logMessage.' on website '.$storeData['website_id'].'.';
+                    $logData = array('store id'=>$storeId, 'dataToMap'=>$dataToMap, 'dataToCheck'=>$dataToCheck);
+
                     $this->getServiceLocator()->get('logService')
                         ->log(LogService::LEVEL_DEBUGINTERNAL, $logCode, $logMessage, $logData);
 
