@@ -898,7 +898,7 @@ class ProductGateway extends AbstractGateway
 
                         if ($soapResult) {
                             $this->_entityService->linkEntity($nodeId, $entity, $soapResult);
-                            $type == Update::TYPE_UPDATE;
+                            $type = Update::TYPE_UPDATE;
 
                             $logData['soap data'] = $soapData;
                             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO,
