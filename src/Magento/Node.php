@@ -45,7 +45,7 @@ class Node extends AbstractNode
         $this->_api[$type] = $this->getServiceLocator()->get('magento_' . $type);
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
-                'init_api',
+                'mag_init_api',
                 'Creating API instance '.$type,
                 array('type'=>$type),
                 array('node'=>$this)
@@ -66,30 +66,30 @@ class Node extends AbstractNode
     public function getStoreViews()
     {
         if ($this->_storeViews === NULL) {
-            $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_INFO,
-                    'storeviews',
-                    'Loading store views',
-                    array(),
-                    array('node'=>$this)
-                );
-
             $soap = $this->getApi('soap');
             if (!$soap) {
                 throw new SyncException('Failed to initialize SOAP api for store view fetch');
             }else{
                 /** @var \Magento\Api|Soap $soap */
-                $result = $soap->call('storeList', array());
-                if (count($result)) {
-                    if (isset($result['result'])) {
-                        $result = $result['result'];
+                $response = $soap->call('storeList', array());
+                if (count($response)) {
+                    if (isset($response['result'])) {
+                        $response = $response['result'];
                     }
 
                     $this->_storeViews = array();
-                    foreach ($result as $storeView) {
+                    foreach ($response as $storeView) {
                         $this->_storeViews[$storeView['store_id']] = $storeView;
                     }
                 }
+
+                $this->getServiceLocator()->get('logService')
+                    ->log(LogService::LEVEL_INFO,
+                        'mag_storeviews',
+                        'Loaded store views',
+                        array('soap response'=>$response, 'store views'=>$this->_storeViews),
+                        array('node'=>$this)
+                    );
             }
         }
 
@@ -108,7 +108,7 @@ class Node extends AbstractNode
         if ($storeCount == 1 && $this->isMultiStore()) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
-                    'multistore_single',
+                    'mag_mstore_sng',
                     'Multi-store enabled but only one store view!',
                     array(),
                     array('node'=>$this)
@@ -116,7 +116,7 @@ class Node extends AbstractNode
         }elseif ($storeCount > 1 && !$this->isMultiStore()) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_WARN,
-                    'multistore_missing',
+                    'mag_mstore_miss',
                     'Multi-store disabled but multiple store views!',
                     array(),
                     array('node'=>$this)
