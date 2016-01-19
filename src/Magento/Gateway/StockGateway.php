@@ -1,12 +1,19 @@
 <?php
+/**
+ * @category Magento
+ * @package Magento\Gateway
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Gateway;
 
 use Entity\Service\EntityService;
 use Log\Service\LogService;
+use Magelink\Exception\MagelinkException;
 use Node\AbstractNode;
 use Node\Entity;
-use Magelink\Exception\MagelinkException;
 
 
 class StockGateway extends AbstractGateway
@@ -140,6 +147,39 @@ class StockGateway extends AbstractGateway
     }
 
     /**
+     * @param \Entity\Entity $entity
+     * @param bool $log
+     * @param bool $error
+     * @return int|NULL
+     */
+    protected function getParentLocal(\Entity\Entity $entity, $log = FALSE, $error = FALSE)
+    {
+        $nodeId = $this->_node->getNodeId();
+
+        if ($log) {
+            $logLevel = ($error ? LogService::LEVEL_ERROR : LogService::LEVEL_WARN);
+            $logMessage = 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had to use parent local!';
+            $this->getServiceLocator()->get('logService')
+                ->log($logLevel, 'mag_si_par', $logMessage,
+                    array('parent'=>$entity->getParentId()),
+                    array('node'=>$this->_node, 'entity'=>$entity)
+                );
+        }
+
+        $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
+
+        if (!$localId) {
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_ERROR,
+                    'mag_si_nolink', 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had no local id!',
+                    array('data'=>$entity->getFullArrayCopy()), array('node'=>$this->_node, 'entity'=>$entity)
+                );
+        }
+
+        return $localId;
+    }
+
+    /**
      * Write out all the updates to the given entity.
      * @param \Entity\Entity $entity
      * @param string[] $attributes
@@ -153,48 +193,80 @@ class StockGateway extends AbstractGateway
         $logEntities = array('node' => $this->_node, 'entity' => $entity);
 
         if (in_array('available', $attributes)) {
+            $isUnlinked = FALSE;
+            $nodeId = $this->_node->getNodeId();
+            $logEntities = array('node'=>$this->_node, 'entity' => $entity);
 
-            $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity);
-            if ($localId) {
-                $logLevel = LogService::LEVEL_INFO;
-                $logCode .= '_upd';
-                $logMessage = 'Update stock '.$entity->getUniqueId().'.';
-            }else{
-                $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
+            $localId = $this->_entityService->getLocalId($nodeId, $entity);
+            $qty = $entity->getData('available');
+            $isInStock = (int) ($qty > 0);
+
+            do {
+                $success = FALSE;
                 if ($localId) {
+                    if ($this->_db) {
+                        $success = $this->_db->updateStock($localId, $qty, $isInStock);
+                    }elseif ($this->_soap) {
+                        $success = $this->_soap->call('catalogInventoryStockItemUpdate',
+                            array($localId, 'data'=>array('qty'=>$qty, 'is_in_stock'=>($isInStock))));
+                    }
+                }
+
+                $quit = $success || $isUnlinked;
+                $logData = array('node id'=>$nodeId, 'local id'=>$localId, 'data'=>$entity->getFullArrayCopy());
+
+                if (!$success) {
+                    if (!$isUnlinked) {
+                        if ($localId) {
+                            $this->_entityService->unlinkEntity($this->_node->getNodeId(), $entity);
+                        }
+                        $isUnlinked = TRUE;
+                        $localId = $this->getParentLocal($entity, TRUE);
+
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_WARN,
+                                $logCode.'_unlink',
+                                'Removed stockitem local id from '.$entity->getUniqueId().' ('.$nodeId.')',
+                                $logData, $logEntities
+                            );
+                    }else{
+                        $product = $this->_entityService
+                            ->loadEntityId($this->_node->getNodeId(), $entity->getParentId());
+
+                        if ($localId) {
+                            $localId = NULL;
+                            $this->_entityService->unlinkEntity($this->_node->getNodeId(), $product);
+
+                            $logMessage = 'Stock update for '.$entity->getUniqueId().' failed!'
+                                .' Product '.$product->getUniqueId().' had wrong local id '.$localId.' ('.$nodeId.').'
+                                .' Both local ids (on stockitem and product) are now removed.';
+                            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
+                                'mag_si_par_unlink', $logMessage, $logData, $logEntities);
+                        }
+                    }
+                }
+            }while (!$quit);
+
+            if ($isUnlinked) {
+                if ($success) {
+                    $this->_entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                    $logLevel = LogService::LEVEL_INFO;
+                    $logCode .= '_link';
+                    $logMessage = 'Linked stockitem '.$entity->getUniqueId().' on node '.$nodeId;
+                }else{
                     $logLevel = LogService::LEVEL_WARN;
-                    $logCode .= '_prnt_loc';
-                    $logMessage = 'Stock update for '.$entity->getUniqueId().' had to use parent local!';
-                    $logData['parent'] = $entity->getParentId();
-                }else{
-                    $logLevel = LogService::LEVEL_ERROR;
-                    $logCode .= '_nolocal';
-                    $logMessage = 'Stock update for '.$entity->getUniqueId().' had no local ID!';
+                    $logCode .= '_link_fail';
+                    $logMessage = 'Stockitem '.$entity->getUniqueId().' could not be linked on node '.$nodeId;
                 }
-            }
-
-            $this->getServiceLocator()->get('logService')
-                ->log($logLevel, $logCode, $logMessage, $logData, $logEntities);
-
-            if ($localId) {
-                $qty = $entity->getData('available');
-                $is_in_stock = ($qty > 0);
-
-                if ($this->_db) {
-                    $this->_db->updateStock($localId, $qty, $is_in_stock ? 1 : 0);
-                }else{
-                    $this->_soap->call('catalogInventoryStockItemUpdate',
-                        // ToDo : Check if product can be removed
-                        array('product'=>$localId, 'productId'=>$localId, 'data'=>array(
-                            'qty' => $qty,
-                            'is_in_stock' => ($is_in_stock ? 1 : 0)
-                        ))
-                    );
-                }
+                $this->getServiceLocator()->get('logService')
+                    ->log($logLevel, $logCode, $logMessage, $logData, $logEntities);
             }
         }else{
             // We don't care about any other attributes
+            $success = TRUE;
         }
+
+        return $success;
     }
 
     /**
@@ -206,4 +278,5 @@ class StockGateway extends AbstractGateway
     {
         throw new MagelinkException('Unsupported action type ' . $action->getType() . ' for Magento Stock Items.');
     }
+
 }

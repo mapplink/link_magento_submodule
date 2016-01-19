@@ -1,19 +1,34 @@
 <?php
+/**
+ * Implements SOAP access to Magento
+ * @category Magento
+ * @package Magento\Api
+ * @author Matt Johnston
+ * @author Andreas Gerhards <andreas@lero9.co.nz>
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license Commercial - All Rights Reserved
+ */
 
 namespace Magento\Api;
 
+use Log\Service\LogService;
+use Magelink\Exception\MagelinkException;
+use Magento\Node;
 use Zend\ServiceManager\ServiceLocatorAwareInterface;
 use Zend\ServiceManager\ServiceLocatorInterface;
-use Magento\Node;
 use Zend\Soap\Client;
 
-/**
- * Implements SOAP access to Magento
- * @package Magento\Api
- */
-class SoapV1 extends Soap {
 
-    public function init(Node $magentoNode){
+class SoapV1 extends Soap
+{
+
+    /**
+     * @param Node $magentoNode
+     * @return bool $success
+     * @throws MagelinkException
+     */
+    public function init(Node $magentoNode)
+    {
         if($this->_soapClient !== null){
             throw new \Magelink\Exception\MagelinkException('Tried to initialize Soap v1 API twice!');
         }
@@ -42,16 +57,23 @@ class SoapV1 extends Soap {
      * @throws \SoapFault
      * @return array|mixed Response data
      */
-    public function call($call, $data){
+    public function call($call, $data)
+    {
         array_unshift($data, $call);
         array_unshift($data, $this->_sessionId);
+
         try{
-            $res = $this->_soapClient->call('call', $data);
-        }catch(\SoapFault $sf){
-            $this->getServiceLocator()->get('logService')->log(\Log\Service\LogService::LEVEL_ERROR, 'soap_fault', 'SOAP v1 Fault with call ' . $call . ': ' . $sf->getMessage(), array('keys'=>array_keys($data), 'code'=>$sf->getCode(), 'trace'=>$sf->getTraceAsString(), 'req'=>$this->_soapClient->getLastRequest(), 'resp'=>$this->_soapClient->getLastResponse()));
-            throw new \Magelink\Exception\MagelinkException('Soap Fault - ' . $sf->getMessage(), 0, $sf);//throw $sf;
+            $result = $this->_soapClient->call('call', $data);
+        }catch (\SoapFault $soapFault) {
+            $logData = array('data'=>$data, 'code'=>$soapFault->getCode(), 'trace'=>$soapFault->getTraceAsString(),
+                'request'=>$this->_soapClient->getLastRequest(), 'response'=>$this->_soapClient->getLastResponse());
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_ERROR, 'mag_soap1_fault',
+                    'SOAP v1 Fault with call '.$call.': '.$soapFault->getMessage(), $logData);
+            throw new MagelinkException('Soap Fault - '.$soapFault->getMessage(), 0, $soapFault); //throw $soapFault;
         }
-        //echo PHP_EOL . $this->_soapClient->getLastRequest() . PHP_EOL . $this->_soapClient->getLastResponse() . PHP_EOL;
-        return $this->_processResponse($res);
+
+        return $this->_processResponse($result);
     }
+
 }
