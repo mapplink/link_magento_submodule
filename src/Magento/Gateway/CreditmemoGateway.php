@@ -110,7 +110,7 @@ class CreditmemoGateway extends AbstractGateway
                 if ($this->_node->getConfig('enterprise')) {
                     $map = array_merge($map, array(
                         'customer_balance'=>'base_customer_balance_amount',
-                        'customer_balance_ref'=>'bs_customer_bal_total_refunded ',
+                        'customer_balance_ref'=>'bs_customer_bal_total_refunded',
                         'gift_cards_amount'=>'base_gift_cards_amount',
                         'gw_price'=>'gw_base_price',
                         'gw_items_price'=>'gw_items_base_price',
@@ -442,7 +442,7 @@ class CreditmemoGateway extends AbstractGateway
 
                     try {
                         // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
-                        $storeCreditRefundAdjusted = $entity->getData('customer_balance', 0)
+                        $storeCreditRefundAdjusted = $entity->getData('customer_balance_ref', 0)
                             / $originalOrder->getData('base_to_currency_rate', 1);
                         $soapResult = $this->_soap->call(
                             'salesOrderCreditmemoCreate',
