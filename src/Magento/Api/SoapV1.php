@@ -23,31 +23,16 @@ class SoapV1 extends Soap
 {
 
     /**
-     * @param Node $magentoNode
-     * @return bool $success
-     * @throws MagelinkException
+     * @return NULL|Client $this->_soapClient
      */
-    public function init(Node $magentoNode)
+    protected function getAndStoreSoapClient()
     {
-        if($this->_soapClient !== null){
-            throw new \Magelink\Exception\MagelinkException('Tried to initialize Soap v1 API twice!');
-        }
+        $this->_soapClient = new Client(
+            $this->_node->getConfig('web_url').'api/soap/?wsdl',
+            array('soap_version'=>SOAP_1_1)
+        );
 
-        $username = $magentoNode->getConfig('soap_username');
-        $password = $magentoNode->getConfig('soap_password');
-        if(!$username || !$password){
-            // No auth passed, SOAP unavailable
-            return false;
-        }
-
-        $this->_soapClient = new Client($magentoNode->getConfig('web_url').'api/soap/?wsdl', array('soap_version'=>SOAP_1_1));
-        $loginRes = $this->_soapClient->call('login', array($magentoNode->getConfig('soap_username'), $magentoNode->getConfig('soap_password')));
-        //$loginRes = $this->_processResponse($loginRes);
-        $this->_sessionId = $loginRes;
-        if($loginRes){
-            return true;
-        }
-        return false;
+        return $this->_soapClient;
     }
 
     /**
@@ -57,23 +42,24 @@ class SoapV1 extends Soap
      * @throws \SoapFault
      * @return array|mixed Response data
      */
-    public function call($call, $data)
+    protected function _call($call, $data)
     {
         array_unshift($data, $call);
         array_unshift($data, $this->_sessionId);
 
         try{
             $result = $this->_soapClient->call('call', $data);
-        }catch (\SoapFault $soapFault) {
-            $logData = array('data'=>$data, 'code'=>$soapFault->getCode(), 'trace'=>$soapFault->getTraceAsString(),
-                'request'=>$this->_soapClient->getLastRequest(), 'response'=>$this->_soapClient->getLastResponse());
             $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_ERROR, 'mag_soap1_fault',
-                    'SOAP v1 Fault with call '.$call.': '.$soapFault->getMessage(), $logData);
-            throw new MagelinkException('Soap Fault - '.$soapFault->getMessage(), 0, $soapFault); //throw $soapFault;
+                ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
+                    'mag_soap_call',
+                    'Successful SOAP v1 call '.$call.'.',
+                    array('data'=>$data, 'result'=>$result)
+                );
+        }catch (\SoapFault $soapFault) {
+            throw new MagelinkException('SOAP v1 Fault with call '.$call.': '.$soapFault->getMessage(), 0, $soapFault);
         }
 
-        return $this->_processResponse($result);
+        return $result;
     }
 
 }
