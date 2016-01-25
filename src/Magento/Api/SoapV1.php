@@ -51,7 +51,7 @@ class SoapV1 extends Soap
             $result = $this->_soapClient->call('call', $data);
             $this->getServiceLocator()->get('logService')
                 ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
-                    'mag_soap_call',
+                    'mag_soap_call_v1',
                     'Successful SOAP v1 call '.$call.'.',
                     array('data'=>$data, 'result'=>$result)
                 );
