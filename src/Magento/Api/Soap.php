@@ -21,10 +21,11 @@ use Zend\Soap\Client;
 class Soap implements ServiceLocatorAwareInterface
 {
 
-    /** @var string The Session ID provided by Magento after logging in */
+    /** @var Node|NULL $this->_node */
+    protected $_node = NULL;
+    /** @var string $this->_sessionId The Session ID provided by Magento after logging in */
     protected $_sessionId;
-
-    /** @var Client $_soapClient */
+    /** @var Client|NULL $this->_soapClient */
     protected $_soapClient = NULL;
 
     /** @var ServiceLocatorInterface $_serviceLocator */
@@ -49,30 +50,52 @@ class Soap implements ServiceLocatorAwareInterface
     }
 
     /**
-     * Sets up the SOAP API, connects to Magento, and performs a login.
      * @param Node $magentoNode The Magento node we are representing communications for
      * @return bool Whether we successfully connected
      * @throws MagelinkException If this API has already been initialized
      */
     public function init(Node $magentoNode)
     {
-        if($this->_soapClient !== NULL){
+        $this->_node = $magentoNode;
+        return $this->_init();
+    }
+
+    /**
+     * @return NULL|Client $this->_soapClient
+     */
+    protected function getAndStoreSoapClient()
+    {
+        $this->_soapClient = new Client(
+            $this->_node->getConfig('web_url').'api/v2_soap?wsdl=1',
+            array('soap_version'=>SOAP_1_1)
+        );
+
+        return $this->_soapClient;
+    }
+
+    /**
+     * Sets up the SOAP API, connects to Magento, and performs a login.
+     * @return bool Whether we successfully connected
+     * @throws MagelinkException If this API has already been initialized
+     */
+    protected function _init()
+    {
+        if(!is_null($this->_node)) {
+            throw new MagelinkException('Magento node is not available on the SOAP API!');
+            $success = FALSE;
+        }elseif(!is_null($this->_soapClient)) {
             throw new MagelinkException('Tried to initialize Soap API twice!');
             $success = FALSE;
         }else{
-            $username = $magentoNode->getConfig('soap_username');
-            $password = $magentoNode->getConfig('soap_password');
+            $username = $this->_node->getConfig('soap_username');
+            $password = $this->_node->getConfig('soap_password');
             if (!$username || !$password) {
                 // No auth passed, SOAP unavailable
                 $success = FALSE;
             }else{
-                $this->_soapClient = new Client(
-                    $magentoNode->getConfig('web_url').'api/v2_soap?wsdl=1',
-                    array('soap_version'=>SOAP_1_1)
-                );
-
+                $this->getAndStoreSoapClient();
                 $loginResult = $this->_soapClient->call(
-                    'login', array($magentoNode->getConfig('soap_username'), $magentoNode->getConfig('soap_password'))
+                    'login', array($this->_node->getConfig('soap_username'), $this->_node->getConfig('soap_password'))
                 );
                 //$loginResult = $this->_processResponse($loginRes);
                 $this->_sessionId = $loginResult;
@@ -92,6 +115,61 @@ class Soap implements ServiceLocatorAwareInterface
      */
     public function call($call, $data)
     {
+        $retry = FALSE;
+        do {
+            try{
+                $result = $this->_call($call, $data);
+                $success = TRUE;
+            }catch(MagelinkException $exception) {
+                $success = FALSE;
+                $retry = !$retry;
+                $soapFault = $exception->getPrevious();
+                if ($retry === TRUE && (strpos(strtolower($soapFault->getMessage()), 'session expired') !== FALSE
+                    || strpos(strtolower($soapFault->getMessage()), 'try to relogin') !== FALSE)) {
+
+                    $this->_soapClient = NULL;
+                    $this->_init();
+                }
+            }
+        }while ($retry === TRUE && $success === FALSE);
+
+        if ($success !== TRUE) {
+            $this->getServiceLocator()->get('logService')
+                ->log(\Log\Service\LogService::LEVEL_ERROR,
+                    'mag_soap_fault',
+                    $exception->getMessage(),
+                    array(
+                        'data'=>$data,
+                        'code'=>$soapFault->getCode(),
+                        'trace'=>$soapFault->getTraceAsString(),
+                        'request'=>$this->_soapClient->getLastRequest(),
+                        'response'=>$this->_soapClient->getLastResponse())
+                );
+            // ToDo: Check if this additional logging is necessary
+            $this->forceStdoutDebug();
+            throw $exception;
+            $result = NULL;
+        }else{
+            $result = $this->_processResponse($result);
+            /* ToDo: Investigate if that could be centralised
+                    if (isset($result['result'])) {
+                        $result = $result['result'];
+                    }
+            */
+        }
+
+        return $result;
+    }
+
+    /**
+     * Make a call to SOAP API, automatically adding required headers/sessions/etc and processing response
+     * @param string $call The name of the call to make
+     * @param array $data The data to be passed to the call (as associative/numerical arrays)
+     * @throws \SoapFault
+     * @return array|mixed Response data
+     */
+    protected function _call($call, $data)
+    {
         if (!is_array($data)) {
             if (is_object($data)) {
                 $data = get_object_vars($data);
@@ -108,38 +186,20 @@ class Soap implements ServiceLocatorAwareInterface
                 ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
                     'mag_soap_call',
                     'Successful SOAP call '.$call.'.',
-                    array(
-                        'data'=>$data,
-                        'result'=>$result
-                    )
+                    array('data'=>$data, 'result'=>$result)
                 );
         }catch (\SoapFault $soapFault) {
-            $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_ERROR,
-                    'mag_soap_fault',
-                    'SOAP Fault with call '.$call.': '.$soapFault->getMessage(),
-                    array(
-                        'data'=>$data,
-                        'code'=>$soapFault->getCode(),
-                        'trace'=>$soapFault->getTraceAsString(),
-                        'request'=>$this->_soapClient->getLastRequest(),
-                        'response'=>$this->_soapClient->getLastResponse())
-                );
-            $this->forceStdoutDebug();
-            throw new MagelinkException('Soap Fault - '.$soapFault->getMessage(), 0, $soapFault);
+            throw new MagelinkException('SOAP Fault with call '.$call.': '.$soapFault->getMessage(), 0, $soapFault);
         }
-        // $this->forceStdoutDebug(); // Uncomment for debugging
 
-        $result = $this->_processResponse($result);
-/* ToDo (maybe): Investigate if that could be centralised
-        if (isset($result['result'])) {
-            $result = $result['result'];
-        }
-*/
         return $result;
     }
 
-    public function forceStdoutDebug(){
+    /**
+     * Forced debug output to command line
+     */
+    public function forceStdoutDebug()
+    {
         echo PHP_EOL . $this->_soapClient->getLastRequest() . PHP_EOL . $this->_soapClient->getLastResponse() . PHP_EOL;
     }
 
