@@ -23,6 +23,14 @@ class SoapV1 extends Soap
 {
 
     /**
+     * @return string $initLogCode
+     */
+    protected function getInitLogCode()
+    {
+        return 'mag_isoap1';
+    }
+
+    /**
      * @return NULL|Client $this->_soapClient
      */
     protected function getAndStoreSoapClient()

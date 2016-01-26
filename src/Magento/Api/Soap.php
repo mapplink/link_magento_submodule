@@ -11,6 +11,7 @@
 
 namespace Magento\Api;
 
+use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
 use Magento\Node;
 use Zend\ServiceManager\ServiceLocatorAwareInterface;
@@ -61,6 +62,14 @@ class Soap implements ServiceLocatorAwareInterface
     }
 
     /**
+     * @return string $initLogCode
+     */
+    protected function getInitLogCode()
+    {
+        return 'mag_isoap';
+    }
+
+    /**
      * @return NULL|Client $this->_soapClient
      */
     protected function getAndStoreSoapClient()
@@ -80,27 +89,42 @@ class Soap implements ServiceLocatorAwareInterface
      */
     protected function _init()
     {
-        if(!is_null($this->_node)) {
+        $success = FALSE;
+
+        if (!is_null($this->_node)) {
             throw new MagelinkException('Magento node is not available on the SOAP API!');
-            $success = FALSE;
-        }elseif(!is_null($this->_soapClient)) {
+        }elseif (!is_null($this->_soapClient)) {
             throw new MagelinkException('Tried to initialize Soap API twice!');
-            $success = FALSE;
         }else{
+            $logLevel = LogService::LEVEL_ERROR;
+            $logCode = $this->getInitLogCode();
+            $logData = array();
+
             $username = $this->_node->getConfig('soap_username');
             $password = $this->_node->getConfig('soap_password');
+
             if (!$username || !$password) {
-                // No auth passed, SOAP unavailable
-                $success = FALSE;
+                $logCode .= '_fail';
+                $logMessage = 'SOAP initialisation failed: Please check user name and password.';
             }else{
                 $this->getAndStoreSoapClient();
                 $loginResult = $this->_soapClient->call(
                     'login', array($this->_node->getConfig('soap_username'), $this->_node->getConfig('soap_password'))
                 );
-                //$loginResult = $this->_processResponse($loginRes);
+//                $loginResult = $this->_processResponse($loginRes);
                 $this->_sessionId = $loginResult;
                 $success = (bool) $loginResult;
+
+                if ($success) {
+                    $logLevel = LogService::LEVEL_INFO;
+                    $logMessage = 'SOAP was sucessfully initialised.';
+                }else{
+                    $logCode .= '_err';
+                    $logMessage = 'SOAP initialisation problem.';
+                }
             }
+
+            $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
         }
 
         return $success;
@@ -135,7 +159,7 @@ class Soap implements ServiceLocatorAwareInterface
 
         if ($success !== TRUE) {
             $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_ERROR,
+                ->log(LogService::LEVEL_ERROR,
                     'mag_soap_fault',
                     $exception->getMessage(),
                     array(
@@ -183,7 +207,7 @@ class Soap implements ServiceLocatorAwareInterface
         try{
             $result = $this->_soapClient->call($call, $data);
             $this->getServiceLocator()->get('logService')
-                ->log(\Log\Service\LogService::LEVEL_DEBUGEXTRA,
+                ->log(LogService::LEVEL_DEBUGEXTRA,
                     'mag_soap_call',
                     'Successful SOAP call '.$call.'.',
                     array('data'=>$data, 'result'=>$result)
