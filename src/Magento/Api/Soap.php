@@ -91,7 +91,7 @@ class Soap implements ServiceLocatorAwareInterface
     {
         $success = FALSE;
 
-        if (!is_null($this->_node)) {
+        if (is_null($this->_node)) {
             throw new MagelinkException('Magento node is not available on the SOAP API!');
         }elseif (!is_null($this->_soapClient)) {
             throw new MagelinkException('Tried to initialize Soap API twice!');
