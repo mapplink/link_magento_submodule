@@ -337,8 +337,8 @@ class OrderGateway extends AbstractGateway
 
         if (array_key_exists('base_gift_cards_amount', $orderData)) {
             $data['giftcard_total'] = $orderData['base_gift_cards_amount'];
-        }elseif (array_key_exists('base_gift_cards_amount_invoiced', $orderData)) {
-            $data['giftcard_total'] = $orderData['base_gift_cards_amount_invoiced'];
+        }elseif (array_key_exists('base_gift_cards_invoiced', $orderData)) {
+            $data['giftcard_total'] = $orderData['base_gift_cards_invoiced'];
         }else{
             $data['giftcard_total'] = 0;
         }
