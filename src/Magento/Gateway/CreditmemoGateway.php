@@ -13,6 +13,7 @@
 namespace Magento\Gateway;
 
 use Entity\Service\EntityService;
+use Entity\Wrapper\Creditmemo;
 use Log\Service\LogService;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
@@ -90,7 +91,26 @@ class CreditmemoGateway extends AbstractGateway
                 $storeId = ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0);
                 $uniqueId = $creditmemo['increment_id'];
                 $localId = $creditmemo['creditmemo_id'];
-                $parentId = null;
+                $parentId = NULL;
+                /** @var Creditmemo $existingEntity */
+                $existingEntity = $entityService
+                    ->loadEntityLocal($this->_node->getNodeId(), 'creditmemo', $storeId, $localId);
+
+                if ($existingEntity) {
+                    $noLocalId = FALSE;
+                    $logLevel = LogService::LEVEL_INFO;
+                    $logCode = 'mag_cm_upd';
+                    $logMessage = 'Updated creditmemo '.$uniqueId.'.';
+                }else{
+                    $existingEntity = $entityService->loadEntity(
+                        $this->_node->getNodeId(), 'creditmemo', $storeId, $uniqueId);
+
+                    $noLocalId = TRUE;
+                    $logLevel = LogService::LEVEL_WARN;
+                    $logCode = 'mag_cm_updrl';
+                    $logMessage = 'Updated and unlinked creditmemo '.$uniqueId.'. ';
+                }
+                $logData = array('creditmemo unique id'=>$uniqueId);
 
                 $map = array(
                     'order_currency'=>'order_currency_code',
@@ -110,7 +130,7 @@ class CreditmemoGateway extends AbstractGateway
                 if ($this->_node->getConfig('enterprise')) {
                     $map = array_merge($map, array(
                         'customer_balance'=>'base_customer_balance_amount',
-                        'customer_balance_ref'=>'bs_customer_bal_total_refunded ',
+                        'customer_balance_ref'=>'bs_customer_bal_total_refunded',
                         'gift_cards_amount'=>'base_gift_cards_amount',
                         'gw_price'=>'gw_base_price',
                         'gw_items_price'=>'gw_items_base_price',
@@ -125,22 +145,13 @@ class CreditmemoGateway extends AbstractGateway
                 }
 
                 foreach ($map as $attributeCode=>$key) {
-                    if(isset($creditmemo[$key])){
+                    if (isset($creditmemo[$key])) {
                         $data[$attributeCode] = $creditmemo[$key];
-                    }else{
+                    }elseif ($existingEntity && is_null($existingEntity->getData($attributeCode))) {
                         $data[$attributeCode] = NULL;
                     }
                 }
-/*
-                if(isset($creditmemo['invoice_id']) && $creditmemo['invoice_id']){
-                    $ent = $entityService->loadEntityLocal($this->_node->getNodeId(), 'invoice', $storeId, $creditmemo['invoice_id']);
-                    if($ent && $ent->getId()){
-                        $data['invoice'] = $ent;
-                    }else{
-                        $data['invoice'] = null;
-                    }
-                }
-*/
+
                 if (isset($creditmemo['billing_address_id']) && $creditmemo['billing_address_id']) {
                     $billingAddress = $entityService->loadEntityLocal(
                         $this->_node->getNodeId(), 'address', $storeId, $creditmemo['billing_address_id']);
@@ -188,70 +199,53 @@ class CreditmemoGateway extends AbstractGateway
                     }
                 }
 
-                /** @var boolean $needsUpdate Whether we need to perform an entity update here */
-                $needsUpdate = TRUE;
-
-                $existingEntity = $entityService->loadEntityLocal(
-                    $this->_node->getNodeId(), 'creditmemo', $storeId, $localId);
-                if (!$existingEntity) {
-                    $existingEntity = $entityService->loadEntity(
-                        $this->_node->getNodeId(), 'creditmemo', $storeId, $uniqueId);
-                    if (!$existingEntity) {
-                        $entityService->beginEntityTransaction('magento-creditmemo-'.$uniqueId);
-                        try{
-                            $existingEntity = $entityService->createEntity(
-                                $this->_node->getNodeId(), 'creditmemo', $storeId, $uniqueId, $data, $parentId);
-                            $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
-                            $this->getServiceLocator()->get('logService')
-                                ->log(LogService::LEVEL_INFO,
-                                    'mag_cm_new',
-                                    'New creditmemo '.$uniqueId,
-                                    array('creditmemo unique id'=>$uniqueId),
-                                    array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
-                                );
-                            $this->createItems($creditmemo, $existingEntity->getId(), $entityService, TRUE);
-                            $entityService->commitEntityTransaction('magento-creditmemo-'.$uniqueId);
-                        }catch (\Exception $exception){
-                            $entityService->rollbackEntityTransaction('magento-creditmemo-'.$uniqueId);
-                            // store as sync issue
-                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-                        }
-                        $needsUpdate = FALSE;
-                    }else{
-                        $this->getServiceLocator()->get('logService')
-                            ->log(LogService::LEVEL_WARN,
-                                'mag_cm_unlink',
-                                'Unlinked creditmemo '.$uniqueId,
-                                array('creditmemo unique id'=>$uniqueId),
-                                array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
-                            );
+                if ($existingEntity) {
+                    if ($noLocalId) {
                         try{
                             $entityService->unlinkEntity($this->_node->getNodeId(), $existingEntity);
-                        }catch(\Exception $exception){
-                            // Ignore errors
-                        }
+                        }catch(\Exception $exception) {}
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
+
+                        $localEntity = $entityService->loadEntityLocal(
+                            $this->_node->getNodeId(), 'creditmemo', $storeId, $localId);
+                        if ($localEntity) {
+                            $logMessage .= 'Successfully relinked.';
+                        }else{
+                            $logCode .= '_err';
+                            $logMessage .= 'Relinking failed.';
+                        }
                     }
-                }else{
+
+                    $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
                     $this->getServiceLocator()->get('logService')
-                        ->log(LogService::LEVEL_INFO,
-                            'mag_cm_upd',
-                            'Updated creditmemo '.$uniqueId,
-                            array('creditmemo unique id'=>$uniqueId),
-                            array('node'=>$this->_node, 'creditmemo'=>$existingEntity)
-                        );
+                        ->log($logLevel, $logCode, $logMessage, $logData, array('creditmemo unique id'=>$uniqueId));
+
+                    $this->createItems($creditmemo, $existingEntity->getId(), $entityService, FALSE);
+                }else{
+                    $entityService->beginEntityTransaction('magento-creditmemo-'.$uniqueId);
+                    try{
+                        $existingEntity = $entityService->createEntity(
+                            $this->_node->getNodeId(), 'creditmemo', $storeId, $uniqueId, $data, $parentId);
+                        $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_INFO, 'mag_cm_new', 'New creditmemo '.$uniqueId,
+                                $logData, array('node'=>$this->_node, 'creditmemo'=>$existingEntity));
+
+                        $this->createItems($creditmemo, $existingEntity->getId(), $entityService, TRUE);
+                        $entityService->commitEntityTransaction('magento-creditmemo-'.$uniqueId);
+                    }catch (\Exception $exception) {
+                        $entityService->rollbackEntityTransaction('magento-creditmemo-'.$uniqueId);
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    }
                 }
 
-                if ($needsUpdate) {
-                    $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
-                    $this->createItems($creditmemo, $existingEntity->getId(), $entityService, FALSE);
-                }
                 $this->updateComments($creditmemo, $existingEntity, $entityService);
             }
         }else{
-            // Nothing worked
             throw new NodeException('No valid API available for sync');
         }
+
         $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $timestamp);
     }
 
@@ -442,7 +436,7 @@ class CreditmemoGateway extends AbstractGateway
 
                     try {
                         // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
-                        $storeCreditRefundAdjusted = $entity->getData('customer_balance', 0)
+                        $storeCreditRefundAdjusted = $entity->getData('customer_balance_ref', 0)
                             / $originalOrder->getData('base_to_currency_rate', 1);
                         $soapResult = $this->_soap->call(
                             'salesOrderCreditmemoCreate',
