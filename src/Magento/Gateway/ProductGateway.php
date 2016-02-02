@@ -642,7 +642,7 @@ class ProductGateway extends AbstractGateway
 
         $originalData = $entity->getFullArrayCopy();
         $attributeCodes = array_unique(array_merge(
-            //array('special_price', 'special_from_date', 'special_to_date'), // force update off these attributes
+            //array('special_price', 'special_from_date', 'special_to_date'), // force update of these attributes
             //$customAttributes,
             $attributes
         ));
@@ -725,7 +725,7 @@ class ProductGateway extends AbstractGateway
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != Update::TYPE_DELETE) {
                 $dataPerStore[0] = $data;
-                foreach (array('price', 'msrp') as $code) {
+                foreach (array('price', 'special_price', 'msrp') as $code) {
                     if (array_key_exists($code, $data)) {
                         unset($data[$code]);
                     }
