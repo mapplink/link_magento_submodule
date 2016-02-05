@@ -482,7 +482,7 @@ class OrderGateway extends AbstractGateway
                 ->log($logLevel,
                     'mag_o_upd'.$logCodeSuffix,
                     'Updated order '.$uniqueId.$logMessageSuffix,
-                    array('sku'=>$uniqueId),
+                    array('order'=>$uniqueId),
                     array('node'=>$this->_node, 'entity'=>$existingEntity)
                 );
         }
@@ -515,12 +515,22 @@ class OrderGateway extends AbstractGateway
             }
         }
 
-        if ($orderComment) {
-            if (!is_array($orderComment)) {
-                $orderComment = array($orderComment=>$orderComment);
+        try{
+            if ($orderComment) {
+                if (!is_array($orderComment)) {
+                    $orderComment = array($orderComment=>$orderComment);
+                }
+                $this->_entityService
+                    ->createEntityComment($existingEntity, 'Magento/HOPS', key($orderComment), current($orderComment));
             }
-            $this->_entityService
-                ->createEntityComment($existingEntity, 'Magento/HOPS', key($orderComment), current($orderComment));
+        }catch (\Exception $exception) {
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_ERROR,
+                    'mag_o_comt_err'.$logCodeSuffix,
+                    'Comment creation failed on order '.$uniqueId.'.',
+                    array('order'=>$uniqueId, 'order comment array'=>$orderComment, 'error'=>$exception->getMessage()),
+                    array('entity'=>$existingEntity, 'exception'=>$exception)
+                );
         }
 
         $this->updateStatusHistory($orderData, $existingEntity);
