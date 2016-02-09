@@ -421,12 +421,12 @@ class Db implements ServiceLocatorAwareInterface
             $sqlString = $sql->getSqlStringForSqlObject($sqlSelect);
             $message = 'Selected entity row from '.$table.' table.';
             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO,
-                    'mag_db_loId', $message, array('query'=>$sqlString, 'result'=>$selectResult));
+                    'mag_db_loid', $message, array('query'=>$sqlString, 'result'=>$selectResult));
 
             $localEntityId = $selectResult['entity_id'];
         }else{
             $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
-                'mag_db_loId_err', 'Invalid entity type: '.$entityType.'.', array());
+                'mag_db_loid_err', 'Invalid entity type: '.$entityType.'.', array());
             $localEntityId = NULL;
         }
 

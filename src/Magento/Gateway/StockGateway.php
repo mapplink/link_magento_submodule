@@ -155,18 +155,18 @@ class StockGateway extends AbstractGateway
     protected function getParentLocal(\Entity\Entity $entity, $log = FALSE, $error = FALSE)
     {
         $nodeId = $this->_node->getNodeId();
+        $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
 
-        if ($log) {
-            $logLevel = ($error ? LogService::LEVEL_ERROR : LogService::LEVEL_WARN);
+        $logCode = 'mag_si_plo';
+        $logLevel = ($error ? LogService::LEVEL_ERROR : LogService::LEVEL_WARN);
+        if ($log || $error) {
             $logMessage = 'Stock update for '.$entity->getUniqueId().' ('.$nodeId.') had to use parent local!';
             $this->getServiceLocator()->get('logService')
-                ->log($logLevel, 'mag_si_par', $logMessage,
-                    array('parent'=>$entity->getParentId()),
+                ->log($logLevel, $logCode, $logMessage,
+                    array('parent'=>$entity->getParentId(), 'local id'=>$localId),
                     array('node'=>$this->_node, 'entity'=>$entity)
                 );
         }
-
-        $localId = $this->_entityService->getLocalId($this->_node->getNodeId(), $entity->getParentId());
 
         if (!$localId) {
             $parentEntity = $entity->getParent();
@@ -184,12 +184,14 @@ class StockGateway extends AbstractGateway
 
             if ($localId) {
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $parentEntity, $localId);
-                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_si_relink',
-                    'Stock parent product '.$entity->getUniqueId().' re-linked on '.$nodeId.'!', array());
-            }else {
-                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR, 'mag_si_nolink',
-                    'Stock update for '.$entity->getUniqueId().' ('.$nodeId.'): Parent had no local id!',
-                    array('data'=>$entity->getFullArrayCopy()), array('node'=>$this->_node));
+                if ($log) {
+                    $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, $logCode.'_relnk',
+                        'Stock parent product '.$entity->getUniqueId().' re-linked on '.$nodeId.'!', array());
+                }
+            }elseif ($log || $error) {
+                $this->getServiceLocator()->get('logService')->log($logLevel, $logCode.'_nolnk',
+                    'Stock update for '.$entity->getUniqueId().' on node '.$nodeId.': Parent had no local id!',
+                    array('data' => $entity->getFullArrayCopy()), array('node' => $this->_node));
             }
         }
 
