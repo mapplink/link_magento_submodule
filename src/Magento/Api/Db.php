@@ -400,6 +400,40 @@ class Db implements ServiceLocatorAwareInterface
     }
 
     /**
+     * @param string $entityType
+     * @param string $uniqueId
+     * @return int $localEntityId
+     */
+    public function getLocalId($entityType, $uniqueId)
+    {
+        if ($entityType == 'product' || $entityType == 'stockitem') {
+            $productType = 'product';
+
+            $table = $this->getEntityPrefix($entityType).'_entity';
+            $tableGateway = new TableGateway($table, $this->_adapter);
+            $sql = $tableGateway->getSql();
+
+            $where = new Where();
+            $where->equalTo('sku', $uniqueId);
+            $sqlSelect = $sql->select()->where($where);
+            $selectResult = $tableGateway->selectWith($sqlSelect);
+
+            $sqlString = $sql->getSqlStringForSqlObject($sqlSelect);
+            $message = 'Selected entity row from '.$table.' table.';
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO,
+                    'mag_db_loid', $message, array('query'=>$sqlString, 'result'=>$selectResult));
+
+            $localEntityId = $selectResult['entity_id'];
+        }else{
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
+                'mag_db_loid_err', 'Invalid entity type: '.$entityType.'.', array());
+            $localEntityId = NULL;
+        }
+
+        return $localEntityId;
+    }
+
+    /**
      * Update an entity in the Magento EAV system
      *
      * @todo Untested on multi-select / option type attributes.
