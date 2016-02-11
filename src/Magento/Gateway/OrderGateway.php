@@ -299,7 +299,7 @@ class OrderGateway extends AbstractGateway
     {
         if ($forced) {
             $logLevel = LogService::LEVEL_WARN;
-            $logCodeSuffix = '_forced';
+            $logCodeSuffix = '_fcd';
             $logMessageSuffix = ' (out of sync - forced)';
         }else{
             $logLevel = LogService::LEVEL_INFO;
@@ -449,7 +449,7 @@ class OrderGateway extends AbstractGateway
                     }catch (\Exception $exception) {
                         $this->getServiceLocator()->get('logService')
                             ->log($logLevel,
-                                'mag_o_comt_err'.$logCodeSuffix,
+                                'mag_o_r_cerr'.$logCodeSuffix,
                                 'Failed to write comment on order '.$uniqueId.$logMessageSuffix,
                                 array('exception message'=>$exception->getMessage()),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity, 'exception'=>$exception)
@@ -526,14 +526,24 @@ class OrderGateway extends AbstractGateway
         }catch (\Exception $exception) {
             $this->getServiceLocator()->get('logService')
                 ->log(LogService::LEVEL_ERROR,
-                    'mag_o_comt_err'.$logCodeSuffix,
+                    'mag_o_w_cerr'.$logCodeSuffix,
                     'Comment creation failed on order '.$uniqueId.'.',
                     array('order'=>$uniqueId, 'order comment array'=>$orderComment, 'error'=>$exception->getMessage()),
                     array('entity'=>$existingEntity, 'exception'=>$exception)
                 );
         }
 
-        $this->updateStatusHistory($orderData, $existingEntity);
+        try{
+            $this->updateStatusHistory($orderData, $existingEntity);
+        }catch (\Exception $exception) {
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_ERROR,
+                    'mag_o_w_herr'.$logCodeSuffix,
+                    'Updating of the status history failed on order '.$uniqueId.'.',
+                    array('order'=>$uniqueId, 'order data'=>$orderData, 'error'=>$exception->getMessage()),
+                    array('entity'=>$existingEntity, 'exception'=>$exception)
+                );
+        }
     }
 
     /**
