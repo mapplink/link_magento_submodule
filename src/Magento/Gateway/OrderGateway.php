@@ -621,7 +621,7 @@ class OrderGateway extends AbstractGateway
         }
 
         $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $timestamp);
-        $seconds = ceil($this->getNewRetrieveTimestamp() - $timestamp);
+        $seconds = ceil($this->getAdjustedTimestamp() - $timestamp);
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
                 'mag_o_re_no',
