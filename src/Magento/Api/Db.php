@@ -340,13 +340,18 @@ class Db implements ServiceLocatorAwareInterface
             }
         }
 
+        $logData = array(
+            'product_id'=>$productId,
+            'qty'=>$qty,
+            'is_in_stock'=>$isInStock,
+            'affected rows'=>$affectedRows
+        );
         if ($affectedRows !== 1) {
-            $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_ERROR,
-                'mag_db_upd_err_si',
-                'Update error on stock with product id '.$productId,
-                array('product_id'=>$productId, 'qty'=>$qty, 'is_in_stock'=>$isInStock, 'affected rows'=>$affectedRows)
-            );
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR, 'mag_db_upd_err_si',
+                'Update error on stock with product id '.$productId.'.', $logData);
+        }else{
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUG, 'mag_db_upd_si',
+                'Update of stock with product id '.$productId.' was successful.', $logData);
         }
 
         return ($affectedRows > 0);
