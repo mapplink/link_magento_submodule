@@ -159,9 +159,7 @@ class Soap implements ServiceLocatorAwareInterface
 
         if ($success !== TRUE) {
             $this->getServiceLocator()->get('logService')
-                ->log(LogService::LEVEL_ERROR,
-                    'mag_soap_fault',
-                    $exception->getMessage(),
+                ->log(LogService::LEVEL_ERROR, 'mag_soap_fault', $exception->getMessage(),
                     array(
                         'data'=>$data,
                         'code'=>$soapFault->getCode(),
@@ -176,10 +174,13 @@ class Soap implements ServiceLocatorAwareInterface
         }else{
             $result = $this->_processResponse($result);
             /* ToDo: Investigate if that could be centralised
-                    if (isset($result['result'])) {
-                        $result = $result['result'];
-                    }
-            */
+            if (isset($result['result'])) {
+                $result = $result['result'];
+            }*/
+
+            $this->getServiceLocator()->get('logService')
+                ->log(LogService::LEVEL_DEBUG, 'mag_soap_success', 'Successfully soap call: '.$call,
+                    array('call'=>$call, 'data'=>$data, 'result'=>$result));
         }
 
         return $result;
