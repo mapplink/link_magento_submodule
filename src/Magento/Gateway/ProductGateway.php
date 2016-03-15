@@ -20,9 +20,6 @@ use Magelink\Exception\SyncException;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
 use Node\Entity;
-use Zend\Db\Sql\Where;
-use Zend\Db\TableGateway\TableGateway;
-
 
 
 class ProductGateway extends AbstractGateway
@@ -614,69 +611,6 @@ class ProductGateway extends AbstractGateway
 
         return $soapData;
     }
-
-    /**
-     * @return bool $success
-     */
-    protected function triggerSliFeed()
-    {
-        $logCode = 'mag_crn_slif';
-        $logData = array();
-        $success = NULL;
-
-        try {
-            $tableGateway = new TableGateway('cron', $this->getServiceLocator()->get('zend_db'));
-            $sql = $tableGateway->getSql();
-            $logData['tableGateway'] = get_class($tableGateway);
-
-            $where = new Where();
-            $where->equalTo('cron_name', 'slifeed');
-            $logData['where'] = get_class($where);
-
-            $sqlSelect = $sql->select()->where($where);
-            $selectedRows = $tableGateway->selectWith($sqlSelect);
-            $logData['selected rows'] = $selectedRows;
-
-            if (count($selectedRows) > 0) {
-                $logMessage = 'update';
-                $sqlUpdate = $sql->update()
-                    ->set(array('overdue'=>1))
-                    ->where($where);
-                $success = (bool) $tableGateway->updateWith($sqlUpdate);
-                $sqlString = $sql->getSqlStringForSqlObject($sqlUpdate);
-            }else {
-                $logMessage = 'insert';
-                $sqlInsert = $sql->insert()
-                    ->columns(array('cron_name', 'overdue'))
-                    ->values(array('slifeed', 1));
-                $success = (bool) $tableGateway->insertWith($sqlInsert);
-                $sqlString = $sql->getSqlStringForSqlObject($sqlInsert);
-            }
-            $logData['success'] = $success;
-            $logData['query'] = $sqlString;
-
-            if ($success) {
-                $logLevel = LogService::LEVEL_INFO;
-                $logMessage = 'Successfully triggered slifeed cron job to be executed via '.$logMessage.'.';
-            }else {
-                $logLevel = LogService::LEVEL_ERROR;
-                $logCode .= '_fai';
-                $logMessage = 'Failed to '.$logMessage.' slifeed cron job with overdue set.';
-            }
-        }catch (\Exception $exception) {
-            $logLevel = LogService::LEVEL_ERROR;
-            $logCode .= '_err';
-            $logMessage = 'Execption thrown on Magento ProductGateway::triggerSliFeed(): '.$exception->getMessage();
-            $logData['success'] = $success;
-            $success = FALSE;
-        }
-
-        $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
-
-        return $success;
-    }
-
-
 
     /**
      * Write out all the updates to the given entity.
