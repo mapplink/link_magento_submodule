@@ -161,14 +161,14 @@ class Node extends AbstractNode
             if (count($selectedRows) > 0) {
                 $logMessage = 'update';
                 $sqlUpdate = $sql->update()
-                    ->set(array('overdue'=>1))
+                    ->set(array('overdue'=>1, 'updated_at'=>date('Y-m-d H:i:s')))
                     ->where($where);
                 $success = (bool) $tableGateway->updateWith($sqlUpdate);
                 $sqlString = $sql->getSqlStringForSqlObject($sqlUpdate);
             }else {
                 $logMessage = 'insert';
                 $sqlInsert = $sql->insert()
-                    ->values(array('cron_name'=>'slifeed', 'overdue'=>1));
+                    ->values(array('cron_name'=>'slifeed', 'overdue'=>1, 'updated_at'=>date('Y-m-d H:i:s')));
                 $success = (bool) $tableGateway->insertWith($sqlInsert);
                 $sqlString = $sql->getSqlStringForSqlObject($sqlInsert);
             }
