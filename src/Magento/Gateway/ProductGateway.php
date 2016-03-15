@@ -19,8 +19,10 @@ use Magelink\Exception\MagelinkException;
 use Magelink\Exception\SyncException;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
-use Node\AbstractNode;
 use Node\Entity;
+use Zend\Db\Sql\Where;
+use Zend\Db\TableGateway\TableGateway;
+
 
 
 class ProductGateway extends AbstractGateway
@@ -338,19 +340,19 @@ class ProductGateway extends AbstractGateway
                         'mag_p_new',
                         'New product '.$sku,
                        array('sku'=>$sku),
-                       array('node'=>$this->_node, 'entity'=>$existingEntity) 
+                       array('node'=>$this->_node, 'entity'=>$existingEntity)
                     );
                 try{
                     $stockEntity = $this->_entityService
                         ->createEntity($this->_node->getNodeId(), 'stockitem', 0, $sku, array(), $existingEntity);
                     $this->_entityService->linkEntity($this->_node->getNodeId(), $stockEntity, $productId);
                 }catch (\Exception $exception) {
-                    $this->getServiceLocator() ->get('logService') 
+                    $this->getServiceLocator() ->get('logService')
                         ->log(LogService::LEVEL_WARN,
                             'mag_p_si_ex',
                             'Already existing stockitem for new product '.$sku,
                            array('sku'=>$sku),
-                           array('node'=>$this->_node, 'entity'=>$existingEntity) 
+                           array('node'=>$this->_node, 'entity'=>$existingEntity)
                         );
                 }
                 $needsUpdate = FALSE;
@@ -377,7 +379,7 @@ class ProductGateway extends AbstractGateway
                         'mag_p_link',
                         'Unlinked product '.$sku,
                        array('sku'=>$sku),
-                       array('node'=>$this->_node, 'entity'=>$existingEntity) 
+                       array('node'=>$this->_node, 'entity'=>$existingEntity)
                     );
                 $this->_entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $productId);
             }
@@ -570,14 +572,14 @@ class ProductGateway extends AbstractGateway
      * @return array $soapData
      * @throws \Magelink\Exception\MagelinkException
      */
-    protected function getUpdateDataForSoapCall(array $data, array $customAttributes) 
+    protected function getUpdateDataForSoapCall(array $data, array $customAttributes)
     {
         // Restructure data for soap call
         $soapData = array(
             'additional_attributes'=>array(
                 'single_data'=>array(),
-                'multi_data'=>array() 
-            ) 
+                'multi_data'=>array()
+            )
         );
         $removeSingleData = $removeMultiData = TRUE;
 
@@ -614,6 +616,69 @@ class ProductGateway extends AbstractGateway
     }
 
     /**
+     * @return bool $success
+     */
+    protected function triggerSliFeed()
+    {
+        $logCode = 'mag_crn_slif';
+        $logData = array();
+        $success = NULL;
+
+        try {
+            $tableGateway = new TableGateway('cron', $this->getServiceLocator()->get('zend_db'));
+            $sql = $tableGateway->getSql();
+            $logData['tableGateway'] = get_class($tableGateway);
+
+            $where = new Where();
+            $where->equalTo('cron_name', 'slifeed');
+            $logData['where'] = get_class($where);
+
+            $sqlSelect = $sql->select()->where($where);
+            $selectedRows = $tableGateway->selectWith($sqlSelect);
+            $logData['selected rows'] = $selectedRows;
+
+            if (count($selectedRows) > 0) {
+                $logMessage = 'update';
+                $sqlUpdate = $sql->update()
+                    ->set(array('overdue'=>1))
+                    ->where($where);
+                $success = (bool) $tableGateway->updateWith($sqlUpdate);
+                $sqlString = $sql->getSqlStringForSqlObject($sqlUpdate);
+            }else {
+                $logMessage = 'insert';
+                $sqlInsert = $sql->insert()
+                    ->columns(array('cron_name', 'overdue'))
+                    ->values(array('slifeed', 1));
+                $success = (bool) $tableGateway->insertWith($sqlInsert);
+                $sqlString = $sql->getSqlStringForSqlObject($sqlInsert);
+            }
+            $logData['success'] = $success;
+            $logData['query'] = $sqlString;
+
+            if ($success) {
+                $logLevel = LogService::LEVEL_INFO;
+                $logMessage = 'Successfully triggered slifeed cron job to be executed via '.$logMessage.'.';
+            }else {
+                $logLevel = LogService::LEVEL_ERROR;
+                $logCode .= '_fai';
+                $logMessage = 'Failed to '.$logMessage.' slifeed cron job with overdue set.';
+            }
+        }catch (\Exception $exception) {
+            $logLevel = LogService::LEVEL_ERROR;
+            $logCode .= '_err';
+            $logMessage = 'Execption thrown on Magento ProductGateway::triggerSliFeed(): '.$exception->getMessage();
+            $logData['success'] = $success;
+            $success = FALSE;
+        }
+
+        $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
+
+        return $success;
+    }
+
+
+
+    /**
      * Write out all the updates to the given entity.
      * @param \Entity\Entity $entity
      * @param string[] $attributes
@@ -637,7 +702,7 @@ class ProductGateway extends AbstractGateway
                 'mag_p_wrupd',
                 'Attributes for update of product '.$sku.': '.var_export($attributes, TRUE),
                array('attributes'=>$attributes, 'custom'=>$customAttributes),
-               array('entity'=>$entity) 
+               array('entity'=>$entity)
             );
 
         $originalData = $entity->getFullArrayCopy();
@@ -942,7 +1007,7 @@ class ProductGateway extends AbstractGateway
      * @param Action $action
      * @throws MagelinkException
      */
-    public function writeAction(Action $action) 
+    public function writeAction(Action $action)
     {
         $entity = $action->getEntity();
         switch($action->getType()) {
