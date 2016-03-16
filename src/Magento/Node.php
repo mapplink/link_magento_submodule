@@ -9,12 +9,14 @@
 
 namespace Magento;
 
+use Application\Service\ApplicationConfigService;
 use Log\Service\LogService;
 use Node\AbstractNode;
 use Node\AbstractGateway;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\SyncException;
+use HOPS\Cron\SliFeed;
 use Zend\Db\TableGateway\TableGateway;
 use Zend\Db\Sql\Where;
 
@@ -146,6 +148,16 @@ class Node extends AbstractNode
         $success = NULL;
 
         try {
+            /** @var ApplicationConfigService $applicationConfigService */
+            $applicationConfigService = $this->getServiceLocator()->get('applicationConfigService');
+            /** @var SliFeed $sliFeedCron */
+            $sliFeedCron = $applicationConfigService->getCronjob('slifeed');
+            if (!$sliFeedCron->prepareExecution()) {
+                $success = FALSE;
+                $logCode .= '_err';
+                $logMessage = 'Sli feed lock file could not be created.';
+            }
+
             $tableGateway = new TableGateway('cron', $this->getServiceLocator()->get('zend_db'));
             $sql = $tableGateway->getSql();
             $logData['tableGateway'] = get_class($tableGateway);
