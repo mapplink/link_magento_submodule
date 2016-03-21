@@ -770,6 +770,25 @@ class ProductGateway extends AbstractGateway
                     $productData = $dataPerStore[$storeId];
                     $productData['website_ids'] = $websiteIds;
 
+                    if ($magentoService->isStoreUsingDefaults($storeId)) {
+                        $setSpecialPrice = FALSE;
+                        unset($productData['special_price']);
+                        unset($productData['special_from_date']);
+                        unset($productData['special_to_date']);
+                    }elseif (isset($productData['special_price'])) {
+                        $setSpecialPrice = FALSE;
+                    }elseif ($storeId === 0) {
+                        $setSpecialPrice = FALSE;
+                        $productData['special_price'] = NULL;
+                        $productData['special_from_date'] = NULL;
+                        $productData['special_to_date'] = NULL;
+                    }else{
+                        $setSpecialPrice = FALSE;
+                        $productData['special_price'] = '';
+                        $productData['special_from_date'] = '';
+                        $productData['special_to_date'] = '';
+                    }
+
                     $soapData = $this->getUpdateDataForSoapCall($productData, $customAttributes);
                     $logData = array(
                         'type'=>$entity->getData('type'),
@@ -812,9 +831,22 @@ class ProductGateway extends AbstractGateway
                             $logCode = 'mag_p_wrupddb';
                             $logMessage .= 'successfully via DB api with '.implode(', ', array_keys($productData));
                         }else{
-                            $request = array($sku, $soapData, $storeId, 'sku');
                             try{
-                                $soapResult = $this->_soap->call('catalogProductUpdate', $request);
+                                $request = array($sku, $soapData, $storeId, 'sku');
+                                $soapResult = array('update'=>
+                                    $this->_soap->call('catalogProductUpdate', $request));
+                                if ($setSpecialPrice) {
+                                    $requestSpecial = array(
+                                        $sku,
+                                        $productData['special_price'],
+                                        $productData['special_from_date'],
+                                        $productData['special_to_date'],
+                                        $storeId,
+                                        'sku'
+                                    );
+                                    $soapResult['special'] =
+                                        $this->_soap->call('catalogProductSetSpecialPrice', $requestSpecial);
+                                }
                             }catch(\Exception $exception) {
                                 $soapResult = FALSE;
                                 $soapFaultMessage = $exception->getPrevious()->getMessage();
@@ -836,6 +868,7 @@ class ProductGateway extends AbstractGateway
                             $logMessage .= ($soapResult ? 'successfully' : 'without success').' via SOAP api.'
                                 .($type == Update::TYPE_CREATE ? ' Try to create now.' : '');
                             $logData['soap data'] = $soapData;
+                            $logData['soap result'] = $soapResult;
                         }
                         $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
                     }
