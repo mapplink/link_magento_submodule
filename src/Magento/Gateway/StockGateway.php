@@ -47,7 +47,7 @@ class StockGateway extends AbstractGateway
             return;
         }
 
-        $timestamp = $this->getNewRetrieveTimestamp();
+        $this->getNewRetrieveTimestamp();
 //        $lastRetrieve = $this->getLastRetrieveDate();
 
         $products = $this->_entityService->locateEntity(
@@ -143,7 +143,8 @@ class StockGateway extends AbstractGateway
             // Nothing worked
             throw new \Magelink\Exception\NodeException('No valid API available for sync');
         }
-        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'stockitem', 'retrieve', $timestamp);
+        $this->_nodeService
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'stockitem', 'retrieve', $this->newRetrieveTimestamp);
     }
 
     /**

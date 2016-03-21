@@ -554,7 +554,7 @@ class OrderGateway extends AbstractGateway
      */
     public function retrieve()
     {
-        $timestamp = $this->getNewRetrieveTimestamp();
+        $this->getNewRetrieveTimestamp();
         $lastRetrieve = $this->getLastRetrieveDate();
 
         $this->getServiceLocator()->get('logService')
@@ -569,7 +569,7 @@ class OrderGateway extends AbstractGateway
             try{
                 // ToDo (maybe): Implement
                 $storeId = $orderIds = FALSE;
-                $results = $this->_db->getOrders($storeId, $orderIds, $lastRetrieve);
+                $results = $this->_db->getOrders($storeId, $lastRetrieve, FALSE, $orderIds);
                 foreach ($results as $orderData) {
                     $orderData = (array) $orderData;
                     if ($this->isOrderToBeRetrieved($orderData)) {
@@ -620,8 +620,9 @@ class OrderGateway extends AbstractGateway
             throw new NodeException('No valid API available for sync');
         }
 
-        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $timestamp);
-        $seconds = ceil($this->getAdjustedTimestamp() - $timestamp);
+        $this->_nodeService
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $this->newRetrieveTimestamp);
+        $seconds = ceil($this->getAdjustedTimestamp() - $this->newRetrieveTimestamp);
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
                 'mag_o_re_no',
@@ -650,7 +651,11 @@ class OrderGateway extends AbstractGateway
 
             if ($this->_db) {
                 try {
-                    $results = $this->_db->getOrders(FALSE, FALSE, $this->getRetrieveDateForForcedSynchronisation());
+                    $results = $this->_db->getOrders(
+                        FALSE,
+                        $this->getRetrieveDateForForcedSynchronisation(),
+                        $this->newRetrieveTimestamp
+                    );
                 }catch (\Exception $exception) {
                     // store as sync issue
                     throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);

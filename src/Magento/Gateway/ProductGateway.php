@@ -70,7 +70,7 @@ class ProductGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = $this->getNewRetrieveTimestamp();
+        $this->getNewRetrieveTimestamp();
         $lastRetrieve = $this->getLastRetrieveDate();
 
         $this->getServiceLocator()->get('logService')
@@ -307,7 +307,8 @@ class ProductGateway extends AbstractGateway
             throw new NodeException('No valid API available for sync');
         }
 
-        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve', $timestamp);
+        $this->_nodeService
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve', $this->newRetrieveTimestamp);
     }
 
     /**

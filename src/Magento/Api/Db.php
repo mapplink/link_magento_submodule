@@ -270,26 +270,31 @@ class Db implements ServiceLocatorAwareInterface
 
     /**
      * Retrieve some or all magento orders, optionally filtering by an updated at date.
-     *
-     * @param int|bool $storeId The store ID to look at, or FALSE if irrelevant
-     * @param array|bool $orderIds
-     * @param bool|string $updatedSince
+     * @param int|FALSE $storeId
+     * @param string|FALSE $updatedSince
+     * @param string|FALSE $updatedTo
+     * @param array $orderIds
      * @return array
      */
-    public function getOrders($storeId = FALSE, $orderIds = FALSE, $updatedSince = FALSE)
+    public function getOrders($storeId = FALSE, $updatedSince = FALSE, $updatedTo = FALSE, array $orderIds = array())
     {
         $select = new \Zend\Db\Sql\Select('sales_flat_order');
 
         if ($storeId !== FALSE) {
             $select->where(array('store_id'=>$storeId));
         }
-        if (is_array($orderIds)) {
-            $select->where(array('entity_id'=>$orderIds));
-        }
         if ($updatedSince) {
             $where = new Where();
-            $where->greaterThan('updated_at', $updatedSince);
+            $where->greaterThanOrEqualTo('updated_at', $updatedSince);
             $select->where($where);
+        }
+        if ($updatedTo) {
+            $where = new Where();
+            $where->lessThanOrEqualTo('updated_at', $updatedTo);
+            $select->where($where);
+        }
+        if (is_array($orderIds)) {
+            $select->where(array('entity_id'=>$orderIds));
         }
 
         $ordersDataArray = $this->getOrdersFromDatabase($select);

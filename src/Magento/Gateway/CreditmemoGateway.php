@@ -56,7 +56,7 @@ class CreditmemoGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = $this->getNewRetrieveTimestamp();
+        $this->getNewRetrieveTimestamp();
         $lastRetrieve = $this->getLastRetrieveDate();
 
         if (FALSE && $this->_db) {
@@ -246,7 +246,8 @@ class CreditmemoGateway extends AbstractGateway
             throw new NodeException('No valid API available for sync');
         }
 
-        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $timestamp);
+        $this->_nodeService
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $this->newRetrieveTimestamp);
     }
 
     /**

@@ -68,7 +68,7 @@ class CustomerGateway extends AbstractGateway
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $timestamp = $this->getNewRetrieveTimestamp();
+        $this->getNewRetrieveTimestamp();
         $lastRetrieve = $this->getLastRetrieveDate();
 
         $this->getServiceLocator()->get('logService')
@@ -202,11 +202,11 @@ class CustomerGateway extends AbstractGateway
                         ->loadEntity($this->_node->getNodeId(), 'customer', $storeId, $uniqueId);
                     if (!$existingEntity) {
                         $existingEntity = $entityService->createEntity(
-                            $this->_node->getNodeId(), 
-                            'customer', 
-                            $storeId, 
-                            $uniqueId, 
-                            $data, 
+                            $this->_node->getNodeId(),
+                            'customer',
+                            $storeId,
+                            $uniqueId,
+                            $data,
                             $parentId
                         );
                         $entityService->linkEntity($this->_node->getNodeId(), $existingEntity, $localId);
@@ -255,7 +255,8 @@ class CustomerGateway extends AbstractGateway
             // Nothing worked
             throw new NodeException('No valid API available for sync');
         }
-        $this->_nodeService->setTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve', $timestamp);
+        $this->_nodeService
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve', $this->newRetrieveTimestamp);
     }
 
     /**
@@ -306,8 +307,8 @@ class CustomerGateway extends AbstractGateway
         $uniqueId = 'cust-'.$customer['customer_id'].'-'.$type;
 
         $addressEntity = $entityService->loadEntity(
-            $this->_node->getNodeId(), 
-            'address', 
+            $this->_node->getNodeId(),
+            'address',
             ($this->_node->isMultiStore() ? $customer['store_id'] : 0),
             $uniqueId
         );
@@ -329,8 +330,8 @@ class CustomerGateway extends AbstractGateway
 
         if (!$addressEntity) {
             $addressEntity = $entityService->createEntity(
-                $this->_node->getNodeId(), 
-                'address', 
+                $this->_node->getNodeId(),
+                'address',
                 ($this->_node->isMultiStore() ? $customer['store_id'] : 0),
                 $uniqueId, $data
             );
