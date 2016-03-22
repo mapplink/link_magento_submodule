@@ -247,7 +247,7 @@ class CreditmemoGateway extends AbstractGateway
         }
 
         $this->_nodeService
-            ->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $this->newRetrieveTimestamp);
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $this->getNewRetrieveTimestamp());
     }
 
     /**

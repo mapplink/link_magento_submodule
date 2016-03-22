@@ -621,14 +621,13 @@ class OrderGateway extends AbstractGateway
         }
 
         $this->_nodeService
-            ->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $this->newRetrieveTimestamp);
-        $seconds = ceil($this->getAdjustedTimestamp() - $this->newRetrieveTimestamp);
-        $this->getServiceLocator()->get('logService')
-            ->log(LogService::LEVEL_INFO,
-                'mag_o_re_no',
-                'Retrieved '.count($results).' orders in '.$seconds.'s',
-                array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds)
-            );
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $this->getNewRetrieveTimestamp());
+        $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
+        $message = 'Retrieved '.count($results).' orders in '.$seconds.'s up to '
+            .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
+        $logData = array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds);
+
+        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_o_re_no', $message, $logData);
 
         try{
             $this->forceSynchronisation();
@@ -654,7 +653,7 @@ class OrderGateway extends AbstractGateway
                     $results = $this->_db->getOrders(
                         FALSE,
                         $this->getRetrieveDateForForcedSynchronisation(),
-                        $this->newRetrieveTimestamp
+                        $this->getNewRetrieveTimestamp()
                     );
                 }catch (\Exception $exception) {
                     // store as sync issue
@@ -808,7 +807,8 @@ class OrderGateway extends AbstractGateway
             }else{
                 $logLevel = LogService::LEVEL_INFO;
                 $logCode .= 'no';
-                $logMessage = 'Forced retrieval on '.$forcedOrders.' orders in '.$seconds.'s';
+                $logMessage = 'Forced retrieval on '.$forcedOrders.' orders in '.$seconds.'s up to '
+                    .strftime('%H:%M:%S, %d/%m', $this->getNewRetrieveTimestamp()).'.';
             }
 
             $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);

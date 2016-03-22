@@ -308,7 +308,7 @@ class ProductGateway extends AbstractGateway
         }
 
         $this->_nodeService
-            ->setTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve', $this->newRetrieveTimestamp);
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve', $this->getNewRetrieveTimestamp());
     }
 
     /**

@@ -144,7 +144,7 @@ class StockGateway extends AbstractGateway
             throw new \Magelink\Exception\NodeException('No valid API available for sync');
         }
         $this->_nodeService
-            ->setTimestamp($this->_nodeEntity->getNodeId(), 'stockitem', 'retrieve', $this->newRetrieveTimestamp);
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'stockitem', 'retrieve', $this->getNewRetrieveTimestamp());
     }
 
     /**

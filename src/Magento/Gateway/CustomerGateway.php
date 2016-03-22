@@ -256,7 +256,7 @@ class CustomerGateway extends AbstractGateway
             throw new NodeException('No valid API available for sync');
         }
         $this->_nodeService
-            ->setTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve', $this->newRetrieveTimestamp);
+            ->setTimestamp($this->_nodeEntity->getNodeId(), 'customer', 'retrieve', $this->getNewRetrieveTimestamp());
     }
 
     /**
