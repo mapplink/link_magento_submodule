@@ -653,7 +653,7 @@ class OrderGateway extends AbstractGateway
                     $results = $this->_db->getOrders(
                         FALSE,
                         $this->getRetrieveDateForForcedSynchronisation(),
-                        $this->getNewRetrieveTimestamp()
+                        $this->convertTimestampToMagentoDateFormat($this->getNewRetrieveTimestamp())
                     );
                 }catch (\Exception $exception) {
                     // store as sync issue

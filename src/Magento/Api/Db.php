@@ -279,24 +279,22 @@ class Db implements ServiceLocatorAwareInterface
     public function getOrders($storeId = FALSE, $updatedSince = FALSE, $updatedTo = FALSE, array $orderIds = array())
     {
         $select = new \Zend\Db\Sql\Select('sales_flat_order');
+        $where = new Where();
 
         if ($storeId !== FALSE) {
-            $select->where(array('store_id'=>$storeId));
+            $where->equalTo('store_id', $storeId);
         }
         if ($updatedSince) {
-            $where = new Where();
             $where->greaterThanOrEqualTo('updated_at', $updatedSince);
-            $select->where($where);
         }
         if ($updatedTo) {
-            $where = new Where();
             $where->lessThanOrEqualTo('updated_at', $updatedTo);
-            $select->where($where);
         }
-        if (is_array($orderIds)) {
-            $select->where(array('entity_id'=>$orderIds));
+        if (count($orderIds) > 0) {
+            $where->in('entity_id', $orderIds);
         }
 
+        $select->where($where);
         $ordersDataArray = $this->getOrdersFromDatabase($select);
 
         return $ordersDataArray;
