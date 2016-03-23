@@ -622,11 +622,11 @@ class OrderGateway extends AbstractGateway
 
         $this->_nodeService
             ->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $this->getNewRetrieveTimestamp());
+
         $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
         $message = 'Retrieved '.count($results).' orders in '.$seconds.'s up to '
             .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
         $logData = array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds);
-
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_o_re_no', $message, $logData);
 
         try{
