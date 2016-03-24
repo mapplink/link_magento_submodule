@@ -645,10 +645,14 @@ class OrderGateway extends AbstractGateway
      */
     protected function getNotRetrievedOrders()
     {
+        $start = microtime(TRUE);
+        $logCode = 'mag_o_re_f';
+
         if ($this->notRetrievedOrderIncrementIds === NULL) {
             $notRetrievedOrderIncrementIds = array();
 
             if ($this->_db) {
+                $api = 'db';
                 try {
                     $results = $this->_db->getOrders(
                         FALSE,
@@ -660,6 +664,7 @@ class OrderGateway extends AbstractGateway
                     throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                 }
             }elseif ($this->_soap) {
+                $api = 'soap';
                 if ($this->getRetrieveDateForForcedSynchronisation()) {
                     $soapCallFilterData = array(array('complex_filter'=>array(
                         array(
@@ -699,7 +704,14 @@ class OrderGateway extends AbstractGateway
             }
 
             if ($notRetrievedOrderIncrementIds) {
-                $this->notRetrievedOrderIncrementIds = $notRetrievedOrderIncrementIds;
+                $seconds = ceil(microtime(TRUE) - $start);
+                $message = 'Get not retrieved orders via '.$api.' took '.$seconds.'s.';
+                $this->getServiceLocator()->get('logService')
+                    ->log(LogService::LEVEL_INFO, $logCode.'_'.$api.'no', $message, array(
+                        'checked orders'=>count($results),
+                        'not retrieved orders'=>count($notRetrievedOrderIncrementIds),
+                        'period[s]'=>$seconds
+                    ));
             }else {
                 $this->notRetrievedOrderIncrementIds = FALSE;
             }
@@ -732,10 +744,10 @@ class OrderGateway extends AbstractGateway
     public function forceSynchronisation()
     {
         $success = TRUE;
+        $start = microtime(TRUE);
 
         if (!$this->areOrdersInSync()) {
             $logCode = 'mag_o_re_frc';
-            $start = microtime(TRUE);
             $forcedOrders = count($this->notRetrievedOrderIncrementIds);
 
             $orderOutOfSyncList = implode(', ', $this->notRetrievedOrderIncrementIds);
