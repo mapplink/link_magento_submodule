@@ -248,7 +248,7 @@ class CustomerGateway extends AbstractGateway
                         );
                 }
                 if ($needsUpdate) {
-                    $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, false);
+                    $entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
                 }
             }
         }else{

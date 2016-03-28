@@ -154,55 +154,54 @@ class Node extends AbstractNode
             $sliFeedCron = $applicationConfigService->getCronjob('slifeed');
             if (!$sliFeedCron->prepareExecution()) {
                 $success = FALSE;
-                $logCode .= '_err';
+                $logCode .= '_erp';
                 $logMessage = 'Sli feed lock file could not be created.';
-            }
+            }else{
+                $tableGateway = new TableGateway('cron', $this->getServiceLocator()->get('zend_db'));
+                $sql = $tableGateway->getSql();
+                $logData['tableGateway'] = get_class($tableGateway);
 
-            $tableGateway = new TableGateway('cron', $this->getServiceLocator()->get('zend_db'));
-            $sql = $tableGateway->getSql();
-            $logData['tableGateway'] = get_class($tableGateway);
+                $where = new Where();
+                $where->equalTo('cron_name', 'slifeed');
+                $logData['where'] = get_class($where);
 
-            $where = new Where();
-            $where->equalTo('cron_name', 'slifeed');
-            $logData['where'] = get_class($where);
+                $sqlSelect = $sql->select()->where($where);
+                $selectedRows = $tableGateway->selectWith($sqlSelect);
+                $logData['selected rows'] = $selectedRows;
 
-            $sqlSelect = $sql->select()->where($where);
-            $selectedRows = $tableGateway->selectWith($sqlSelect);
-            $logData['selected rows'] = $selectedRows;
+                if (count($selectedRows) > 0) {
+                    $logMessage = 'update';
+                    $sqlUpdate = $sql->update()
+                        ->set(array('overdue' => 1, 'updated_at' => date('Y-m-d H:i:s')))
+                        ->where($where);
+                    $success = (bool) $tableGateway->updateWith($sqlUpdate);
+                    $sqlString = $sql->getSqlStringForSqlObject($sqlUpdate);
+                }else{
+                    $logMessage = 'insert';
+                    $sqlInsert = $sql->insert()
+                        ->values(array('cron_name' => 'slifeed', 'overdue' => 1, 'updated_at' => date('Y-m-d H:i:s')));
+                    $success = (bool) $tableGateway->insertWith($sqlInsert);
+                    $sqlString = $sql->getSqlStringForSqlObject($sqlInsert);
+                }
+                $logData['query'] = $sqlString;
 
-            if (count($selectedRows) > 0) {
-                $logMessage = 'update';
-                $sqlUpdate = $sql->update()
-                    ->set(array('overdue'=>1, 'updated_at'=>date('Y-m-d H:i:s')))
-                    ->where($where);
-                $success = (bool) $tableGateway->updateWith($sqlUpdate);
-                $sqlString = $sql->getSqlStringForSqlObject($sqlUpdate);
-            }else {
-                $logMessage = 'insert';
-                $sqlInsert = $sql->insert()
-                    ->values(array('cron_name'=>'slifeed', 'overdue'=>1, 'updated_at'=>date('Y-m-d H:i:s')));
-                $success = (bool) $tableGateway->insertWith($sqlInsert);
-                $sqlString = $sql->getSqlStringForSqlObject($sqlInsert);
-            }
-            $logData['success'] = $success;
-            $logData['query'] = $sqlString;
-
-            if ($success) {
-                $logLevel = LogService::LEVEL_INFO;
-                $logMessage = 'Successfully triggered slifeed cron job to be executed via '.$logMessage.'.';
-            }else {
-                $logLevel = LogService::LEVEL_ERROR;
-                $logCode .= '_fai';
-                $logMessage = 'Failed to '.$logMessage.' slifeed cron job with overdue set.';
+                if ($success) {
+                    $logLevel = LogService::LEVEL_INFO;
+                    $logMessage = 'Successfully triggered slifeed cron job to be executed via '.$logMessage.'.';
+                }else{
+                    $logLevel = LogService::LEVEL_ERROR;
+                    $logCode .= '_fai';
+                    $logMessage = 'Failed to '.$logMessage.' slifeed cron job with overdue set.';
+                }
             }
         }catch (\Exception $exception) {
             $logLevel = LogService::LEVEL_ERROR;
             $logCode .= '_err';
             $logMessage = 'Execption thrown on Magento ProductGateway::triggerSliFeed(): '.$exception->getMessage();
-            $logData['success'] = $success;
             $success = FALSE;
         }
 
+        $logData['success'] = $success;
         $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $logMessage, $logData);
 
         return $success;
