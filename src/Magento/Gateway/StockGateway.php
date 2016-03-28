@@ -48,7 +48,14 @@ class StockGateway extends AbstractGateway
         }
 
         $this->getNewRetrieveTimestamp();
-//        $lastRetrieve = $this->getLastRetrieveDate();
+        $lastRetrieve = $this->getLastRetrieveDate();
+
+        $this->getServiceLocator()->get('logService')
+            ->log(LogService::LEVEL_INFO,
+                'mag_si_re_time',
+                'Retrieving stockitems updated since '.$lastRetrieve,
+                array('type'=>'product', 'timestamp'=>$lastRetrieve)
+            );
 
         $products = $this->_entityService->locateEntity(
             $this->_node->getNodeId(),
@@ -109,7 +116,7 @@ class StockGateway extends AbstractGateway
 
                             $this->getServiceLocator()->get('logService')
                                 ->log(LogService::LEVEL_INFO,
-                                    'mag_si_new',
+                                    'mag_si_re_new',
                                     'New stockitem '.$unique_id,
                                     array('code'=>$unique_id),
                                     array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -118,7 +125,7 @@ class StockGateway extends AbstractGateway
                         }else{
                             $this->getServiceLocator()->get('logService')
                                 ->log(LogService::LEVEL_INFO,
-                                    'mag_si_link',
+                                    'mag_si_re_link',
                                     'Unlinked stockitem '.$unique_id,
                                     array('code'=>$unique_id),
                                     array('node'=>$this->_node, 'entity'=>$existingEntity)
@@ -128,7 +135,7 @@ class StockGateway extends AbstractGateway
                     }else{
                         $this->getServiceLocator()->get('logService')
                             ->log(LogService::LEVEL_INFO,
-                                'mag_si_upd',
+                                'mag_si_re_upd',
                                 'Updated stockitem '.$unique_id,
                                 array('code'=>$unique_id),
                                 array('node'=>$this->_node, 'entity'=>$existingEntity)

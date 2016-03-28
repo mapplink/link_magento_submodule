@@ -59,6 +59,13 @@ class CreditmemoGateway extends AbstractGateway
         $this->getNewRetrieveTimestamp();
         $lastRetrieve = $this->getLastRetrieveDate();
 
+        $this->getServiceLocator()->get('logService')
+            ->log(LogService::LEVEL_INFO,
+                'mag_cm_re_time',
+                'Retrieving creditmemos updated since '.$lastRetrieve,
+                array('type'=>'creditmemo', 'timestamp'=>$lastRetrieve)
+            );
+
         if (FALSE && $this->_db) {
             // ToDo: Implement
         }elseif ($this->_soap) {
@@ -99,7 +106,7 @@ class CreditmemoGateway extends AbstractGateway
                 if ($existingEntity) {
                     $noLocalId = FALSE;
                     $logLevel = LogService::LEVEL_INFO;
-                    $logCode = 'mag_cm_upd';
+                    $logCode = 'mag_cm_re_upd';
                     $logMessage = 'Updated creditmemo '.$uniqueId.'.';
                 }else{
                     $existingEntity = $entityService->loadEntity(
@@ -107,7 +114,7 @@ class CreditmemoGateway extends AbstractGateway
 
                     $noLocalId = TRUE;
                     $logLevel = LogService::LEVEL_WARN;
-                    $logCode = 'mag_cm_updrl';
+                    $logCode = 'mag_cm_re_updrl';
                     $logMessage = 'Updated and unlinked creditmemo '.$uniqueId.'. ';
                 }
                 $logData = array('creditmemo unique id'=>$uniqueId);
