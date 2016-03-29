@@ -29,6 +29,14 @@ class Node extends AbstractNode
 
 
     /**
+     * @return string $nodeLogPrefix
+     */
+    protected function getNodeLogPrefix()
+    {
+        return 'mag_';
+    }
+
+    /**
      * @return bool Whether or not we should enable multi store mode
      */
     public function isMultiStore()
