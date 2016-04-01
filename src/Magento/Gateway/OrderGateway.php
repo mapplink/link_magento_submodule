@@ -129,9 +129,18 @@ class OrderGateway extends AbstractGateway
      */
     protected function isOrderToBeRetrieved(array $orderData)
     {
-        // Check if order has a magento increment id
-        if (intval($orderData['increment_id']) > 100000000) {
+        // current NZ orders
+        if (intval($orderData['increment_id']) > 100000000 && intval($orderData['increment_id']) < 200000000) {
             $retrieve = TRUE;
+        // new orders (determined by the first au increment id after the migration)
+        }elseif (intval($orderData['increment_id']) > 200050000) {
+            $retrieve = TRUE;
+        // old au orders
+        }elseif (intval($orderData['increment_id']) > 200000000) {
+            $isOrderPending = self::hasOrderStatePending($orderData['status']);
+            $isOrderProcessing = self::hasOrderStateProcessing($orderData['status']);
+            $retrieve = $isOrderPending || $isOrderProcessing;
+        // estar orders
         }else{
             $retrieve =  FALSE;
         }
