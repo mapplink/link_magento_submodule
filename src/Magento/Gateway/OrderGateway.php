@@ -591,12 +591,11 @@ class OrderGateway extends AbstractGateway
             }
         }elseif ($this->_soap) {
             try{
-                $results = $this->_soap->call('salesOrderList', array(
-                    array('complex_filter'=>array(array(
-                        'key'=>'updated_at',
-                        'value'=>array('key'=>'gt', 'value'=>$lastRetrieve),
-                    )))
+                $complexFilter = array(array(
+                    'key'=>'updated_at',
+                    'value'=>array('key'=>'gt', 'value'=>$lastRetrieve)
                 ));
+                $results = $this->_soap->call('salesOrderList', array(array('complex_filter'=>$complexFilter)));
 
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_INFO,
@@ -622,6 +621,12 @@ class OrderGateway extends AbstractGateway
                     }
                 }
             }catch(\Exception $exception) {
+                if (!isset($results) || !$results) {
+                    $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR, 'mag_o_soap_lerr',
+                        'Error on soap call salesOrderList since '.$lastRetrieve,
+                        array('results'=>(isset($results) ? $results : 'not set'), 'complex_filter'=>$complexFilter)
+                    );
+                }
                 // store as sync issue
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
             }
@@ -675,12 +680,10 @@ class OrderGateway extends AbstractGateway
             }elseif ($this->_soap) {
                 $api = 'soap';
                 if ($this->getRetrieveDateForForcedSynchronisation()) {
-                    $soapCallFilterData = array(array('complex_filter'=>array(
-                        array(
-                            'key'=>'updated_at',
-                            'value'=>array('key'=>'gt', 'value'=>$this->getRetrieveDateForForcedSynchronisation()),
-                        )
-                    )));
+                    $soapCallFilterData = array(array('complex_filter'=>array(array(
+                        'key'=>'updated_at',
+                        'value'=>array('key'=>'gt', 'value'=>$this->getRetrieveDateForForcedSynchronisation()),
+                    ))));
                 }else{
                     $soapCallFilterData = array();
                 }
@@ -782,17 +785,18 @@ class OrderGateway extends AbstractGateway
                     }
 
                     try {
-                        $results = $this->_soap->call(
-                            'salesOrderList',
-                            array(array('complex_filter'=>array(
-                                array(
-                                    'key'=>'increment_id',
-                                    'value'=>array('key'=>'eq', 'value'=>$orderIncrementId),
-                                )
-                            )))
-                        );
+                        $complexFilter = array(array(
+                            'key'=>'increment_id',
+                            'value'=>array('key'=>'eq', 'value'=>$orderIncrementId),
+                        ));
+                        $results = $this->_soap->call('salesOrderList', array(array('complex_filter'=>$complexFilter)));
                         $orderFromList = array_shift($results);
                     }catch (\Exception $exception) {
+                        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR,
+                            'mag_o_soap_lfer',
+                            'Error on soap call salesOrderList on order '.$orderIncrementId.'.',
+                            array('results'=>(isset($results) ? $results : 'not set'), 'complex_filter'=>$complexFilter)
+                        );
                         // store as sync issue
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                     }
