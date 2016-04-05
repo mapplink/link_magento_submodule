@@ -716,6 +716,7 @@ class OrderGateway extends AbstractGateway
             }
 
             if ($notRetrievedOrderIncrementIds) {
+                $this->notRetrievedOrderIncrementIds = $notRetrievedOrderIncrementIds;
                 $seconds = ceil(microtime(TRUE) - $start);
                 $message = 'Get not retrieved orders via '.$api.' took '.$seconds.'s.';
                 $this->getServiceLocator()->get('logService')
