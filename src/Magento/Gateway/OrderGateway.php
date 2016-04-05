@@ -133,7 +133,7 @@ class OrderGateway extends AbstractGateway
         if (intval($orderData['increment_id']) > 100000000 && intval($orderData['increment_id']) < 200000000) {
             $retrieve = TRUE;
         // new orders (determined by the first au increment id after the migration)
-        }elseif (intval($orderData['increment_id']) > 200050000) {
+        }elseif (intval($orderData['increment_id']) > 200048293) {
             $retrieve = TRUE;
         // old au orders
         }elseif (intval($orderData['increment_id']) > 200000000) {
