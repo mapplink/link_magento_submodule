@@ -110,10 +110,10 @@ class OrderGateway extends AbstractGateway
     protected function getRetrieveDateForForcedSynchronisation()
     {
         if ($this->newRetrieveTimestamp !== NULL) {
-            $intervalsBefore = 3;
             $retrieveInterval = $this->newRetrieveTimestamp - $this->getLastRetrieveTimestamp();
-
-            $retrieveTimestamp = $this->getLastRetrieveTimestamp() - $retrieveInterval * $intervalsBefore;
+            $intervalsBefore = 2.4 - min(1.2, max(0, $retrieveInterval / 3600));
+            $retrieveTimestamp = intval($this->getLastRetrieveTimestamp()
+                - min($retrieveInterval * $intervalsBefore, $retrieveInterval + 3600));
             $date = $this->convertTimestampToMagentoDateFormat($retrieveTimestamp);
         }else{
             $date = FALSE;
