@@ -640,7 +640,8 @@ class OrderGateway extends AbstractGateway
         $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
         $message = 'Retrieved '.count($results).' orders in '.$seconds.'s up to '
             .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
-        $logData = array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds);
+        $logData = array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds,
+            'per [s]'=>round(count($results) / $seconds, 1));
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_o_re_no', $message, $logData);
 
         try{
@@ -820,7 +821,8 @@ class OrderGateway extends AbstractGateway
 
             $forcedOrders -= count($this->notRetrievedOrderIncrementIds);
             $seconds = ceil(microtime(TRUE) - $start);
-            $logData = array('type'=>'order', 'forced orders'=>$forcedOrders, 'period [s]'=>$seconds);
+            $logData = array('type'=>'order', 'forced orders'=>$forcedOrders, 'period [s]'=>$seconds,
+                'per [s]'=>round(count($results) / $seconds, 1));
 
             if (count($this->notRetrievedOrderIncrementIds) > 0) {
                 $success = FALSE;

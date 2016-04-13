@@ -90,7 +90,7 @@ class ProductGateway extends AbstractGateway
 
         if ($this->_db) {
             try {
-                $updatedProducts = $this->_db->getChangedEntityIds('catalog_product', $lastRetrieve);
+                $updatedProducts = $results = $this->_db->getChangedEntityIds('catalog_product', $lastRetrieve);
             }catch (\Exception $exception) {
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
             }
@@ -309,6 +309,13 @@ class ProductGateway extends AbstractGateway
 
         $this->_nodeService
             ->setTimestamp($this->_nodeEntity->getNodeId(), 'product', 'retrieve', $this->getNewRetrieveTimestamp());
+
+        $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
+        $message = 'Retrieved '.count($results).' products in '.$seconds.'s up to '
+            .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
+        $logData = array('type'=>'product', 'amount'=>count($results), 'period [s]'=>$seconds,
+            'per [s]'=>round(count($results) / $seconds, 1));
+        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_p_re_no', $message, $logData);
     }
 
     /**
