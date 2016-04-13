@@ -26,7 +26,7 @@ class ProductGateway extends AbstractGateway
 {
 
     const GATEWAY_ENTITY = 'product';
-
+    const GATEWAY_ENTITY_CODE = 'p';
 
     /**
      * Initialize the gateway and perform any setup actions required.

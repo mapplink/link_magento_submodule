@@ -19,6 +19,9 @@ use Node\Entity;
 class StockGateway extends AbstractGateway
 {
 
+    const GATEWAY_ENTITY = 'stockitem';
+    const GATEWAY_ENTITY_CODE = 'si';
+
     /**
      * Initialize the gateway and perform any setup actions required.
      * @param string $entityType

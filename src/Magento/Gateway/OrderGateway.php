@@ -27,6 +27,7 @@ class OrderGateway extends AbstractGateway
 {
 
     const GATEWAY_ENTITY = 'order';
+    const GATEWAY_ENTITY_CODE = 'o';
 
     const MAGENTO_STATUS_PENDING = 'pending';
     const MAGENTO_STATUS_PENDING_ALIPAY = 'pending_alipay';

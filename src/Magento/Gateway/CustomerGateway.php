@@ -14,7 +14,7 @@ class CustomerGateway extends AbstractGateway
 {
 
     const GATEWAY_ENTITY = 'customer';
-
+    const GATEWAY_ENTITY_CODE = 'cu';
 
     /**
      * Initialize the gateway and perform any setup actions required.

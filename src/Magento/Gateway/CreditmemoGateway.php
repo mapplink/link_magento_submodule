@@ -25,7 +25,7 @@ class CreditmemoGateway extends AbstractGateway
 {
 
     const GATEWAY_ENTITY = 'creditmemo';
-
+    const GATEWAY_ENTITY_CODE = 'cm';
 
     /**
      * Initialize the gateway and perform any setup actions required.
