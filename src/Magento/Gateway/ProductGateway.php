@@ -240,6 +240,7 @@ class ProductGateway extends AbstractGateway
                 }
             }
         }elseif ($this->_soap) {
+            // ToDo : Multistore capability!
             $api = 'soap';
             try {
                 $results = $this->_soap->call('catalogProductList', array(
