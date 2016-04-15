@@ -689,19 +689,19 @@ class ProductGateway extends AbstractGateway
                     case 'weight':
                     case 'barcode':
                     case 'bin_location':
-                    case 'cost':
                     case 'msrp':
+                    case 'cost_price':
                         // Same name in both systems
                         $data[$code] = $value;
                         break;
                     case 'enabled':
                         $data['status'] = ($value == 1 ? 1 : 2);
                         break;
-                    case 'visible':
-                        $data['visibility'] = ($value == 1 ? 4 : 1);
-                        break;
                     case 'taxable':
                         $data['tax_class_id'] = ($value == 1 ? 2 : 1);
+                        break;
+                    case 'visible':
+                        $data['visibility'] = ($value == 1 ? 4 : 1);
                         break;
                     // ToDo (maybe) : Add logic for this custom attributes
                     case 'brand':
@@ -733,7 +733,7 @@ class ProductGateway extends AbstractGateway
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != Update::TYPE_DELETE) {
                 $dataPerStore[0] = $data;
-                foreach (array('price', 'special_price', 'msrp', 'code') as $code) {
+                foreach (array('price', 'special_price', 'msrp', 'cost_price') as $code) {
                     if (array_key_exists($code, $data)) {
                         unset($data[$code]);
                     }
