@@ -722,11 +722,13 @@ class OrderGateway extends AbstractGateway
             if ($notRetrievedOrderIncrementIds) {
                 $this->notRetrievedOrderIncrementIds = $notRetrievedOrderIncrementIds;
                 $seconds = ceil(microtime(TRUE) - $start);
-                $message = 'Get not retrieved orders via '.$api.' took '.$seconds.'s.';
+                $message = 'Get not retrieved orders (back to '.$this->getRetrieveDateForForcedSynchronisation()
+                    .') via '.$api.' took '.$seconds.'s.';
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_INFO, $logCode.'_'.$api.'no', $message, array(
                         'checked orders'=>count($results),
                         'not retrieved orders'=>count($notRetrievedOrderIncrementIds),
+                        'retrieve start date'=>$this->getRetrieveDateForForcedSynchronisation(),
                         'period[s]'=>$seconds
                     ));
             }else {
