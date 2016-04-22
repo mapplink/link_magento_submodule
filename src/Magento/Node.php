@@ -224,20 +224,46 @@ class Node extends AbstractNode
     {
         $logCode = $this->logTimes('Magento\Node');
 
+        $startGetActionsTime = time();
         $this->getPendingActions();
+
+        $startGetUpdatesTime = time();
         $this->getPendingUpdates();
 
-        $logMessage = 'Magento\Node update: '.count($this->updates).' updates, '.count($this->actions).' actions.';
-        $logDataNumbers = array('updates'=>count($this->updates), 'actions'=>count($this->actions));
-        $logEntities = array('node'=>$this, 'actions'=>$this->actions, 'updates'=>$this->updates);
-        $this->_logService->log(LogService::LEVEL_INFO, $logCode.'_no', $logMessage, $logDataNumbers, $logEntities);
+        $getEndTime = time();
 
+        $logMessage = 'Magento\Node update: '.count($this->updates).' updates, '.count($this->actions).' actions.';
+        $logEntities = array('node'=>$this, 'actions'=>$this->actions, 'updates'=>$this->updates);
+        $this->_logService->log(LogService::LEVEL_DEBUGEXTRA, $logCode.'_list', $logMessage, array(), $logEntities);
+
+        $startProcessActionsTime = time();
         $this->processActions();
+
+        $startProcessUpdatesTime = time();
         $triggerSliFeed = $this->processUpdates();
 
         if ($triggerSliFeed) {
             $this->triggerSliFeed();
         }
+
+        $endProcessTime = time();
+
+        $getActionsTime = ceil($startGetActionsTime - $startGetUpdatesTime);
+        $getUpdatesTime = ceil($getEndTime - $startGetUpdatesTime);
+        $processActionsTime = ceil($startProcessActionsTime - $startProcessUpdatesTime);
+        $processUpdatesTime = ceil($endProcessTime - $startProcessUpdatesTime);
+
+        $message = 'Get and process actions and updates to Magento.';
+        $logData = array('type'=>'all', 'actions'=>count($this->actions), 'updates'=>count($this->updates),
+            'get actions [s]'=>$getActionsTime, 'get updates [s]'=>$getUpdatesTime,
+            'process actions [s]'=>$processActionsTime, 'process updates [s]'=>$processUpdatesTime);
+        if (count($this->actions) > 0) {
+            $logData['per action [s]'] = round(($getActionsTime + $processActionsTime) / count($this->actions), 1);
+        }
+        if (count($this->updates) > 0) {
+            $logData['per update [s]'] = round(($getUpdatesTime + $processUpdatesTime) / count($this->updates), 1);
+        }
+        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, $logCode.'_no', $message, $logData);
 
         $this->logTimes('Magento\Node', TRUE);
     }
