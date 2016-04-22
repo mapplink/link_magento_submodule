@@ -78,8 +78,8 @@ abstract class AbstractGateway extends BaseAbstractGateway
         $message = 'Retrieved '.$results.' '.static::GATEWAY_ENTITY.'s in '.$seconds.'s up to '
             .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
         $logData = array('type'=>static::GATEWAY_ENTITY, 'amount'=>$results, 'period [s]'=>$seconds);
-        if ($seconds > 0) {
-            $logData['per [s]'] = round(count($results) / $seconds, 1);
+        if (count($results) > 0) {
+                $logData['per entity [s]'] = round($seconds / count($results), 1);
         }
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_cu_re_no', $message, $logData);
     }
