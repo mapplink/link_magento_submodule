@@ -53,6 +53,12 @@ class ProductGateway extends AbstractGateway
             foreach ($attributeSets as $attributeSetArray) {
                 $this->_attributeSets[$attributeSetArray['set_id']] = $attributeSetArray;
             }
+
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUG, 'mag_p_init',
+                'Initialised Magento product gateway.',
+                array('db api'=>(bool) $this->_db, 'soap api'=>(bool) $this->_soap,
+                    'retrieved attributes'=>$attributeSets, 'stored attributes'=>$this->_attributeSets)
+            );
         }
 
         return $success;
@@ -89,6 +95,7 @@ class ProductGateway extends AbstractGateway
         }
 
         if ($this->_db) {
+            $api = 'db';
             try {
                 $updatedProducts = $results = $this->_db->getChangedEntityIds('catalog_product', $lastRetrieve);
             }catch (\Exception $exception) {
@@ -154,8 +161,7 @@ class ProductGateway extends AbstractGateway
                                 $brands = $this->_db->loadEntitiesEav('brand', NULL, $storeId, array('name'));
                                 if (!is_array($brands) || count($brands) == 0) {
                                     $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
-                                        'mag_p_db_nobrnds',
-                                        'Something is wrong with the brands retrieval.',
+                                        'mag_p_db_nobrnds', 'Something is wrong with the brands retrieval.',
                                         array('brands'=>$brands)
                                     );
                                     $brands = FALSE;
@@ -168,6 +174,10 @@ class ProductGateway extends AbstractGateway
                         try{
                             $productsData = $this->_db
                                 ->loadEntitiesEav('catalog_product', array($localId), $storeId, $attributes);
+                            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGEXTRA,
+                                'mag_p_db_data', 'Loaded product data from Magento via DB api.',
+                                array('local id'=>$localId, 'store id'=>$storeId, 'data'=>$productsData)
+                            );
                         }catch(\Exception $exception) {
                             throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         }
@@ -230,6 +240,8 @@ class ProductGateway extends AbstractGateway
                 }
             }
         }elseif ($this->_soap) {
+            // ToDo : Multistore capability!
+            $api = 'soap';
             try {
                 $results = $this->_soap->call('catalogProductList', array(
                    array('complex_filter'=>array(array(
@@ -245,22 +257,22 @@ class ProductGateway extends AbstractGateway
             foreach ($results as $productData) {
                 $productId = $productData['product_id'];
 
-                $productInfo = $this->_soap->call('catalogProductInfo', array($productId));
-                $productInfoData = array();
+                if ($this->_node->getConfig('load_full_product')) {
+                    $productInfo = $this->_soap->call('catalogProductInfo', array($productId));
+                    $productInfoData = array();
 
-                if ($productInfo) {
-                    if (isset($productInfo['result'])) {
-                        $productInfo = $productInfo['result'];
-                    }
+                    if ($productInfo) {
+                        if (isset($productInfo['result'])) {
+                            $productInfo = $productInfo['result'];
+                        }
 
-                    foreach ($additional as $attributeCode) {
-                        if (strlen(trim($attributeCode)) && isset($productInfo[$attributeCode])) {
-                            $productInfoData[$attributeCode] = $productInfo[$attributeCode];
+                        foreach ($additional as $attributeCode) {
+                            if (strlen(trim($attributeCode)) && isset($productInfo[$attributeCode])) {
+                                $productInfoData[$attributeCode] = $productInfo[$attributeCode];
+                            }
                         }
                     }
-                }
 
-                if ($this->_node->getConfig('load_full_product')) {
                     $productData = array_merge($productData, $productInfoData);
                     $productData = $this->getServiceLocator()->get('magentoService')
                         ->mapProductData($productData, $storeId);
@@ -270,6 +282,11 @@ class ProductGateway extends AbstractGateway
                         $this->loadFullProduct($productId, $storeId, $entityConfigService)
                     );
                 }
+
+                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_DEBUGEXTRA,
+                    'mag_p_soap_data', 'Loaded product data from Magento via SOAP api.',
+                    array('sku'=>$productData['sku'], 'data'=>$productData)
+                );
 
                 if (isset($this->_attributeSets[intval($productData['set']) ])) {
                     $productData['product_class'] = $this->_attributeSets[intval($productData['set']) ]['name'];
@@ -305,6 +322,7 @@ class ProductGateway extends AbstractGateway
             }
         }else{
             throw new NodeException('No valid API available for sync');
+            $api = '-';
         }
 
         $this->_nodeService
@@ -312,7 +330,7 @@ class ProductGateway extends AbstractGateway
 
         $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
         $message = 'Retrieved '.count($results).' products in '.$seconds.'s up to '
-            .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
+            .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).' via '.$api.' api.';
         $logData = array('type'=>'product', 'amount'=>count($results), 'period [s]'=>$seconds);
         if (count($results) > 0) {
             $logData['per entity [s]'] = round($seconds / count($results), 1);
@@ -678,7 +696,6 @@ class ProductGateway extends AbstractGateway
             foreach ($originalData as $code=>$value) {
                 $mappedCode = $magentoService->getMappedCode('product', $code);
                 switch ($mappedCode) {
-                    // Normal attributes
                     case 'price':
                     case 'special_price':
                     case 'special_from_date':
@@ -688,21 +705,21 @@ class ProductGateway extends AbstractGateway
                     case 'description':
                     case 'short_description':
                     case 'weight':
-                    // Custom attributes
                     case 'barcode':
                     case 'bin_location':
                     case 'msrp':
+                    case 'cost_price':
                         // Same name in both systems
                         $data[$code] = $value;
                         break;
                     case 'enabled':
                         $data['status'] = ($value == 1 ? 1 : 2);
                         break;
-                    case 'visible':
-                        $data['visibility'] = ($value == 1 ? 4 : 1);
-                        break;
                     case 'taxable':
                         $data['tax_class_id'] = ($value == 1 ? 2 : 1);
+                        break;
+                    case 'visible':
+                        $data['visibility'] = ($value == 1 ? 4 : 1);
                         break;
                     // ToDo (maybe) : Add logic for this custom attributes
                     case 'brand':
@@ -734,7 +751,7 @@ class ProductGateway extends AbstractGateway
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != Update::TYPE_DELETE) {
                 $dataPerStore[0] = $data;
-                foreach (array('price', 'special_price', 'msrp') as $code) {
+                foreach (array('price', 'special_price', 'msrp', 'cost_price') as $code) {
                     if (array_key_exists($code, $data)) {
                         unset($data[$code]);
                     }

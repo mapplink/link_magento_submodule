@@ -244,7 +244,7 @@ class OrderGateway extends AbstractGateway
             if ($stockitem) {
                 if ($isOrderProcessing) {
                     $attributeCode = 'qty_pre_transit';
-                }else {
+                }else{
                     $attributeCode = 'available';
                 }
 
@@ -731,7 +731,7 @@ class OrderGateway extends AbstractGateway
                         'retrieve start date'=>$this->getRetrieveDateForForcedSynchronisation(),
                         'period[s]'=>$seconds
                     ));
-            }else {
+            }else{
                 $this->notRetrievedOrderIncrementIds = FALSE;
             }
         }
