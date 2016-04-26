@@ -90,9 +90,13 @@ abstract class AbstractGateway extends BaseAbstractGateway
     /**
      * @return int $adjustedTimestamp
      */
-    protected function getAdjustedTimestamp()
+    protected function getAdjustedTimestamp($timestamp = NULL)
     {
-        return $this->getRetrieveTimestamp() - $this->apiOverlappingSeconds;
+        if (is_null($timestamp) || intval($timestamp) != $timestamp || $timestamp == 0) {
+            $timestamp = time();
+        }
+
+        return $timestamp - $this->apiOverlappingSeconds;
     }
 
     /**
@@ -101,7 +105,7 @@ abstract class AbstractGateway extends BaseAbstractGateway
     protected function getNewRetrieveTimestamp()
     {
         if ($this->newRetrieveTimestamp === NULL) {
-            $this->newRetrieveTimestamp = $this->getAdjustedTimestamp();
+            $this->newRetrieveTimestamp = $this->getAdjustedTimestamp($this->getRetrieveTimestamp());
         }
 
         return $this->newRetrieveTimestamp;
