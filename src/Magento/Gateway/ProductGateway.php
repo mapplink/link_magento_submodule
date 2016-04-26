@@ -708,7 +708,7 @@ class ProductGateway extends AbstractGateway
                     case 'barcode':
                     case 'bin_location':
                     case 'msrp':
-                    case 'cost_price':
+                    case 'cost':
                         // Same name in both systems
                         $data[$code] = $value;
                         break;
@@ -751,7 +751,7 @@ class ProductGateway extends AbstractGateway
             $storeDataByStoreId = $this->_node->getStoreViews();
             if (count($storeDataByStoreId) > 0 && $type != Update::TYPE_DELETE) {
                 $dataPerStore[0] = $data;
-                foreach (array('price', 'special_price', 'msrp', 'cost_price') as $code) {
+                foreach (array('price', 'special_price', 'msrp', 'cost') as $code) {
                     if (array_key_exists($code, $data)) {
                         unset($data[$code]);
                     }
