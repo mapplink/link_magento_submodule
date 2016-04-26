@@ -257,7 +257,7 @@ class CreditmemoGateway extends AbstractGateway
             ->setTimestamp($this->_nodeEntity->getNodeId(), 'creditmemo', 'retrieve', $this->getNewRetrieveTimestamp());
 
         $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
-        $message = 'Retrieved '.count($results).' credimemos in '.$seconds.'s up to '
+        $message = 'Retrieved '.count($results).' creditmemos in '.$seconds.'s up to '
             .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
         $logData = array('type'=>'creditmemo', 'amount'=>count($results), 'period [s]'=>$seconds);
         if (count($results) > 0) {
