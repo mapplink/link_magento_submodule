@@ -161,7 +161,7 @@ class StockGateway extends AbstractGateway
             .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
         $logData = array('type'=>'stockitem', 'amount'=>count($results), 'period [s]'=>$seconds);
         if (count($results) > 0) {
-            $logData['per entity [s]'] = round($seconds / count($results), 1);
+            $logData['per entity [s]'] = round($seconds / count($results), 3);
         }
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_si_re_no', $message, $logData);
     }

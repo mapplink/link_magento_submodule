@@ -10,5 +10,3 @@ return array(
          <-store id> => array(<entity type> => array(<magento code> => <magento code>_default, ...)) // for write and clean up purpose only
     )
 );
-
-?>

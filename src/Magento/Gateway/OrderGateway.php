@@ -643,7 +643,7 @@ class OrderGateway extends AbstractGateway
             .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
         $logData = array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds);
         if (count($results) > 0) {
-            $logData['per entity [s]'] = round($seconds / count($results), 1);
+            $logData['per entity [s]'] = round($seconds / count($results), 3);
         }
         $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_o_re_no', $message, $logData);
 
@@ -828,7 +828,7 @@ class OrderGateway extends AbstractGateway
             $seconds = ceil(microtime(TRUE) - $start);
             $logData = array('type'=>'order', 'forced orders'=>$forcedOrders, 'period [s]'=>$seconds);
             if (count($results) > 0) {
-                $logData['per entity [s]'] = round($seconds / count($results), 1);
+                $logData['per entity [s]'] = round($seconds / count($results), 3);
             }
 
             if (count($this->notRetrievedOrderIncrementIds) > 0) {
