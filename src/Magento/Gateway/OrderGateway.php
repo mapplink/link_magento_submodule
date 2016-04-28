@@ -827,8 +827,8 @@ class OrderGateway extends AbstractGateway
             $forcedOrders -= count($this->notRetrievedOrderIncrementIds);
             $seconds = ceil(microtime(TRUE) - $start);
             $logData = array('type'=>'order', 'forced orders'=>$forcedOrders, 'period [s]'=>$seconds);
-            if (count($results) > 0) {
-                $logData['per entity [s]'] = round($seconds / count($results), 3);
+            if (count($forcedOrders) > 0) {
+                $logData['per entity [s]'] = round($seconds / count($forcedOrders), 3);
             }
 
             if (count($this->notRetrievedOrderIncrementIds) > 0) {
