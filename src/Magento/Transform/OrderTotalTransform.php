@@ -33,7 +33,7 @@ class OrderTotalTransform extends AbstractTransform
      * Apply the transform on any necessary data
      * @return array New data changes to be merged into the update.
      */
-    public function apply()
+    public function _apply()
     {
         $order = $this->_entity;
         $data = $order->getArrayCopy();
