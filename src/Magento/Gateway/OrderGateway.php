@@ -411,6 +411,7 @@ class OrderGateway extends AbstractGateway
         $needsUpdate = TRUE;
         $orderComment = FALSE;
 
+        /** @var Order $existingEntity */
         $existingEntity = $this->_entityService->loadEntityLocal(
             $this->_node->getNodeId(),
             'order',
@@ -511,6 +512,14 @@ class OrderGateway extends AbstractGateway
                     $orderComment = array(
                         'Status change' => 'Order #'.$uniqueId.' moved from '.$oldStatus.' to '.$data['status']
                     );
+
+                    $statusData = array('status'=>$data['status']);
+                    foreach ($existingEntity->getAllOrders() as $order) {
+                        if ($existingEntity->getId() != $order->getId()) {
+                            $this->_entityService
+                                ->updateEntity($this->_node->getNodeId(), $order, $statusData, FALSE);
+                        }
+                    }
                 }
 
                 $movedToProcessing = self::hasOrderStateProcessing($orderData['status'])
