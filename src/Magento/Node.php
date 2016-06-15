@@ -16,7 +16,6 @@ use Node\AbstractGateway;
 use Node\Entity;
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\SyncException;
-use HOPS\Cron\SliFeed;
 use Zend\Db\TableGateway\TableGateway;
 use Zend\Db\Sql\Where;
 
@@ -158,10 +157,16 @@ class Node extends AbstractNode
         try {
             /** @var ApplicationConfigService $applicationConfigService */
             $applicationConfigService = $this->getServiceLocator()->get('applicationConfigService');
-            /** @var SliFeed $sliFeedCron */
+            /** @var NULL|\HOPS\Cron\SliFeed $sliFeedCron */
             $sliFeedCron = $applicationConfigService->getCronjob('slifeed');
-            if (!$sliFeedCron->prepareExecution()) {
+            if (is_null($sliFeedCron)) {
                 $success = FALSE;
+                $logCode = LogService::LEVEL_DEBUG;
+                $logCode .= '_nex';
+                $logMessage = 'Sli cron job is not existing.';
+            }elseif (!$sliFeedCron->prepareExecution()) {
+                $success = FALSE;
+                $logLevel = LogService::LEVEL_ERROR;
                 $logCode .= '_erp';
                 $logMessage = 'Sli feed lock file could not be created.';
             }else{
