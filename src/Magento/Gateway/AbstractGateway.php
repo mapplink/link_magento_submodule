@@ -63,29 +63,11 @@ abstract class AbstractGateway extends BaseAbstractGateway
     }
 
     /**
+     * ToDo: Implement this instead of the retrieve functionality on all gateways
      * Retrieve and action all updated records (either from polling, pushed data, or other sources).
+     * @return array $retrieveResults
      */
-/* MIGHT BE BETTER IMPLEMENTED IN BASEABSTRACTGATEWAY straight away or in a second step
-    public function retrieve()
-    {
-        $this->getNewRetrieveTimestamp();
-        $this->getLastRetrieveDate();
-
-        $results = $this->retrieveEntities();
-
-        $logCode = 'mag_'.static::GATEWAY_ENTITY_CODE.'_re_no'
-        $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
-        $message = 'Retrieved '.$results.' '.static::GATEWAY_ENTITY.'s in '.$seconds.'s up to '
-            .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
-        $logData = array('type'=>static::GATEWAY_ENTITY, 'amount'=>$results, 'period [s]'=>$seconds);
-        if (count($results) > 0) {
-                $logData['per entity [s]'] = round($seconds / count($results), 3);
-        }
-        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_cu_re_no', $message, $logData);
-    }
-
-    abstract protected retrieveEntities();
-*/
+    protected function retrieveEntities() {}
 
     /**
      * @return int $adjustedTimestamp
