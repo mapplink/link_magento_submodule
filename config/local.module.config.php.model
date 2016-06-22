@@ -2,6 +2,10 @@
 
 return array(
     'default_stores'=>array(<store using default data>, ...),
+    'store_limits'=>array(
+        <store id> => array(<from increment id>, <to increment id>)
+        'pending_processing'=> array(<from increment id>, <to increment id>)
+    ),
     'store_currencies'=>array(
         <store id: 0 for default> => array(<currency identifier>, ...)
     ),
