@@ -565,9 +565,8 @@ class OrderGateway extends AbstractGateway
      * @throws MagelinkException
      * @throws NodeException
      */
-    public function retrieve()
+    protected function retrieveEntities()
     {
-        $this->getNewRetrieveTimestamp();
         $lastRetrieve = $this->getLastRetrieveDate();
 
         $this->getServiceLocator()->get('logService')
@@ -633,22 +632,15 @@ class OrderGateway extends AbstractGateway
                 }
                 // store as sync issue
                 throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                $results = array();
             }
         }else{
             throw new NodeException('No valid API available for sync');
+            $results = array();
         }
 
         $this->_nodeService
             ->setTimestamp($this->_nodeEntity->getNodeId(), 'order', 'retrieve', $this->getNewRetrieveTimestamp());
-
-        $seconds = ceil($this->getAdjustedTimestamp() - $this->getNewRetrieveTimestamp());
-        $message = 'Retrieved '.count($results).' orders in '.$seconds.'s up to '
-            .strftime('%H:%M:%S, %d/%m', $this->retrieveTimestamp).'.';
-        $logData = array('type'=>'order', 'amount'=>count($results), 'period [s]'=>$seconds);
-        if (count($results) > 0) {
-            $logData['per entity [s]'] = round($seconds / count($results), 3);
-        }
-        $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_o_re_no', $message, $logData);
 
         try{
             $this->forceSynchronisation();
@@ -656,6 +648,8 @@ class OrderGateway extends AbstractGateway
             // store as sync issue
            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
         }
+
+        return count($results);
     }
 
     /**
