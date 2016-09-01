@@ -29,6 +29,8 @@ class OrderGateway extends AbstractGateway
     const GATEWAY_ENTITY = 'order';
     const GATEWAY_ENTITY_CODE = 'o';
 
+    const RETRIEVAL_DELAY_SECONDS = 90;
+
     const MAGENTO_STATUS_PENDING = 'pending';
     const MAGENTO_STATUS_PENDING_ALIPAY = 'pending_alipay';
     const MAGENTO_STATUS_PENDING_ALIPAY_NEW = 'new';
@@ -568,6 +570,7 @@ class OrderGateway extends AbstractGateway
     protected function retrieveEntities()
     {
         $lastRetrieve = $this->getLastRetrieveDate();
+        $thisRetrieveTimestamp = $this->getNewRetrieveTimestamp() - self::RETRIEVAL_DELAY_SECONDS;
 
         $this->getServiceLocator()->get('logService')
             ->log(LogService::LEVEL_INFO,
@@ -594,33 +597,41 @@ class OrderGateway extends AbstractGateway
             }
         }elseif ($this->_soap) {
             try{
-                $complexFilter = array(array(
-                    'key'=>'updated_at',
-                    'value'=>array('key'=>'gt', 'value'=>$lastRetrieve)
-                ));
+                $complexFilter = array(
+                    array('key'=>'updated_at', 'value'=>array(
+                        'key'=>'gt',
+                        'value'=>$lastRetrieve
+                    ))
+                );
                 $results = $this->_soap->call('salesOrderList', array(array('complex_filter'=>$complexFilter)));
 
                 $this->getServiceLocator()->get('logService')
                     ->log(LogService::LEVEL_INFO,
                         'mag_o_soap_list',
                         'Retrieved salesOrderList updated from '.$lastRetrieve,
-                        array('updated_at'=>$lastRetrieve, 'results'=>$results)
+                        array('updated_at'=>$lastRetrieve, 'result no'=>count($results))
                     );
                 foreach ($results as $orderFromList) {
                     if ($this->isOrderToBeRetrieved($orderFromList)) {
-                        $orderData = $this->_soap->call('salesOrderInfo', array($orderFromList['increment_id']));
-                        if (isset($orderData['result'])) {
-                            $orderData = $orderData['result'];
+                        if (strtotime($orderFromList['updated_at']) < $thisRetrieveTimestamp ) {
+                            $orderData = $this->_soap->call('salesOrderInfo', array($orderFromList['increment_id']));
+                            if (isset($orderData['result'])) {
+                                $orderData = $orderData['result'];
+                            }
+
+                            unset ($orderFromList['status']); // Reduces risk overwriting a status when adding a comment
+                            unset ($orderFromList['updated_at']); // Get the last update datetime
+                            $missingFieldsInSalesOrderList = array_diff(
+                                array_keys($orderFromList),
+                                array_keys($orderData)
+                            );
+
+                            foreach ($missingFieldsInSalesOrderList as $key) {
+                                $orderData[$key] = $orderFromList[$key];
+                            }
+
+                            $this->storeOrderData($orderData);
                         }
-
-                        unset ($orderFromList['status']); // Reduces risk overwriting a status when adding a comment
-                        $missingFieldsInSalesOrderList = array_diff(array_keys($orderFromList), array_keys($orderData));
-
-                        foreach ($missingFieldsInSalesOrderList as $key) {
-                            $orderData[$key] = $orderFromList[$key];
-                        }
-
-                        $this->storeOrderData($orderData);
                     }
                 }
             }catch(\Exception $exception) {
