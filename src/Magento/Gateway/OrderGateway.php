@@ -250,6 +250,9 @@ class OrderGateway extends AbstractGateway
 
                 $attributeValue = $stockitem->getData($attributeCode, 0);
                 $itemQuantity = $orderitem->getData('quantity', 0);
+                if (is_array($itemQuantity)) {
+                    $itemQuantity = array_pop($itemQuantity);
+                }
                 if ($isOrderPending) {
                     $itemQuantity *= -1;
                 }
