@@ -75,7 +75,7 @@ class Soap implements ServiceLocatorAwareInterface
     protected function getAndStoreSoapClient()
     {
         $this->_soapClient = new Client(
-            $this->_node->getConfig('web_url').'api/v2_soap?wsdl=1',
+            trim($this->_node->getConfig('web_url').'api/v2_soap?wsdl=1'),
             array('soap_version'=>SOAP_1_1)
         );
 
@@ -98,12 +98,12 @@ class Soap implements ServiceLocatorAwareInterface
             throw new MagelinkException('Tried to initialize Soap API twice!');
 
         }else{
-            $username = $this->_node->getConfig('soap_username');
-            $password = $this->_node->getConfig('soap_password');
+            $username = trim($this->_node->getConfig('soap_username'));
+            $password = trim($this->_node->getConfig('soap_password'));
 
             $logLevel = LogService::LEVEL_ERROR;
             $logCode = $this->getInitLogCode();
-            $logData = array('username'=>$username, 'password'=>$password);
+            $logData = array('username'=>$username);
             $logEntities = array();
 
             if (!$username || !$password) {
@@ -115,18 +115,17 @@ class Soap implements ServiceLocatorAwareInterface
                 $logData['wsdl'] = $this->_soapClient->getWSDL();
 
                 try{
-                    $loginResult = $this->_soapClient->call('login',
-                        array($this->_node->getConfig('soap_username'), $this->_node->getConfig('soap_password'))
-                    );
+                    $loginResult = $this->_soapClient->call('login', array($username, $password));
 // ToDo: Review the next line and remove line or comment
 //                $loginResult = $this->_processResponse($loginResult);
                     $this->_sessionId = $loginResult;
                     $success = (bool) $loginResult;
                     $message = '.';
                 }catch (\Exception $exception) {
+                    $soapClient = $this->_soapClient->getSoapClient();
                     $message = ': '.$exception->getMessage();
-                    $logData['response'] = $this->_soapClient->getSoapClient()->__getLastResponse();
-                    $logData['response headers'] = $this->_soapClient->getSoapClient()->__getLastResponseHeaders();
+                    $logData['response'] = substr($soapClient->__getLastResponse(), 0, 120).' ...';
+                    $logData['response headers'] = $soapClient->__getLastResponseHeaders();
                     $logEntities['exception'] = $exception;
                     $logEntities['\SoapClient'] = $this->_soapClient->getSoapClient();
                 }
