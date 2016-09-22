@@ -125,7 +125,10 @@ class Soap implements ServiceLocatorAwareInterface
                     $message = '.';
                 }catch (\Exception $exception) {
                     $message = ': '.$exception->getMessage();
+                    $logData['response'] = $this->_soapClient->getSoapClient()->__getLastResponse();
+                    $logData['response headers'] = $this->_soapClient->getSoapClient()->__getLastResponseHeaders();
                     $logEntities['exception'] = $exception;
+                    $logEntities['\SoapClient'] = $this->_soapClient->getSoapClient();
                 }
 
                 if ($success) {
@@ -134,7 +137,7 @@ class Soap implements ServiceLocatorAwareInterface
                 }else{
                     $logCode .= '_err';
                     $message = 'SOAP initialisation error'.$message;
-                    $logEntities['soap client'] = $this->_soapClient;
+                    $logEntities['\Zend\Soap\Client'] = $this->_soapClient;
                 }
             }
 
