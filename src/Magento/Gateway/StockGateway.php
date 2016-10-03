@@ -305,6 +305,9 @@ class StockGateway extends AbstractGateway
             $success = TRUE;
         }
 
+// Everything ending up here without an exception is a success
+$success = TRUE;
+
         return $success;
     }
 

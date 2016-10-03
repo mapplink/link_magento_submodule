@@ -544,7 +544,11 @@ class CreditmemoGateway extends AbstractGateway
             default:
                 throw new GatewayException('Invalid update type '.$type);
         }
-        return;
+
+// Everything ending up here without an exception is a success
+$success = TRUE;
+
+        return $success;
     }
 
     /**

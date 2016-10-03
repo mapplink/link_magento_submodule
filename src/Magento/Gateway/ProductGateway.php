@@ -994,6 +994,11 @@ class ProductGateway extends AbstractGateway
                 unset($dataPerStore);
             }
         }
+
+// Everything ending up here without an exception is a success
+$success = TRUE;
+
+        return $success;
     }
 
     /**
