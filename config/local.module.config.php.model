@@ -11,6 +11,6 @@ return array(
     ),
     'store_map'=>array(
          <store id> => array(<entity type> => array(<magento code> => <magelink code>, ...))
-         <-store id> => array(<entity type> => array(<magento code> => <magento code>_default, ...)) // for write and clean up purpose only
+         -<store id> => array(<entity type> => array(<magento code> => <magento code>_default, ...)) // for write and clean up purpose only
     )
 );
