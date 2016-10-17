@@ -417,7 +417,7 @@ class Db implements ServiceLocatorAwareInterface
         if ($entityType == 'product' || $entityType == 'stockitem') {
             $productType = 'product';
 
-            $table = $this->getEntityPrefix($entityType).'_entity';
+            $table = $this->getEntityPrefix($productType).'_entity';
             $tableGateway = new TableGateway($table, $this->_adapter);
             $sql = $tableGateway->getSql();
 
@@ -799,17 +799,22 @@ class Db implements ServiceLocatorAwareInterface
     protected function getEntityPrefix($entityType)
     {
         switch ($entityType) {
+            case 'product':
+            case 'category':
+                $entityType = 'catalog_'.$entityType;
             case 'catalog_product':
             case 'catalog_category':
             case 'customer':
             case 'customer_address':
-                return $entityType;
+                $entityPrefix = $entityType;
             case 'rma_item':
-                return 'enterprise_rma_item';
+                $entityPrefix = 'enterprise_rma_item';
             default:
                 // ToDo: Check : Maybe warn? This should be a safe default
-                return $entityType;
+                $entityPrefix = $entityType;
         }
+
+        return $entityPrefix;
     }
     /**
      * Returns the entity type table entry for the given type
