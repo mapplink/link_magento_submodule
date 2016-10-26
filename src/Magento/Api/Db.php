@@ -414,6 +414,9 @@ class Db implements ServiceLocatorAwareInterface
      */
     public function getLocalId($entityType, $uniqueId)
     {
+        $localEntityId = NULL;
+        $logCode = 'mag_db_lid';
+
         if ($entityType == 'product' || $entityType == 'stockitem') {
             $productType = 'product';
 
@@ -427,17 +430,25 @@ class Db implements ServiceLocatorAwareInterface
             $selectResult = $tableGateway->selectWith($sqlSelect);
 
             $sqlString = $sql->getSqlStringForSqlObject($sqlSelect);
-            $message = 'Selected entity row from '.$table.' table.';
-            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_INFO, 'mag_db_loid',
-                $message, array('query'=>$sqlString, 'result rows'=>count($selectResult), 'result'=>$selectResult));
+            $message = 'Selected entity row from '.$table.' table';
+            $logData = array('query'=>$sqlString, 'result rows'=>count($selectResult), 'result'=>$selectResult);
 
             $firstRowResult = current($selectResult);
-            $localEntityId = $firstRowResult['entity_id'];
+            if (isset($firstRowResult['entity_id'])) {
+                $localEntityId = $firstRowResult['entity_id'];
+                $logLevel = LogService::LEVEL_INFO;
+            }else{
+                $logLevel = LogService::LEVEL_WARN;
+                $logCode .= '_nex';
+                $message .= ' but local id is not existing';
+            }
         }else{
-            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN,
-                'mag_db_loid_err', 'Invalid entity type: '.$entityType.'.', array());
-            $localEntityId = NULL;
+            $logLevel = LogService::LEVEL_ERROR;
+            $logCode .= '_err';
+            $message = 'Invalid entity type: '.$entityType;
+            $logData = array();
         }
+        $this->getServiceLocator()->get('logService')->log($logLevel, $logCode, $message, $logData);
 
         return $localEntityId;
     }
