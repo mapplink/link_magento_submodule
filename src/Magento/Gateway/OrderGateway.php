@@ -132,8 +132,6 @@ class OrderGateway extends AbstractGateway
      */
     protected function isOrderToBeRetrieved(array $orderData)
     {
-        $retrieve =  FALSE;
-
         if (strtotime($orderData['updated_at']) < $this->getNewRetrieveTimestamp() - self::RETRIEVAL_DELAY_SECONDS) {
             if (intval($orderData['increment_id']) > 100000000 && intval($orderData['increment_id']) < 200000000) {
                 $retrieve = TRUE;
@@ -147,6 +145,8 @@ class OrderGateway extends AbstractGateway
                 $retrieve = $isOrderPending || $isOrderProcessing;
                 // estar orders
             }
+        }else{
+            $retrieve =  FALSE;
         }
 
         return $retrieve;
@@ -597,8 +597,9 @@ class OrderGateway extends AbstractGateway
             }
         }elseif ($this->_soap) {
             try{
-                $complexFilter = array(
-                    array('key'=>'updated_at', 'value'=>array(
+                $complexFilter = array(array(
+                    'key'=>'updated_at',
+                    'value'=>array(
                         'key'=>'gt',
                         'value'=>$lastRetrieve
                     ))
