@@ -1,5 +1,6 @@
 <?php
 /**
+ * Magento\Gateway\StockGateway
  * @category Magento
  * @package Magento\Gateway
  * @author Andreas Gerhards <andreas@lero9.co.nz>

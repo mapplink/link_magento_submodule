@@ -1,6 +1,6 @@
 <?php
 /**
- * Magento\Gateway\OrderGateway
+ * Magento\Gateway\ProductGateway
  * @category Magento
  * @package Magento\Gateway
  * @author Matt Johnston

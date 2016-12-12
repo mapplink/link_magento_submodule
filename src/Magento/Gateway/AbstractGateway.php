@@ -2,7 +2,7 @@
 /**
  * Magento Abstract Gateway
  * @category Magento
- * @package Magento\Api
+ * @package Magento\Gateway
  * @author Andreas Gerhards <andreas@lero9.co.nz>
  * @copyright Copyright (c) 2014 LERO9 Ltd.
  * @license Commercial - All Rights Reserved

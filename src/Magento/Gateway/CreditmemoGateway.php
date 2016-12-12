@@ -1,7 +1,6 @@
 <?php
 /**
  * Magento\Gateway\CreditmemoGateway
- *
  * @category Magento
  * @package Magento\Gateway
  * @author Matt Johnston
