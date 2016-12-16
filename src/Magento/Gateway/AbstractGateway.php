@@ -110,15 +110,4 @@ abstract class AbstractGateway extends BaseAbstractGateway
         return $lastRetrieve;
     }
 
-    /** @return bool|int $this->lastRetrieveTimestamp */
-    protected function getLastRetrieveTimestamp()
-    {
-        if ($this->lastRetrieveTimestamp === NULL) {
-            $this->lastRetrieveTimestamp =
-                $this->_nodeService->getTimestamp($this->_nodeEntity->getNodeId(), static::GATEWAY_ENTITY, 'retrieve');
-        }
-
-        return $this->lastRetrieveTimestamp;
-    }
-
 }
