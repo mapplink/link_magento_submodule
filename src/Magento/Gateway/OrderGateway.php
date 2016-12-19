@@ -154,7 +154,7 @@ class OrderGateway extends AbstractGateway
 
     /**
      * @param $orderStatus
-     * @return bool
+     * @return bool $hasOrderStatePending
      */
     public static function hasOrderStatePending($orderStatus)
     {
@@ -164,12 +164,22 @@ class OrderGateway extends AbstractGateway
 
     /**
      * @param $orderStatus
-     * @return bool
+     * @return bool $hasOrderStateProcessing
      */
     public static function hasOrderStateProcessing($orderStatus)
     {
         $hasOrderStateProcessing = in_array($orderStatus, self::$magentoProcessingStatusses);
         return $hasOrderStateProcessing;
+    }
+
+    /**
+     * @param $orderStatus
+     * @return bool $hasOrderStateCancelled
+     */
+    public static function hasOrderStateCancelled($orderStatus)
+    {
+        $hasOrderStateCancelled = $orderStatus == self::MAGENTO_STATUS_CANCELED;
+        return $hasOrderStateCancelled;
     }
 
     /**
@@ -226,7 +236,7 @@ class OrderGateway extends AbstractGateway
         $orderStatus = $order->getData('status');
         $isOrderPending = self::hasOrderStatePending($orderStatus);
         $isOrderProcessing = self::hasOrderStateProcessing($orderStatus);
-        $isOrderCancelled = $orderStatus == self::MAGENTO_STATUS_CANCELED;
+        $isOrderCancelled = self::hasOrderStateCancelled($orderStatus);
 
         $logData = array('order id'=>$order->getId(), 'orderitem'=>$orderitem->getId(), 'sku'=>$orderitem->getData('sku'));
         $logEntities = array('node'=>$this->_node, 'order'=>$order, 'orderitem'=>$orderitem);
@@ -524,8 +534,8 @@ class OrderGateway extends AbstractGateway
 
                 $movedToProcessing = self::hasOrderStateProcessing($orderData['status'])
                     && !self::hasOrderStateProcessing($existingEntity->getData('status'));
-                $movedToCancel = $orderData['status'] == self::MAGENTO_STATUS_CANCELED
-                    && $existingEntity->getData('status') != self::MAGENTO_STATUS_CANCELED;
+                $movedToCancel = self::hasOrderStateCancelled($orderData['status'])
+                    && !self::hasOrderStateCancelled($existingEntity->getData('status'));
                 $this->_entityService->updateEntity($this->_node->getNodeId(), $existingEntity, $data, FALSE);
 
                 $order = $this->_entityService->loadEntityId($this->_node->getNodeId(), $existingEntity->getId());
@@ -1124,7 +1134,7 @@ class OrderGateway extends AbstractGateway
                 break;
             case 'cancel':
                 $isCancelable = self::hasOrderStatePending($orderStatus);
-                if ($orderStatus !== self::MAGENTO_STATUS_CANCELED) {
+                if (!self::hasOrderStateCancelled($orderStatus)) {
                     if (!$isCancelable){
                         $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
                         // store as a sync issue
