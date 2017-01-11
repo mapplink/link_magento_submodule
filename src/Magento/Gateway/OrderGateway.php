@@ -153,6 +153,17 @@ class OrderGateway extends AbstractGateway
     }
 
     /**
+     * Check, if the order should be ignored or written
+     * @param Order $order
+     * @return bool
+     */
+    public static function isOrderToBeWritten(Order $order)
+    {
+        $storeId = $order->getStoreId();
+        return is_numeric($storeId);
+    }
+
+    /**
      * @param $orderStatus
      * @return bool $hasOrderStatePending
      */
@@ -1095,184 +1106,190 @@ class OrderGateway extends AbstractGateway
         $order = $action->getEntity();
         // Reload order because entity might have changed in the meantime
         $order = $this->_entityService->reloadEntity($order);
-        $orderStatus = $order->getData('status');
 
-        $success = TRUE;
-        switch ($action->getType()) {
-            case 'comment':
-                $status = ($action->hasData('status') ? $action->getData('status') : $orderStatus);
-                $comment = $action->getData('comment');
-                if ($comment == NULL && $action->getData('body')) {
-                    if ($action->getData('title') != NULL) {
-                        $comment = $action->getData('title').' - ';
+        if (self::isOrderToBeWritten($order)) {
+            $success = TRUE;
+            $uniqueId = $order->getUniqueId();
+            $orderStatus = $order->getData('status');
+
+            switch ($action->getType()) {
+                case 'comment':
+                    $status = ($action->hasData('status') ? $action->getData('status') : $orderStatus);
+                    $comment = $action->getData('comment');
+                    if ($comment == NULL && $action->getData('body')) {
+                        if ($action->getData('title') != NULL) {
+                            $comment = $action->getData('title').' - ';
+                        }else{
+                            $comment = '';
+                        }
+                        if($action->hasData('comment_id')){
+                            $comment .= '{'.$action->getData('comment_id').'} ';
+                        }
+                        $comment .= $action->getData('body');
+                    }
+
+                    if ($action->hasData('customer_visible')) {
+                        $notify = $action->getData('customer_visible') ? 'true' : 'false';
                     }else{
-                        $comment = '';
+                        $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
                     }
-                    if($action->hasData('comment_id')){
-                        $comment .= '{'.$action->getData('comment_id').'} ';
+
+                    try {
+                        $this->_soap->call('salesOrderAddComment', array(
+                                $order->getOriginalOrder()->getUniqueId(),
+                                $status,
+                                $comment,
+                                $notify
+                            ));
+                    }catch (\Exception $exception) {
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                     }
-                    $comment .= $action->getData('body');
-                }
+                    break;
+                case 'cancel':
+                    $isCancelable = self::hasOrderStatePending($orderStatus);
+                    if (!self::hasOrderStateCancelled($orderStatus)) {
+                        if (!$isCancelable){
+                            $message = 'Attempted to cancel non-pending order '.$uniqueId.' ('.$orderStatus.')';
+                            // store as a sync issue
+                            throw new GatewayException($message);
+                            $success = FALSE;
+                        }elseif ($order->isSegregated()) {
+                            // store as a sync issue
+                            throw new GatewayException('Attempted to cancel child order '.$uniqueId.' !');
+                            $success = FALSE;
+                        }else{
+                            try {
+                                $this->_soap->call('salesOrderCancel', $uniqueId);
 
-                if ($action->hasData('customer_visible')) {
-                    $notify = $action->getData('customer_visible') ? 'true' : 'false';
-                }else{
-                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
-                }
+                                // Update status straight away
+                                $changedOrder = $this->_soap->call('salesOrderInfo', array($uniqueId));
+                                if (isset($changedOrder['result'])) {
+                                    $changedOrder = $changedOrder['result'];
+                                }
 
-                try {
-                    $this->_soap->call('salesOrderAddComment', array(
-                            $order->getOriginalOrder()->getUniqueId(),
-                            $status,
-                            $comment,
-                            $notify
-                        ));
-                }catch (\Exception $exception) {
-                    // store as sync issue
-                    throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-                }
-                break;
-            case 'cancel':
-                $isCancelable = self::hasOrderStatePending($orderStatus);
-                if (!self::hasOrderStateCancelled($orderStatus)) {
-                    if (!$isCancelable){
-                        $message = 'Attempted to cancel non-pending order '.$order->getUniqueId().' ('.$orderStatus.')';
-                        // store as a sync issue
-                        throw new GatewayException($message);
-                        $success = FALSE;
-                    }elseif ($order->isSegregated()) {
-                        // store as a sync issue
-                        throw new GatewayException('Attempted to cancel child order '.$order->getUniqueId().' !');
+                                $newStatus = $changedOrder['status'];
+                                $changedOrderData = array('status'=>$newStatus);
+                                $this->_entityService->updateEntity(
+                                    $this->_node->getNodeId(),
+                                    $order,
+                                    $changedOrderData,
+                                    FALSE
+                                );
+                                $changedOrderData['status_history'] = array(array(
+                                    'comment'=>'HOPS updated status from Magento after abandoning order to '.$newStatus.'.',
+                                    'created_at'=>date('Y/m/d H:i:s')
+                                ));
+                                $this->updateStatusHistory($changedOrderData, $order);
+                            }catch (\Exception $exception) {
+                                // store as sync issue
+                                throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                            }
+                        }
+                    }
+                    break;
+                case 'hold':
+                    if ($order->isSegregated()) {
+                        // Is that really necessary to throw an exception?
+                        throw new GatewayException('Attempted to hold child order!');
                         $success = FALSE;
                     }else{
                         try {
-                            $this->_soap->call('salesOrderCancel', $order->getUniqueId());
-
-                            // Update status straight away
-                            $changedOrder = $this->_soap->call('salesOrderInfo', array($order->getUniqueId()));
-                            if (isset($changedOrder['result'])) {
-                                $changedOrder = $changedOrder['result'];
-                            }
-
-                            $newStatus = $changedOrder['status'];
-                            $changedOrderData = array('status'=>$newStatus);
-                            $this->_entityService->updateEntity(
-                                $this->_node->getNodeId(),
-                                $order,
-                                $changedOrderData,
-                                FALSE
-                            );
-                            $changedOrderData['status_history'] = array(array(
-                                'comment'=>'HOPS updated status from Magento after abandoning order to '.$newStatus.'.',
-                                'created_at'=>date('Y/m/d H:i:s')
-                            ));
-                            $this->updateStatusHistory($changedOrderData, $order);
+                            $this->_soap->call('salesOrderHold', $uniqueId);
                         }catch (\Exception $exception) {
                             // store as sync issue
                             throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         }
                     }
-                }
-                break;
-            case 'hold':
-                if ($order->isSegregated()) {
-                    // Is that really necessary to throw an exception?
-                    throw new GatewayException('Attempted to hold child order!');
-                    $success = FALSE;
-                }else{
-                    try {
-                        $this->_soap->call('salesOrderHold', $order->getUniqueId());
-                    }catch (\Exception $exception) {
-                        // store as sync issue
-                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    break;
+                case 'unhold':
+                    if ($order->isSegregated()) {
+                        // Is that really necessary to throw an exception?
+                        throw new GatewayException('Attempted to unhold child order!');
+                        $success = FALSE;
+                    }else{
+                        try {
+                           $this->_soap->call('salesOrderUnhold', $uniqueId);
+                        }catch (\Exception $exception) {
+                            // store as sync issue
+                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                        }
                     }
-                }
-                break;
-            case 'unhold':
-                if ($order->isSegregated()) {
-                    // Is that really necessary to throw an exception?
-                    throw new GatewayException('Attempted to unhold child order!');
-                    $success = FALSE;
-                }else{
-                    try {
-                       $this->_soap->call('salesOrderUnhold', $order->getUniqueId());
-                    }catch (\Exception $exception) {
-                        // store as sync issue
-                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                    break;
+                case 'ship':
+                    if (self::hasOrderStateProcessing($orderStatus)) {
+                        $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
+                        $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
+                        $sendComment = ($action->hasData('send_comment') ?
+                            ($action->getData('send_comment') ? 'true' : 'false' ) : NULL);
+                        $itemsShipped = ($action->hasData('items') ? $action->getData('items') : NULL);
+                        $trackingCode = ($action->hasData('tracking_code') ? $action->getData('tracking_code') : NULL);
+
+                        $this->actionShip($order, $comment, $notify, $sendComment, $itemsShipped, $trackingCode);
+                    }else{
+                        $message = 'Invalid order status for shipment: '
+                            .$uniqueId.' has '.$order->getData('status');
+                        // Is that really necessary to throw an exception?
+                        throw new GatewayException($message);
+                        $success = FALSE;
                     }
-                }
-                break;
-            case 'ship':
-                if (self::hasOrderStateProcessing($orderStatus)) {
-                    $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
-                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
-                    $sendComment = ($action->hasData('send_comment') ?
-                        ($action->getData('send_comment') ? 'true' : 'false' ) : NULL);
-                    $itemsShipped = ($action->hasData('items') ? $action->getData('items') : NULL);
-                    $trackingCode = ($action->hasData('tracking_code') ? $action->getData('tracking_code') : NULL);
+                    break;
+                case 'creditmemo':
+                    if (self::hasOrderStateProcessing($orderStatus) || $orderStatus == self::MAGENTO_STATUS_COMPLETE) {
+                        $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
+                        $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
+                        $sendComment = ($action->hasData('send_comment') ?
+                            ($action->getData('send_comment') ? 'true' : 'false' ) : NULL);
+                        $itemsRefunded = ($action->hasData('items') ? $action->getData('items') : NULL);
+                        $shippingRefund = ($action->hasData('shipping_refund') ? $action->getData('shipping_refund') : 0);
+                        $creditRefund = ($action->hasData('credit_refund') ? $action->getData('credit_refund') : 0);
+                        $adjustmentPositive =
+                            ($action->hasData('adjustment_positive') ? $action->getData('adjustment_positive') : 0);
+                        $adjustmentNegative =
+                            ($action->hasData('adjustment_negative') ? $action->getData('adjustment_negative') : 0);
 
-                    $this->actionShip($order, $comment, $notify, $sendComment, $itemsShipped, $trackingCode);
-                }else{
-                    $message = 'Invalid order status for shipment: '
-                        .$order->getUniqueId().' has '.$order->getData('status');
-                    // Is that really necessary to throw an exception?
-                    throw new GatewayException($message);
-                    $success = FALSE;
-                }
-                break;
-            case 'creditmemo':
-                if (self::hasOrderStateProcessing($orderStatus) || $orderStatus == self::MAGENTO_STATUS_COMPLETE) {
-                    $comment = ($action->hasData('comment') ? $action->getData('comment') : NULL);
-                    $notify = ($action->hasData('notify') ? ($action->getData('notify') ? 'true' : 'false' ) : NULL);
-                    $sendComment = ($action->hasData('send_comment') ?
-                        ($action->getData('send_comment') ? 'true' : 'false' ) : NULL);
-                    $itemsRefunded = ($action->hasData('items') ? $action->getData('items') : NULL);
-                    $shippingRefund = ($action->hasData('shipping_refund') ? $action->getData('shipping_refund') : 0);
-                    $creditRefund = ($action->hasData('credit_refund') ? $action->getData('credit_refund') : 0);
-                    $adjustmentPositive =
-                        ($action->hasData('adjustment_positive') ? $action->getData('adjustment_positive') : 0);
-                    $adjustmentNegative =
-                        ($action->hasData('adjustment_negative') ? $action->getData('adjustment_negative') : 0);
-
-                    $message = 'Magento, create creditmemo: Passing values orderIncrementId '.$order->getUniqueId()
-                        .'creditmemoData: [qtys=>'.var_export($itemsRefunded, TRUE).', shipping_amount=>'.$shippingRefund
-                        .', adjustment_positive=>'.$adjustmentPositive.', adjustment_negative=>'.$adjustmentNegative
-                        .'], comment '.$comment.', notifyCustomer '.$notify.', includeComment '.$sendComment
-                        .', refundToStoreCreditAmount '.$creditRefund.'.';
-                    $this->getServiceLocator()->get('logService')
-                        ->log(LogService::LEVEL_DEBUGEXTRA,
-                            'mag_o_wr_cr_cm',
-                            $message,
-                            array(
-                                'entity (order)'=>$order,
-                                'action'=>$action,
-                                'action data'=>$action->getData(),
-                                'orderIncrementId'=>$order->getUniqueId(),
-                                'creditmemoData'=>array(
-                                    'qtys'=>$itemsRefunded,
-                                    'shipping_amount'=>$shippingRefund,
-                                    'adjustment_positive'=>$adjustmentPositive,
-                                    'adjustment_negative'=>$adjustmentNegative
-                                ),
-                                'comment'=>$comment,
-                                'notifyCustomer'=>$notify,
-                                'includeComment'=>$sendComment,
-                                'refundToStoreCreditAmount'=>$creditRefund
-                            )
-                        );
-                    $this->actionCreditmemo($order, $comment, $notify, $sendComment,
-                        $itemsRefunded, $shippingRefund, $creditRefund, $adjustmentPositive, $adjustmentNegative);
-                }else{
-                    $message = 'Invalid order status for creditmemo: '.$order->getUniqueId().' has '.$orderStatus;
+                        $message = 'Magento, create creditmemo: Passing values orderIncrementId '.$uniqueId
+                            .'creditmemoData: [qtys=>'.var_export($itemsRefunded, TRUE).', shipping_amount=>'.$shippingRefund
+                            .', adjustment_positive=>'.$adjustmentPositive.', adjustment_negative=>'.$adjustmentNegative
+                            .'], comment '.$comment.', notifyCustomer '.$notify.', includeComment '.$sendComment
+                            .', refundToStoreCreditAmount '.$creditRefund.'.';
+                        $this->getServiceLocator()->get('logService')
+                            ->log(LogService::LEVEL_DEBUGEXTRA,
+                                'mag_o_wr_cr_cm',
+                                $message,
+                                array(
+                                    'entity (order)'=>$order,
+                                    'action'=>$action,
+                                    'action data'=>$action->getData(),
+                                    'orderIncrementId'=>$uniqueId,
+                                    'creditmemoData'=>array(
+                                        'qtys'=>$itemsRefunded,
+                                        'shipping_amount'=>$shippingRefund,
+                                        'adjustment_positive'=>$adjustmentPositive,
+                                        'adjustment_negative'=>$adjustmentNegative
+                                    ),
+                                    'comment'=>$comment,
+                                    'notifyCustomer'=>$notify,
+                                    'includeComment'=>$sendComment,
+                                    'refundToStoreCreditAmount'=>$creditRefund
+                                )
+                            );
+                        $this->actionCreditmemo($order, $comment, $notify, $sendComment,
+                            $itemsRefunded, $shippingRefund, $creditRefund, $adjustmentPositive, $adjustmentNegative);
+                    }else{
+                        $message = 'Invalid order status for creditmemo: '.$uniqueId.' has '.$orderStatus;
+                        // store as a sync issue
+                        throw new GatewayException($message);
+                        $success = FALSE;
+                    }
+                    break;
+                default:
                     // store as a sync issue
-                    throw new GatewayException($message);
+                    throw new GatewayException('Unsupported action type '.$action->getType().' for Magento Orders.');
                     $success = FALSE;
             }
-                break;
-            default:
-                // store as a sync issue
-                throw new GatewayException('Unsupported action type '.$action->getType().' for Magento Orders.');
-                $success = FALSE;
+        }else{
+            $success = NULL;
         }
 
         return $success;
