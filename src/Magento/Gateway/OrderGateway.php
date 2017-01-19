@@ -427,6 +427,10 @@ class OrderGateway extends AbstractGateway
                 $data['customer'] = NULL;
                 // ToDo : Should never be the case, exception handling neccessary
             }
+        }else{
+//            $data['flagged'] = 1;
+            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR, 'mag_o_nocu_err',
+                'New order '.$uniqueId.' has no customer assigned.', array('order unique'=>$uniqueId));
         }
 
         $needsUpdate = TRUE;
