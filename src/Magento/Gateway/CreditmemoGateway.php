@@ -562,12 +562,14 @@ $success = TRUE;
         /** @var \Entity\Service\EntityConfigService $entityConfigService */
         $entityConfigService = $this->getServiceLocator()->get('entityConfigService');
 
-        $entity = $action->getEntity();
+        $creditmemo = $action->getEntity();
+        $order = $creditmemo->getParent();
 
-        $success = FALSE;
-        if (stripos($entity->getUniqueId(), 'TMP-') === 0) {
-            // Hold off for now
-        }else {
+        if (OrderGateway::isOrderToBeWritten($order)) {
+            $success = NULL;
+        }elseif (stripos($creditmemo->getUniqueId(), 'TMP-') === 0) {
+            $success = FALSE;
+        }else{
             switch ($action->getType()) {
                 case 'comment':
                     $comment = $action->getData('comment');
@@ -576,10 +578,8 @@ $success = TRUE;
                         ? ($action->getData('includeComment') ? 'true' : 'false') : NULL);
 
                     try{
-                        $this->_soap->call(
-                            'salesOrderCreditmemoAddComment',
-                            array(
-                                $entity->getUniqueId(),
+                        $this->_soap->call('salesOrderCreditmemoAddComment', array(
+                                $creditmemo->getUniqueId(),
                                 $comment,
                                 $notify,
                                 $includeComment
@@ -589,20 +589,23 @@ $success = TRUE;
                     }catch( \Exception $exception ){
                         // store as sync issue
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                        $success = FALSE;
                     }
                     break;
                 case 'cancel':
                     try {
-                        $this->_soap->call('salesOrderCreditmemoCancel', $entity->getUniqueId());
+                        $this->_soap->call('salesOrderCreditmemoCancel', $creditmemo->getUniqueId());
                         $success = TRUE;
                     }catch (\Exception $exception) {
                         // store as sync issue
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                        $success = FALSE;
                     }
                     break;
                 default:
                     $message = 'Unsupported action type '.$action->getType().' for Magento Credit Memos.';
                     throw new GatewayException($message);
+                    $success = FALSE;
             }
         }
 
