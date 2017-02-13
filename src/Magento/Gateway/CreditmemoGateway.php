@@ -374,178 +374,182 @@ class CreditmemoGateway extends AbstractGateway
 
     /**
      * Write out all the updates to the given entity.
-     * @param \Entity\Entity $entity
+     * @param \Entity\Entity $creditmemo
      * @param string[] $attributes
      * @param int $type
      * @throws GatewayException
      */
-    public function writeUpdates(\Entity\Entity $entity, $attributes, $type = \Entity\Update::TYPE_UPDATE)
+    public function writeUpdates(\Entity\Entity $creditmemo, $attributes, $type = \Entity\Update::TYPE_UPDATE)
     {
-        switch ($type) {
-            case \Entity\Update::TYPE_UPDATE:
-                // We don't update, ever
-                break;
-            case \Entity\Update::TYPE_DELETE:
-                try {
-                    $this->_soap->call('salesOrderCreditmemoCancel', array($entity->getUniqueId()));
-                }catch (\Exception $exception) {
-                    // store as sync issue
-                    throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-                }
-                break;
-            case \Entity\Update::TYPE_CREATE:
-                /** @var \Entity\Service\EntityService $entityService */
-                $entityService = $this->getServiceLocator()->get('entityService');
+        $order = $creditmemo->getParent();
 
-                $order = $entity->getParent();
-                $originalOrder = $entity->getOriginalParent();
-                if (!$order || $order->getTypeStr() != 'order') {
-                    // store as sync issue
-                    throw new GatewayException('Creditmemo parent not correctly set for creditmemo '.$entity->getId());
-                }elseif (!$originalOrder || $originalOrder->getTypeStr() != 'order') {
-                    $message = 'Creditmemo root parent not correctly set for creditmemo '.$entity->getId();
-                    // store as sync issue
-                    throw new GatewayException($message);
-                }else{
-                    /** @var \Entity\Entity[] $items */
-                    $items = $entity->getItems();
-                    if (!count($items)) {
-                        $items = $originalOrder->getOrderitems();
+        if (OrderGateway::isOrderToBeWritten($order)) {
+            $success = NULL;
+        }else{
+            switch ($type) {
+                case \Entity\Update::TYPE_UPDATE:
+                    // We do not update
+                    break;
+                case \Entity\Update::TYPE_DELETE:
+                    try {
+                        $this->_soap->call('salesOrderCreditmemoCancel', array($creditmemo->getUniqueId()));
+                    }catch (\Exception $exception) {
+                        // store as sync issue
+                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                     }
+                    break;
+                case \Entity\Update::TYPE_CREATE:
+                    /** @var \Entity\Service\EntityService $entityService */
+                    $entityService = $this->getServiceLocator()->get('entityService');
 
-                    $itemData = array();
-                    foreach ($items as $item) {
-                        switch ($item->getTypeStr()) {
-                            case 'creditmemoitem':
-                                $orderItemId = $item->getData('order_item');
-                                $qty = $item->getData('qty', 0);
-                                break;
-                            case 'orderitem':
-                                $orderItemId = $item->getId();
-                                $qty = 0;
-                                break;
-                            default:
-                                $message = 'Wrong type of the children of creditmemo '.$entity->getUniqueId().'.';
-                                // store as sync issue
-                                throw new GatewayException($message);
+                    $originalOrder = $creditmemo->getOriginalParent();
+                    if (!$order || $order->getTypeStr() != 'order') {
+                        // Store as sync issue
+                        throw new GatewayException('Creditmemo parent not correctly set for '.$creditmemo->getId());
+                    }elseif (!$originalOrder || $originalOrder->getTypeStr() != 'order') {
+                        // Store as sync issue
+                        throw new GatewayException('Creditmemo root parent not correctly set for '.$creditmemo->getId());
+                    }else{
+                        /** @var \Entity\Entity[] $items */
+                        $items = $creditmemo->getItems();
+                        if (!count($items)) {
+                            $items = $originalOrder->getOrderitems();
                         }
 
-                        $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $orderItemId);
-                        if (!$itemLocalId) {
-                            $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
-                                .' and creditmemo '.$entity->getUniqueId().' (orderitem '.$item->getData(
-                                    'order_item'
-                                ).')';
+                        $itemData = array();
+                        foreach ($items as $item) {
+                            switch ($item->getTypeStr()) {
+                                case 'creditmemoitem':
+                                    $orderItemId = $item->getData('order_item');
+                                    $qty = $item->getData('qty', 0);
+                                    break;
+                                case 'orderitem':
+                                    $orderItemId = $item->getId();
+                                    $qty = 0;
+                                    break;
+                                default:
+                                    $message = 'Wrong type of the children of creditmemo '.$creditmemo->getUniqueId().'.';
+                                    // store as sync issue
+                                    throw new GatewayException($message);
+                            }
+
+                            $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $orderItemId);
+                            if (!$itemLocalId) {
+                                $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
+                                    .' and creditmemo '.$creditmemo->getUniqueId().' (orderitem '.$item->getData(
+                                        'order_item'
+                                    ).')';
+                                // store as sync issue
+                                throw new GatewayException($message);
+                            }
+                            $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$qty);
+                        }
+
+                        $creditmemoData = array(
+                            'qtys' => $itemData,
+                            'shipping_amount' => $creditmemo->getData('shipping_amount', 0),
+                            'adjustment_positive' => $creditmemo->getData('adjustment_positive', 0),
+                            'adjustment_negative' => $creditmemo->getData('adjustment_negative', 0)
+                        );
+
+                        try {
+                            // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
+                            $storeCreditRefundAdjusted = $creditmemo->getData('customer_balance_ref', 0)
+                                / $originalOrder->getData('base_to_currency_rate', 1);
+                            $soapResult = $this->_soap->call(
+                                'salesOrderCreditmemoCreate',
+                                array(
+                                    $originalOrder->getUniqueId(),
+                                    $creditmemoData,
+                                    '',
+                                    false,
+                                    false,
+                                    $storeCreditRefundAdjusted
+                                )
+                            );
+                        }catch (\Exception $exception) {
+                            // store as sync issue
+                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                        }
+
+                        if (is_object($soapResult)) {
+                            $soapResult = $soapResult->result;
+                        }elseif (is_array($soapResult)) {
+                            if (isset($soapResult['result'])) {
+                                $soapResult = $soapResult['result'];
+                            }else {
+                                $soapResult = array_shift($soapResult);
+                            }
+                        }
+
+                        if (!$soapResult) {
+                            $message = 'Failed to get creditmemo ID from Magento for order '.$originalOrder->getUniqueId()
+                                .' (Hops order '.$order->getUniqueId().').';
                             // store as sync issue
                             throw new GatewayException($message);
                         }
-                        $itemData[] = array('order_item_id'=>$itemLocalId, 'qty'=>$qty);
-                    }
+                        $entityService->updateEntityUnique($this->_node->getNodeId(), $creditmemo, $soapResult);
 
-
-                    $creditmemoData = array(
-                        'qtys' => $itemData,
-                        'shipping_amount' => $entity->getData('shipping_amount', 0),
-                        'adjustment_positive' => $entity->getData('adjustment_positive', 0),
-                        'adjustment_negative' => $entity->getData('adjustment_negative', 0)
-                    );
-
-                    try {
-                        // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
-                        $storeCreditRefundAdjusted = $entity->getData('customer_balance_ref', 0)
-                            / $originalOrder->getData('base_to_currency_rate', 1);
-                        $soapResult = $this->_soap->call(
-                            'salesOrderCreditmemoCreate',
-                            array(
-                                $originalOrder->getUniqueId(),
-                                $creditmemoData,
-                                '',
-                                false,
-                                false,
-                                $storeCreditRefundAdjusted
-                            )
-                        );
-                    }catch (\Exception $exception) {
-                        // store as sync issue
-                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-                    }
-
-                    if (is_object($soapResult)) {
-                        $soapResult = $soapResult->result;
-                    }elseif (is_array($soapResult)) {
-                        if (isset($soapResult['result'])) {
-                            $soapResult = $soapResult['result'];
-                        }else {
-                            $soapResult = array_shift($soapResult);
+                        try {
+                            $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($soapResult));
+                        }catch (\Exception $exception) {
+                            // store as sync issue
+                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         }
-                    }
 
-                    if (!$soapResult) {
-                        $message = 'Failed to get creditmemo ID from Magento for order '.$originalOrder->getUniqueId()
-                            .' (Hops order '.$order->getUniqueId().').';
-                        // store as sync issue
-                        throw new GatewayException($message);
-                    }
-                    $entityService->updateEntityUnique($this->_node->getNodeId(), $entity, $soapResult);
+                        if (isset($creditmemo['result'])) {
+                            $creditmemo = $creditmemo['result'];
+                        }
+                        $localId = $creditmemo['creditmemo_id'];
 
-                    try {
-                        $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($soapResult));
-                    }catch (\Exception $exception) {
-                        // store as sync issue
-                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-                    }
+                        try{
+                            $entityService->unlinkEntity($this->_node->getNodeId(), $creditmemo);
+                        }catch (\Exception $exception) {} // Ignore errors
 
-                    if (isset($creditmemo['result'])) {
-                        $creditmemo = $creditmemo['result'];
-                    }
-                    $localId = $creditmemo['creditmemo_id'];
+                        $entityService->linkEntity($this->_node->getNodeId(), $creditmemo, $localId);
 
-                    try{
-                        $entityService->unlinkEntity($this->_node->getNodeId(), $entity);
-                    }catch (\Exception $exception) {} // Ignore errors
+                        // Update credit memo item local and unique IDs
+                        foreach ($creditmemo['items'] as $item) {
+                            foreach ($items as $itemEntity) {
+                                $isItemSkuAndQtyTheSame = $itemEntity->getData('sku') == $item['sku']
+                                    && $itemEntity->getData('qty') == $item['qty'];
+                                if ($isItemSkuAndQtyTheSame) {
+                                    $entityService->updateEntityUnique(
+                                        $this->_node->getNodeId(),
+                                        $itemEntity,
+                                        $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id']
+                                    );
 
-                    $entityService->linkEntity($this->_node->getNodeId(), $entity, $localId);
+                                    try{
+                                        $entityService->unlinkEntity($this->_node->getNodeId(), $itemEntity);
+                                    }catch (\Exception $exception) {} // Ignore errors
 
-                    // Update credit memo item local and unique IDs
-                    foreach ($creditmemo['items'] as $item) {
-                        foreach ($items as $itemEntity) {
-                            $isItemSkuAndQtyTheSame = $itemEntity->getData('sku') == $item['sku']
-                                && $itemEntity->getData('qty') == $item['qty'];
-                            if ($isItemSkuAndQtyTheSame) {
-                                $entityService->updateEntityUnique(
-                                    $this->_node->getNodeId(),
-                                    $itemEntity,
-                                    $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id']
-                                );
-
-                                try{
-                                    $entityService->unlinkEntity($this->_node->getNodeId(), $itemEntity);
-                                }catch (\Exception $exception) {} // Ignore errors
-
-                                $entityService->linkEntity($this->_node->getNodeId(), $itemEntity, $item['item_id']);
-                                break;
+                                    $entityService->linkEntity($this->_node->getNodeId(), $itemEntity, $item['item_id']);
+                                    break;
+                                }
                             }
                         }
+
+                        try {
+                            $this->_soap->call(
+                                'salesOrderCreditmemoAddComment',
+                                array($soapResult, 'FOR ORDER: '.$order->getUniqueId(), FALSE, FALSE)
+                            );
+                        }catch (\Exception $exception) {
+                            // store as sync issue
+                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+                        }
                     }
 
-                    try {
-                        $this->_soap->call(
-                            'salesOrderCreditmemoAddComment',
-                            array($soapResult, 'FOR ORDER: '.$order->getUniqueId(), FALSE, FALSE)
-                        );
-                    }catch (\Exception $exception) {
-                        // store as sync issue
-                        throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-                    }
-                }
-
-                break;
-            default:
-                throw new GatewayException('Invalid update type '.$type);
-        }
+                    break;
+                default:
+                    throw new GatewayException('Invalid update type '.$type);
+            }
 
 // Everything ending up here without an exception is a success
 $success = TRUE;
+
+        }
 
         return $success;
     }
