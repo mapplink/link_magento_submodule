@@ -384,8 +384,6 @@ class CreditmemoGateway extends AbstractGateway
         $order = $creditmemo->getParent();
 
         if (OrderGateway::isOrderToBeWritten($order)) {
-            $success = NULL;
-        }else{
             switch ($type) {
                 case \Entity\Update::TYPE_UPDATE:
                     // We do not update
@@ -462,8 +460,8 @@ class CreditmemoGateway extends AbstractGateway
                                     $originalOrder->getUniqueId(),
                                     $creditmemoData,
                                     '',
-                                    false,
-                                    false,
+                                    FALSE,
+                                    FALSE,
                                     $storeCreditRefundAdjusted
                                 )
                             );
@@ -549,6 +547,8 @@ class CreditmemoGateway extends AbstractGateway
 // Everything ending up here without an exception is a success
 $success = TRUE;
 
+        }else{
+            $success = NULL;
         }
 
         return $success;
@@ -569,7 +569,7 @@ $success = TRUE;
         $creditmemo = $action->getEntity();
         $order = $creditmemo->getParent();
 
-        if (OrderGateway::isOrderToBeWritten($order)) {
+        if (!OrderGateway::isOrderToBeWritten($order)) {
             $success = NULL;
         }elseif (stripos($creditmemo->getUniqueId(), 'TMP-') === 0) {
             $success = FALSE;
