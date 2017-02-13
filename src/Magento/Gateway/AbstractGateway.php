@@ -20,6 +20,7 @@ use Node\Entity;
 abstract class AbstractGateway extends BaseAbstractGateway
 {
 
+    const GATEWAY_NODE_CODE = 'mag';
     const GATEWAY_ENTITY = 'generic';
     const GATEWAY_ENTITY_CODE = 'gty';
 
