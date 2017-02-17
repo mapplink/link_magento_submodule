@@ -347,12 +347,12 @@ class CreditmemoGateway extends AbstractGateway
             $creditmemoitem = $entityService
                 ->loadEntity($this->_node->getNodeId(), 'creditmemoitem', $storeId, $uniqueId);
 
-            if (!$creditmemoitem && !$creationMode && $item['sku']) {
+            if (!$creditmemoitem && !$creationMode && $data['sku']) {
                 $loadedViaSku = FALSE;
                 $entityItems = $creditmemoEntity->getCreditmemoitems();
 
                 foreach ($entityItems as $entityItem) {
-                    if ($entityItem->getSku() == $item['sku']) {
+                    if ($entityItem->getSku() == $data['sku'] && $data['sku']) {
                         $creditmemoitem = $entityItem;
                         $loadedViaSku = TRUE;
                         break;
