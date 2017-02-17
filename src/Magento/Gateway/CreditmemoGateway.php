@@ -324,35 +324,35 @@ class CreditmemoGateway extends AbstractGateway
             );
 
             $data = array(
-                'product' => ($product ? $product->getId() : null),
-                'parent_item' => ($parent_item ? $parent_item->getId() : null),
-                'tax_amount' => (isset($item['base_tax_amount']) ? $item['base_tax_amount'] : null),
-                'discount_amount' => (isset($item['base_discount_amount']) ? $item['base_discount_amount'] : null),
-                'sku' => (isset($item['sku']) ? $item['sku'] : null),
-                'name' => (isset($item['name']) ? $item['name'] : null),
-                'qty' => (isset($item['qty']) ? $item['qty'] : null),
-                'row_total' => (isset($item['base_row_total']) ? $item['base_row_total'] : null),
-                'price_incl_tax' => (isset($item['base_price_incl_tax']) ? $item['base_price_incl_tax'] : null),
-                'price' => (isset($item['base_price']) ? $item['base_price'] : null),
-                'row_total_incl_tax' => (isset($item['base_row_total_incl_tax']) ? $item['base_row_total_incl_tax'] : null),
-                'additional_data' => (isset($item['additional_data']) ? $item['additional_data'] : null),
-                'description' => (isset($item['description']) ? $item['description'] : null),
-                'hidden_tax_amount' => (isset($item['base_hidden_tax_amount']) ? $item['base_hidden_tax_amount'] : null),
+                'product'=>($product ? $product->getId() : NULL),
+                'parent_item'=>($parent_item ? $parent_item->getId() : NULL),
+                'tax_amount'=>(isset($item['base_tax_amount']) ? $item['base_tax_amount'] : NULL),
+                'discount_amount'=>(isset($item['base_discount_amount']) ? $item['base_discount_amount'] : NULL),
+                'sku'=>(isset($item['sku']) ? $item['sku'] : NULL),
+                'name'=>(isset($item['name']) ? $item['name'] : NULL),
+                'qty'=>(isset($item['qty']) ? $item['qty'] : NULL),
+                'row_total'=>(isset($item['base_row_total']) ? $item['base_row_total'] : NULL),
+                'price_incl_tax'=>(isset($item['base_price_incl_tax']) ? $item['base_price_incl_tax'] : NULL),
+                'price'=>(isset($item['base_price']) ? $item['base_price'] : NULL),
+                'row_total_incl_tax'=>(isset($item['base_row_total_incl_tax']) ? $item['base_row_total_incl_tax'] : NULL),
+                'additional_data'=>(isset($item['additional_data']) ? $item['additional_data'] : NULL),
+                'description'=>(isset($item['description']) ? $item['description'] : NULL),
+                'hidden_tax_amount'=>(isset($item['base_hidden_tax_amount']) ? $item['base_hidden_tax_amount'] : NULL),
             );
 
             $storeId = ($this->_node->isMultiStore() ? $creditmemo['store_id'] : 0);
             $creditmemoitem = $entityService
                 ->loadEntity($this->_node->getNodeId(), 'creditmemoitem', $storeId, $uniqueId);
 
-            if (!$creditmemoitem && !$creationMode) {
+            if (!$creditmemoitem && !$creationMode && $item['sku']) {
                 $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN, 'mag_cmi_skuload',
                     'Unique load failed on cmi '.$uniqueId.'.', array('unique id'=>$uniqueId, 'sku'=>$data['sku']));
                 $loadedViaSku = FALSE;
 
                 $entityItems = $creditmemoEntity->getCreditmemoitems();
-                foreach ($entityItems as $item) {
-                    if ($item->getSku() == $data['sku']) {
-                        $creditmemoitem = $item;
+                foreach ($entityItems as $entityItem) {
+                    if ($entityItem->getSku() == $item['sku']) {
+                        $creditmemoitem = $entityItem;
                         $loadedViaSku = TRUE;
                         break;
                     }
@@ -460,10 +460,10 @@ class CreditmemoGateway extends AbstractGateway
                         }
 
                         $creditmemoData = array(
-                            'qtys' => $itemData,
-                            'shipping_amount' => $creditmemo->getData('shipping_amount', 0),
-                            'adjustment_positive' => $creditmemo->getData('adjustment_positive', 0),
-                            'adjustment_negative' => $creditmemo->getData('adjustment_negative', 0)
+                            'qtys'=>$itemData,
+                            'shipping_amount'=>$creditmemo->getData('shipping_amount', 0),
+                            'adjustment_positive'=>$creditmemo->getData('adjustment_positive', 0),
+                            'adjustment_negative'=>$creditmemo->getData('adjustment_negative', 0)
                         );
 
                         try {
