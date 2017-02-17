@@ -304,11 +304,7 @@ class CreditmemoGateway extends AbstractGateway
         $parentId = $creditmemoEntity->getId();
 
         foreach ($creditmemo['items'] as $item) {
-            $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['order_item_id'];
-            if (strpos($uniqueId, Creditmemo::TEMPORARY_PREFIX) === 0) {
-                $uniqueId = substr($uniqueId, strlen(Creditmemo::TEMPORARY_PREFIX));
-            }
-
+            $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['sku'];
             $localId = $item['item_id'];
             $product = $entityService->loadEntityLocal($this->_node->getNodeId(), 'product', 0, $item['product_id']);
 
@@ -354,6 +350,8 @@ class CreditmemoGateway extends AbstractGateway
                 foreach ($entityItems as $entityItem) {
                     if ($entityItem->getSku() == $data['sku'] && $data['sku']) {
                         $creditmemoitem = $entityItem;
+                        $entityService->updateEntityUnique($this->_node->getNodeId(), $creditmemoitem, $uniqueId);
+                        $entityService->reloadEntity($creditmemoitem);
                         $loadedViaSku = TRUE;
                         break;
                     }
@@ -492,7 +490,7 @@ class CreditmemoGateway extends AbstractGateway
                         }elseif (is_array($soapResult)) {
                             if (isset($soapResult['result'])) {
                                 $soapResult = $soapResult['result'];
-                            }else {
+                            }else{
                                 $soapResult = array_shift($soapResult);
                             }
                         }
@@ -529,12 +527,9 @@ class CreditmemoGateway extends AbstractGateway
                                 $isItemSkuAndQtyTheSame = $itemEntity->getData('sku') == $item['sku']
                                     && $itemEntity->getData('qty') == $item['qty'];
                                 if ($isItemSkuAndQtyTheSame) {
-                                    $entityService->updateEntityUnique(
-                                        $this->_node->getNodeId(),
-                                        $itemEntity,
-                                        $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id']
-                                    );
-
+                                    $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
+                                    $entityService
+                                        ->updateEntityUnique($this->_node->getNodeId(), $itemEntity, $uniqueId);
                                     try{
                                         $entityService->unlinkEntity($this->_node->getNodeId(), $itemEntity);
                                     }catch (\Exception $exception) {} // Ignore errors
