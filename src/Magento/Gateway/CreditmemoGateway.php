@@ -348,11 +348,9 @@ class CreditmemoGateway extends AbstractGateway
                 ->loadEntity($this->_node->getNodeId(), 'creditmemoitem', $storeId, $uniqueId);
 
             if (!$creditmemoitem && !$creationMode && $item['sku']) {
-                $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_WARN, 'mag_cmi_skuload',
-                    'Unique load failed on cmi '.$uniqueId.'.', array('unique id'=>$uniqueId, 'sku'=>$data['sku']));
                 $loadedViaSku = FALSE;
-
                 $entityItems = $creditmemoEntity->getCreditmemoitems();
+
                 foreach ($entityItems as $entityItem) {
                     if ($entityItem->getSku() == $item['sku']) {
                         $creditmemoitem = $entityItem;
