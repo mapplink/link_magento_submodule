@@ -305,8 +305,11 @@ class CreditmemoGateway extends AbstractGateway
 
         foreach ($creditmemo['items'] as $item) {
             $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['order_item_id'];
-            $localId = $item['item_id'];
+            if (strpos($uniqueId, Creditmemo::TEMPORARY_PREFIX) === 0) {
+                $uniqueId = substr($uniqueId, strlen(Creditmemo::TEMPORARY_PREFIX));
+            }
 
+            $localId = $item['item_id'];
             $product = $entityService->loadEntityLocal($this->_node->getNodeId(), 'product', 0, $item['product_id']);
 
             $parent_item = $entityService->loadEntityLocal(
