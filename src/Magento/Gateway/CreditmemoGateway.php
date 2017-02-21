@@ -389,14 +389,15 @@ class CreditmemoGateway extends AbstractGateway
 
     /**
      * Write out all the updates to the given entity.
-     * @param \Entity\Entity $creditmemo
+     * @param \Entity\Entity $creditmemoEntity
      * @param string[] $attributes
      * @param int $type
      * @throws GatewayException
      */
-    public function writeUpdates(\Entity\Entity $creditmemo, $attributes, $type = \Entity\Update::TYPE_UPDATE)
+    public function writeUpdates(\Entity\Entity $creditmemoEntity, $attributes, $type = \Entity\Update::TYPE_UPDATE)
     {
-        $order = $creditmemo->getParent();
+        $order = $creditmemoEntity->getParent();
+        $uniqueId = $creditmemoEntity->getUniqueId();
 
         if (OrderGateway::isOrderToBeWritten($order)) {
             switch ($type) {
@@ -405,7 +406,7 @@ class CreditmemoGateway extends AbstractGateway
                     break;
                 case \Entity\Update::TYPE_DELETE:
                     try {
-                        $this->_soap->call('salesOrderCreditmemoCancel', array($creditmemo->getUniqueId()));
+                        $this->_soap->call('salesOrderCreditmemoCancel', array($uniqueId));
                     }catch (\Exception $exception) {
                         // store as sync issue
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
@@ -415,16 +416,16 @@ class CreditmemoGateway extends AbstractGateway
                     /** @var \Entity\Service\EntityService $entityService */
                     $entityService = $this->getServiceLocator()->get('entityService');
 
-                    $originalOrder = $creditmemo->getOriginalParent();
+                    $originalOrder = $creditmemoEntity->getOriginalParent();
                     if (!$order || $order->getTypeStr() != 'order') {
-                        // Store as sync issue
-                        throw new GatewayException('Creditmemo parent not correctly set for '.$creditmemo->getId());
+                        $message = 'Creditmemo parent not correctly set for '.$creditmemoEntity->getId();
+                        throw new GatewayException($message);
                     }elseif (!$originalOrder || $originalOrder->getTypeStr() != 'order') {
-                        // Store as sync issue
-                        throw new GatewayException('Creditmemo root parent not correctly set for '.$creditmemo->getId());
+                        $message = 'Creditmemo root parent not correctly set for '.$creditmemoEntity->getId();
+                        throw new GatewayException($message);
                     }else{
                         /** @var \Entity\Entity[] $items */
-                        $items = $creditmemo->getItems();
+                        $items = $creditmemoEntity->getItems();
                         if (!count($items)) {
                             $items = $originalOrder->getOrderitems();
                         }
@@ -441,17 +442,14 @@ class CreditmemoGateway extends AbstractGateway
                                     $qty = 0;
                                     break;
                                 default:
-                                    $message = 'Wrong type of the children of creditmemo '.$creditmemo->getUniqueId().'.';
-                                    // store as sync issue
+                                    $message = 'Wrong children type for creditmemo '.$uniqueId.'.';
                                     throw new GatewayException($message);
                             }
 
                             $itemLocalId = $entityService->getLocalId($this->_node->getNodeId(), $orderItemId);
                             if (!$itemLocalId) {
                                 $message = 'Invalid order item local ID for creditmemo item '.$item->getUniqueId()
-                                    .' and creditmemo '.$creditmemo->getUniqueId().' (orderitem '.$item->getData(
-                                        'order_item'
-                                    ).')';
+                                    .' and creditmemo '.$uniqueId.' (orderitem '.$item->getData('order_item').')';
                                 // store as sync issue
                                 throw new GatewayException($message);
                             }
@@ -460,14 +458,14 @@ class CreditmemoGateway extends AbstractGateway
 
                         $creditmemoData = array(
                             'qtys'=>$itemData,
-                            'shipping_amount'=>$creditmemo->getData('shipping_amount', 0),
-                            'adjustment_positive'=>$creditmemo->getData('adjustment_positive', 0),
-                            'adjustment_negative'=>$creditmemo->getData('adjustment_negative', 0)
+                            'shipping_amount'=>$creditmemoEntity->getData('shipping_amount', 0),
+                            'adjustment_positive'=>$creditmemoEntity->getData('adjustment_positive', 0),
+                            'adjustment_negative'=>$creditmemoEntity->getData('adjustment_negative', 0)
                         );
 
                         try {
                             // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
-                            $storeCreditRefundAdjusted = $creditmemo->getData('customer_balance_ref', 0)
+                            $storeCreditRefundAdjusted = $creditmemoEntity->getData('customer_balance_ref', 0)
                                 / $originalOrder->getData('base_to_currency_rate', 1);
                             $soapResult = $this->_soap->call(
                                 'salesOrderCreditmemoCreate',
@@ -501,33 +499,33 @@ class CreditmemoGateway extends AbstractGateway
                             // store as sync issue
                             throw new GatewayException($message);
                         }
-                        $entityService->updateEntityUnique($this->_node->getNodeId(), $creditmemo, $soapResult);
+                        $entityService->updateEntityUnique($this->_node->getNodeId(), $creditmemoEntity, $soapResult);
 
                         try {
-                            $creditmemo = $this->_soap->call('salesOrderCreditmemoInfo', array($soapResult));
+                            $creditmemoData = $this->_soap->call('salesOrderCreditmemoInfo', array($soapResult));
                         }catch (\Exception $exception) {
                             // store as sync issue
                             throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         }
 
-                        if (isset($creditmemo['result'])) {
-                            $creditmemo = $creditmemo['result'];
+                        if (isset($creditmemoData['result'])) {
+                            $creditmemoData = $creditmemoData['result'];
                         }
-                        $localId = $creditmemo['creditmemo_id'];
+                        $localId = $creditmemoData['creditmemo_id'];
 
                         try{
-                            $entityService->unlinkEntity($this->_node->getNodeId(), $creditmemo);
+                            $entityService->unlinkEntity($this->_node->getNodeId(), $creditmemoEntity);
                         }catch (\Exception $exception) {} // Ignore errors
 
-                        $entityService->linkEntity($this->_node->getNodeId(), $creditmemo, $localId);
+                        $entityService->linkEntity($this->_node->getNodeId(), $creditmemoEntity, $localId);
 
                         // Update credit memo item local and unique IDs
-                        foreach ($creditmemo['items'] as $item) {
+                        foreach ($creditmemoData['items'] as $item) {
                             foreach ($items as $itemEntity) {
                                 $isItemSkuAndQtyTheSame = $itemEntity->getData('sku') == $item['sku']
                                     && $itemEntity->getData('qty') == $item['qty'];
                                 if ($isItemSkuAndQtyTheSame) {
-                                    $uniqueId = $creditmemo['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
+                                    $uniqueId = $creditmemoData['increment_id'].'-'.$item['sku'].'-'.$item['item_id'];
                                     $entityService
                                         ->updateEntityUnique($this->_node->getNodeId(), $itemEntity, $uniqueId);
                                     try{
