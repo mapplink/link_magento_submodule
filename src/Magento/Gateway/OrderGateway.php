@@ -194,6 +194,16 @@ class OrderGateway extends AbstractGateway
     }
 
     /**
+     * @param $orderStatus
+     * @return bool $hasOrderStateProcessing
+     */
+    public static function isFinalOrderStatus($orderStatus)
+    {
+        $isFinalOrderStatus = in_array($orderStatus, self::$magentoFinalStatusses);
+        return $isFinalOrderStatus;
+    }
+
+    /**
      * @param Order|int $orderOrStoreId
      * @return int $storeId
      */
@@ -428,8 +438,13 @@ class OrderGateway extends AbstractGateway
                 // ToDo : Should never be the case, exception handling neccessary
             }
         }else{
-//            $data['flagged'] = 1;
-            $this->getServiceLocator()->get('logService')->log(LogService::LEVEL_ERROR, 'mag_o_nocu_err',
+            if ($this->isFinalOrderStatus($data['status'])) {
+                $logLevel = LogService::LEVEL_WARN;
+            }else{
+//                $data['flagged'] = 1;
+                $logLevel = LogService::LEVEL_ERROR;
+            }
+            $this->getServiceLocator()->get('logService')->log($logLevel, 'mag_o_nocu_err',
                 'New order '.$uniqueId.' has no customer assigned.', array('order unique'=>$uniqueId));
         }
 
