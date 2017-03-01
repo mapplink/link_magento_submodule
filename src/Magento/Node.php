@@ -11,6 +11,7 @@ namespace Magento;
 
 use Application\Service\ApplicationConfigService;
 use Log\Service\LogService;
+use Magelink\Exception\NodeException;
 use Node\AbstractNode;
 use Node\AbstractGateway;
 use Node\Entity;
@@ -230,10 +231,30 @@ class Node extends AbstractNode
         $logCode = $this->logTimes('Magento\Node');
 
         $startGetActionsTime = time();
-        $this->getPendingActions();
+        try{
+            $this->getPendingActions();
+        }catch (NodeException $nodeException) {
+            $this->_logService->log(LogService::LEVEL_ERROR,
+                $logCode.'_peac_ex',
+                'Synchronizer error on ->getPendingActions() on the Magento node: '.$nodeException->getMessage(),
+                array($nodeException->getMessage(), $nodeException->getTraceAsString()),
+                array('exception'=>$nodeException, 'node'=>$this)
+            );
+            throw new NodeException($nodeException->getMessage(), $nodeException->getCode(), $nodeException->getPrevious());
+        }
 
         $startGetUpdatesTime = time();
-        $this->getPendingUpdates();
+        try{
+            $this->getPendingUpdates();
+        }catch (NodeException $nodeException) {
+            $this->_logService->log(LogService::LEVEL_ERROR,
+                $logCode.'_peup_ex',
+                'Synchronizer error on ->getPendingActions() on the Magento node: '.$nodeException->getMessage(),
+                array($nodeException->getMessage(), $nodeException->getTraceAsString()),
+                array('exception'=>$nodeException, 'node'=>$this)
+            );
+            throw new NodeException($nodeException->getMessage(), $nodeException->getCode(), $nodeException->getPrevious());
+        }
 
         $getEndTime = time();
 
