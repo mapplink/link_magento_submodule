@@ -16,8 +16,7 @@ use Entity\Wrapper\Creditmemo;
 use Log\Service\LogService;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
-use Node\AbstractNode;
-use Node\Entity;
+
 
 class CreditmemoGateway extends AbstractGateway
 {
@@ -25,13 +24,13 @@ class CreditmemoGateway extends AbstractGateway
     const GATEWAY_ENTITY = 'creditmemo';
     const GATEWAY_ENTITY_CODE = 'cm';
 
+
     /**
      * Initialize the gateway and perform any setup actions required.
      * @param string $entityType
      * @return bool $success
      * @throws GatewayException
      */
-
     protected function _init($entityType)
     {
         $success = parent::_init($entityType);
@@ -45,7 +44,9 @@ class CreditmemoGateway extends AbstractGateway
     }
 
     /**
-     * Retrieve and action all updated records (either from polling, pushed data, or other sources).
+     * Retrieves and actions all updated records (either from polling, pushed data, or other sources).
+     * @throws GatewayException
+     * @throws NodeException
      */
     public function retrieve()
     {
@@ -160,7 +161,7 @@ class CreditmemoGateway extends AbstractGateway
                 if (isset($creditmemo['billing_address_id']) && $creditmemo['billing_address_id']) {
                     $billingAddress = $entityService->loadEntityLocal(
                         $this->_node->getNodeId(), 'address', $storeId, $creditmemo['billing_address_id']);
-                    if($billingAddress && $billingAddress->getId()){
+                    if($billingAddress && $billingAddress->getId()) {
                         $data['billing_address'] = $billingAddress;
                     }else{
                         $data['billing_address'] = NULL;
@@ -170,7 +171,7 @@ class CreditmemoGateway extends AbstractGateway
                 if (isset($creditmemo['shipping_address_id']) && $creditmemo['shipping_address_id']) {
                     $shippingAddress = $entityService->loadEntityLocal(
                         $this->_node->getNodeId(), 'address', $storeId, $creditmemo['shipping_address_id']);
-                    if($shippingAddress && $shippingAddress->getId()){
+                    if($shippingAddress && $shippingAddress->getId()) {
                         $data['shipping_address'] = $shippingAddress;
                     }else{
                         $data['shipping_address'] = NULL;
@@ -186,14 +187,14 @@ class CreditmemoGateway extends AbstractGateway
                 }
 
                 if (isset($creditmemo['comments'])) {
-                    foreach ($creditmemo['comments'] as $commentData){
+                    foreach ($creditmemo['comments'] as $commentData) {
                         $isOrderComment = isset($commentData['comment'])
                             && preg_match('#FOR ORDER: ([0-9]+[a-zA-Z]*)#', $commentData['comment'], $matches);
                         if ($isOrderComment) {
                             $originalOrderUniqueId = $matches[1];
                             $originalOrder = $entityService->loadEntity(
                                 $this->_node->getNodeId(), 'order', $storeId, $originalOrderUniqueId);
-                            if (!$order){
+                            if (!$order) {
                                 $message = 'Comment referenced order '.$originalOrderUniqueId
                                     .' on creditmemo '.$uniqueId.' but could not locate order!';
                                 throw new GatewayException($message);
@@ -266,9 +267,9 @@ class CreditmemoGateway extends AbstractGateway
 
     /**
      * Insert any new comment entries as entity comments
-     * @param array $creditmemoData The full creditmemo data
-     * @param \Entity\Entity $creditmemo The order entity to attach to
-     * @param EntityService $entityService The EntityService
+     * @param array $creditmemoData
+     * @param \Entity\Entity $creditmemo
+     * @param EntityService $entityService
      */
     protected function updateComments(array $creditmemoData, \Entity\Entity $creditmemo, EntityService $entityService)
     {
@@ -297,10 +298,10 @@ class CreditmemoGateway extends AbstractGateway
      * @param array $creditmemo
      * @param Creditmemo $creditmemoEntity
      * @param EntityService $entityService
-     * @param bool $creationMode Whether this is for a newly created credit memo in magelink
+     * @param bool $creationMode - Whether this a is newly created credit memo in Magelink or not
      */
-    protected function createItems(array $creditmemo, $creditmemoEntity, EntityService $entityService, $creationMode){
-
+    protected function createItems(array $creditmemo, $creditmemoEntity, EntityService $entityService, $creationMode)
+    {
         $parentId = $creditmemoEntity->getId();
 
         foreach ($creditmemo['items'] as $item) {
@@ -581,7 +582,7 @@ $success = TRUE;
 
         if (!OrderGateway::isOrderToBeWritten($order)) {
             $success = NULL;
-        }elseif (stripos($creditmemo->getUniqueId(), Creditmemo::TEMPORARY_PREFIX) === 0) {
+        }elseif (strpos($creditmemo->getUniqueId(), Creditmemo::TEMPORARY_PREFIX) === 0) {
             $success = FALSE;
         }else{
             switch ($action->getType()) {
@@ -600,7 +601,7 @@ $success = TRUE;
                             )
                         );
                         $success = TRUE;
-                    }catch( \Exception $exception ){
+                    }catch (\Exception $exception) {
                         // store as sync issue
                         throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
                         $success = FALSE;
