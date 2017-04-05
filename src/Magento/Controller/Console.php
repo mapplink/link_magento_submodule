@@ -1,9 +1,8 @@
 <?php
-
-/* 
- * Copyright (c) 2014 Lero9 Limited
- * All Rights Reserved
- * This software is subject to our terms of trade and any applicable licensing agreements.
+/**
+ * Manages assorted router maintenance tasks
+ * @copyright Copyright (c) 2014 LERO9 Ltd.
+ * @license http://opensource.org/licenses/BSD-3-Clause BSD-3-Clause - Please view LICENSE.md for more information
  */
 
 namespace Magento\Controller;
@@ -12,9 +11,6 @@ use Application\Controller\AbstractConsole;
 use Magelink\Exception\MagelinkException;
 use Zend\ServiceManager\ServiceLocatorAwareInterface;
 
-/**
- * Manages assorted router maintenance tasks
- */
 class Console extends AbstractConsole
 {
 
