@@ -1408,19 +1408,36 @@ class OrderGateway extends AbstractGateway
         );
 
         $originalOrder = $order->getOriginalOrder();
-        try {
-            $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
-                $originalOrder->getUniqueId(),
-                $creditmemoData,
-                $comment,
-                $notify,
-                $sendComment,
-                $creditRefund
-            ));
-        }catch (\Exception $exception) {
-            // store as sync issue
-            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-        }
+        $repeatCall = FALSE;
+
+        do{
+            try{
+                $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
+                    $originalOrder->getUniqueId(),
+                    $creditmemoData,
+                    $comment,
+                    $notify,
+                    $sendComment,
+                    $creditRefund
+                ));
+                $repeatCall = FALSE;
+            }catch(\Exception $exception){
+                $message = $exception->getMessage().($repeatCall ? ' - 2nd call' : '');
+                if (!$repeatCall
+                    && strpos($message, 'SOAP Fault') !== FALSE
+                    && strpos($message, 'salesOrderCreditmemoCreate') !== FALSE
+                    && strpos($message, 'Maximum amount available to refund is') !== FALSE
+                    && $originalOrder->getData('placed_at', '2014-01-01 00:00:00') < '2017-04-04 23:00:00'
+                ) {
+                    $creditmemoData['adjustment_negative'] += $creditRefund;
+                    $repeatCall = !$repeatCall;
+                }else{
+                    $repeatCall = FALSE;
+                    // store as sync issue
+                    throw new GatewayException($message, $exception->getCode(), $exception);
+                }
+            }
+        }while ($repeatCall);
 
         if (is_object($soapResult)) {
             $soapResult = $soapResult->result;

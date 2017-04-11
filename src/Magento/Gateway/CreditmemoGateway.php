@@ -464,25 +464,39 @@ class CreditmemoGateway extends AbstractGateway
                             'adjustment_negative'=>$creditmemoEntity->getData('adjustment_negative', 0)
                         );
 
-                        try {
-                            // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
-                            $storeCreditRefundAdjusted = $creditmemoEntity->getData('customer_balance_ref', 0)
-                                / $originalOrder->getData('base_to_currency_rate', 1);
-                            $soapResult = $this->_soap->call(
-                                'salesOrderCreditmemoCreate',
-                                array(
+                        // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
+                        $storeCreditRefundAdjusted = $creditmemoEntity->getData('customer_balance_ref', 0)
+                            / $originalOrder->getData('base_to_currency_rate', 1);
+                        $repeatCall = FALSE;
+
+                        do{
+                            try{
+                                $soapResult = $this->_soap->call('salesOrderCreditmemoCreate', array(
                                     $originalOrder->getUniqueId(),
                                     $creditmemoData,
                                     '',
                                     FALSE,
                                     FALSE,
                                     $storeCreditRefundAdjusted
-                                )
-                            );
-                        }catch (\Exception $exception) {
-                            // store as sync issue
-                            throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
-                        }
+                                ));
+                                $repeatCall = FALSE;
+                            }catch(\Exception $exception){
+                                $message = $exception->getMessage().($repeatCall ? ' - 2nd call' : '');
+                                if (!$repeatCall
+                                    && strpos($message, 'SOAP Fault') !== FALSE
+                                    && strpos($message, 'salesOrderCreditmemoCreate') !== FALSE
+                                    && strpos($message, 'Maximum amount available to refund is') !== FALSE
+                                    && $originalOrder->getData('placed_at', '2014-01-01 00:00:00') < '2017-04-04 23:00:00'
+                                ) {
+                                    $creditmemoData['adjustment_negative'] += $storeCreditRefundAdjusted;
+                                    $repeatCall = !$repeatCall;
+                                }else{
+                                    $repeatCall = FALSE;
+                                    // store as sync issue
+                                    throw new GatewayException($message, $exception->getCode(), $exception);
+                                }
+                            }
+                        }while ($repeatCall);
 
                         if (is_object($soapResult)) {
                             $soapResult = $soapResult->result;
