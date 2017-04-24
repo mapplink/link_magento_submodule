@@ -11,16 +11,12 @@
 
 namespace Magento\Gateway;
 
-use Entity\Comment;
-use Entity\Service\EntityService;
 use Entity\Wrapper\Order;
 use Entity\Wrapper\Orderitem;
 use Log\Service\LogService;
 use Magelink\Exception\MagelinkException;
 use Magelink\Exception\NodeException;
 use Magelink\Exception\GatewayException;
-use Node\AbstractNode;
-use Zend\Stdlib\ArrayObject;
 
 
 class OrderGateway extends AbstractGateway
@@ -1431,6 +1427,16 @@ class OrderGateway extends AbstractGateway
                 ) {
                     $creditmemoData['adjustment_negative'] += $creditRefund;
                     $repeatCall = !$repeatCall;
+
+                    // ToDo: Reduce log level to info
+                    $this->getServiceLocator()->get('logService')
+                        ->log(LogService::LEVEL_ERROR,
+                            'mag_o_ac_cmxex',
+                            'Autofix for: '.$message,
+                            array('order'=>$originalOrder->getUniqueId(),
+                                'adjustment_negative'=>$creditmemoData['adjustment_negative'],
+                                'creditRefund'=>$creditRefund)
+                        );
                 }else{
                     $repeatCall = FALSE;
                     // store as sync issue

@@ -464,9 +464,9 @@ class CreditmemoGateway extends AbstractGateway
                             'adjustment_negative'=>$creditmemoEntity->getData('adjustment_negative', 0)
                         );
 
+                        $nonCashRefund = $creditmemoEntity->getData('customer_balance_ref', 0);
                         // Adjustment because of the conversion in Mage_Sales_Model_Order_Creditmemo_Api:165 (rounding issues likely)
-                        $storeCreditRefundAdjusted = $creditmemoEntity->getData('customer_balance_ref', 0)
-                            / $originalOrder->getData('base_to_currency_rate', 1);
+                        $storeCreditRefundAdjusted = $nonCashRefund / $originalOrder->getData('base_to_currency_rate', 1);
                         $repeatCall = FALSE;
 
                         do{
@@ -488,8 +488,18 @@ class CreditmemoGateway extends AbstractGateway
                                     && strpos($message, 'Maximum amount available to refund is') !== FALSE
                                     && $originalOrder->getData('placed_at', '2014-01-01 00:00:00') < '2017-04-04 23:00:00'
                                 ) {
-                                    $creditmemoData['adjustment_negative'] += $storeCreditRefundAdjusted;
+                                    $creditmemoData['adjustment_negative'] += $nonCashRefund;
                                     $repeatCall = !$repeatCall;
+
+                                    // ToDo: Reduce log level to info
+                                    $this->getServiceLocator()->get('logService')
+                                        ->log(LogService::LEVEL_ERROR,
+                                            'mag_cm_up_mxex',
+                                            'Autofix for: '.$message,
+                                            array('order'=>$originalOrder->getUniqueId(),
+                                                'adjustment_negative'=>$creditmemoData['adjustment_negative'],
+                                                'non-cash refund'=>$nonCashRefund)
+                                        );
                                 }else{
                                     $repeatCall = FALSE;
                                     // store as sync issue
