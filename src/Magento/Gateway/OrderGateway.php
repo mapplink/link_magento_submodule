@@ -1535,17 +1535,29 @@ class OrderGateway extends AbstractGateway
         }
 
         if ($trackingCode != NULL) {
-            try {
-                $this->_soap->call('salesOrderShipmentAddTrack',
-                    array(
-                        'shipmentIncrementId'=>$soapResult,
-                        'carrier'=>'custom',
-                        'title'=>$order->getData('shipping_method', 'Shipping'),
-                        'trackNumber'=>$trackingCode)
-                );
-            }catch (\Exception $exception) {
-                // store as sync issue
-                throw new GatewayException($exception->getMessage(), $exception->getCode(), $exception);
+            $maxTries = 3;
+            $tries = 0;
+            $message = 'Shipment sucessfully created but adding of traking code failed:';
+            $code = array();
+            do {
+                try {
+                    $this->_soap->call('salesOrderShipmentAddTrack',
+                        array(
+                            'shipmentIncrementId'=>$soapResult,
+                            'carrier'=>'custom',
+                            'title'=>$order->getData('shipping_method', 'Shipping'),
+                            'trackNumber'=>$trackingCode)
+                    );
+                    $success = TRUE;
+                }catch (\Exception $exception) {
+                    $success = FALSE;
+                    $message .= ' '.$exception->getMessage();
+                    $code[] = $exception->getCode();
+                }
+            }while (!$success && $tries++ < $maxTries);
+
+            if (!$success) {
+                throw new GatewayException($message, explode(', ', $code), $exception);
             }
         }
     }
