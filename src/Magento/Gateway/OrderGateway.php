@@ -1557,6 +1557,7 @@ class OrderGateway extends AbstractGateway
             }while (!$success && $tries++ < $maxTries);
 
             if (!$success) {
+                // store as sync issue
                 throw new GatewayException($message, explode(', ', $code), $exception);
             }
         }
